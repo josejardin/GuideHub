@@ -1,0 +1,232 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Faculty Portal - GuideHub</title>
+
+    <script src="https://cdn.tailwindcss.com"></script>
+
+    <script src="https://unpkg.com/lucide@latest"></script>
+
+    <link rel="stylesheet" href="css/custom.css" />
+  </head>
+  <body class="bg-slate-50 text-slate-700 flex flex-col min-h-screen">
+    <div id="navbar-container"></div>
+
+    <main class="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6">
+      <div
+        class="bg-white rounded-xl p-6 border border-slate-200 shadow-xs flex flex-col md:flex-row items-start md:items-center justify-between gap-4"
+      >
+        <div>
+          <div class="flex items-center gap-2">
+            <h1 class="text-xl font-bold text-slate-900 tracking-tight">Faculty Student Referral Portal</h1>
+            <span
+              class="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-medium bg-amber-50 text-amber-800 border border-amber-200"
+            >
+              Early Intervention
+            </span>
+          </div>
+          <p class="text-xs text-slate-500 mt-1" id="faculty-welcome-text">
+            Submit observed student distress, consecutive unexcused absences, or behavioral changes for guidance
+            support.
+          </p>
+        </div>
+
+        <button
+          id="btn-open-referral-modal"
+          class="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-md bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold shadow-xs transition"
+        >
+          <i data-lucide="user-plus" class="w-3.5 h-3.5"></i>
+          <span>Submit Referral</span>
+        </button>
+      </div>
+
+      <div class="bg-white rounded-xl border border-slate-200 shadow-xs overflow-hidden">
+        <div
+          class="p-4 sm:p-5 border-b border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3"
+        >
+          <div>
+            <h2 class="text-sm font-bold text-slate-900 flex items-center gap-2">
+              <i data-lucide="list-checks" class="w-4 h-4 text-slate-500"></i>
+              Referrals & Early Warning Tracker
+            </h2>
+            <p class="text-[11px] text-slate-500 mt-0.5">
+              Real-time status tracking without exposing confidential clinical session notes
+            </p>
+          </div>
+          <div class="flex items-center gap-2">
+            <span class="text-xs text-slate-400 font-medium">Stage:</span>
+            <select
+              id="referral-status-filter"
+              class="text-xs border border-slate-200 rounded-md px-2.5 py-1 bg-slate-50 text-slate-700 font-medium focus:outline-none"
+            >
+              <option value="ALL">All Stages</option>
+              <option value="Referred">Referred</option>
+              <option value="Call Slip Issued">Call Slip Issued</option>
+              <option value="Intake Conducted">Intake Conducted</option>
+              <option value="Closed">Closed</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="overflow-x-auto">
+          <table class="w-full text-left border-collapse text-xs">
+            <thead>
+              <tr
+                class="bg-slate-50/80 border-b border-slate-200 text-slate-500 uppercase tracking-wider font-semibold text-[11px]"
+              >
+                <th class="py-2.5 px-4">Date</th>
+                <th class="py-2.5 px-4">Student</th>
+                <th class="py-2.5 px-4">Course / Subject</th>
+                <th class="py-2.5 px-4">Reason Category</th>
+                <th class="py-2.5 px-4">Stage</th>
+                <th class="py-2.5 px-4 text-right">Action</th>
+              </tr>
+            </thead>
+            <tbody id="referrals-table-body" class="divide-y divide-slate-100">
+              <tr>
+                <td colspan="6" class="p-8 text-center text-slate-400 text-xs">Loading submitted referrals...</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </main>
+
+    <div id="referral-modal" class="fixed inset-0 z-50 flex items-center justify-center p-4 modal-backdrop hidden">
+      <div
+        class="bg-white rounded-xl max-w-lg w-full p-6 shadow-lg border border-slate-200 relative max-h-[92vh] flex flex-col"
+      >
+        <div class="flex items-center justify-between pb-3 border-b border-slate-200">
+          <div>
+            <h3 class="text-sm font-bold text-slate-900">Submit Student Referral</h3>
+            <p class="text-[11px] text-slate-500">Early intervention notification to Guidance Office</p>
+          </div>
+          <button id="btn-close-referral" class="text-slate-400 hover:text-slate-600">
+            <i data-lucide="x" class="w-4 h-4"></i>
+          </button>
+        </div>
+
+        <form id="referral-form" class="flex-1 overflow-y-auto py-3 space-y-3 text-xs">
+          <div class="grid grid-cols-2 gap-3">
+            <div>
+              <label class="block font-semibold text-slate-700 mb-1">Student Name</label>
+              <input
+                type="text"
+                id="ref-student-name"
+                required
+                placeholder="e.g. Maria Santos"
+                class="w-full px-2.5 py-1.5 border border-slate-300 rounded focus:border-slate-900 focus:outline-none"
+              />
+            </div>
+            <div>
+              <label class="block font-semibold text-slate-700 mb-1">Student ID Number</label>
+              <input
+                type="text"
+                id="ref-student-number"
+                required
+                inputmode="numeric"
+                pattern="[0-9-]*"
+                oninput="this.value = this.value.replace(/[^0-9-]/g, '')"
+                placeholder="2023-55019"
+                class="w-full px-2.5 py-1.5 border border-slate-300 rounded focus:border-slate-900 focus:outline-none"
+              />
+            </div>
+          </div>
+
+          <div class="grid grid-cols-2 gap-3">
+            <div>
+              <label class="block font-semibold text-slate-700 mb-1">Strand / Degree Program</label>
+              <input
+                type="text"
+                id="ref-student-program"
+                required
+                placeholder="e.g. SHS STEM / BS Psychology"
+                class="w-full px-2.5 py-1.5 border border-slate-300 rounded focus:border-slate-900 focus:outline-none"
+              />
+            </div>
+            <div>
+              <label class="block font-semibold text-slate-700 mb-1">Course / Subject Code</label>
+              <input
+                type="text"
+                id="ref-subject-course"
+                required
+                placeholder="CCIT-101"
+                class="w-full px-2.5 py-1.5 border border-slate-300 rounded focus:border-slate-900 focus:outline-none"
+              />
+            </div>
+          </div>
+
+          <div>
+            <label class="block font-semibold text-slate-700 mb-1">Primary Observed Reason</label>
+            <select
+              id="ref-reason-category"
+              required
+              class="w-full px-2.5 py-1.5 border border-slate-300 rounded focus:border-slate-900 focus:outline-none bg-white"
+            >
+              <option value="Excessive Absences / Ghosting">Excessive Absences / Consecutive Ghosting</option>
+              <option value="Academic Distress">Severe Academic Distress / Sudden Grade Drop</option>
+              <option value="Behavioral Concern">Behavioral Concern / Withdrawn or Agitated Demeanor</option>
+              <option value="Suspected Crisis / Safety Concern">Suspected Emotional Crisis / Safety Concern</option>
+            </select>
+          </div>
+
+          <div>
+            <label class="block font-semibold text-slate-700 mb-1">Behavioral Observations</label>
+            <textarea
+              id="ref-observations"
+              required
+              rows="3"
+              placeholder="Specific dates, missed classes, or observable distress signs..."
+              class="w-full px-2.5 py-1.5 border border-slate-300 rounded focus:border-slate-900 focus:outline-none"
+            ></textarea>
+          </div>
+
+          <div class="bg-slate-50 border border-slate-200 rounded p-2.5 text-[11px] text-slate-600">
+            The Guidance Office will issue an official Call Slip to invite the student for an intake consultation.
+          </div>
+
+          <div class="pt-2 flex items-center justify-end gap-2">
+            <button
+              type="button"
+              id="btn-cancel-referral"
+              class="px-3 py-1.5 rounded bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-medium"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              id="btn-submit-referral"
+              class="px-3.5 py-1.5 rounded bg-slate-900 hover:bg-slate-800 text-white font-semibold text-xs shadow-xs transition"
+            >
+              Submit Referral
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <div id="view-referral-modal" class="fixed inset-0 z-50 flex items-center justify-center p-4 modal-backdrop hidden">
+      <div class="bg-white rounded-xl max-w-md w-full p-6 shadow-lg border border-slate-200 relative">
+        <button id="btn-close-view-referral" class="absolute top-4 right-4 text-slate-400 hover:text-slate-600">
+          <i data-lucide="x" class="w-4 h-4"></i>
+        </button>
+
+        <div class="flex items-center gap-2.5 mb-3">
+          <div class="w-7 h-7 rounded bg-slate-100 text-slate-800 flex items-center justify-center">
+            <i data-lucide="file-text" class="w-4 h-4"></i>
+          </div>
+          <div>
+            <h3 class="text-sm font-bold text-slate-900">Referral Details & Milestone Status</h3>
+            <p class="text-[11px] text-slate-500">Guidance Office tracking</p>
+          </div>
+        </div>
+
+        <div id="view-referral-content" class="space-y-3 text-xs text-slate-700"></div>
+      </div>
+    </div>
+
+    <script type="module" src="js/faculty.js"></script>
+  </body>
+</html>

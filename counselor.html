@@ -1,0 +1,504 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Counselor Workspace - GuideHub</title>
+
+    <script src="https://cdn.tailwindcss.com"></script>
+
+    <script src="https://unpkg.com/lucide@latest"></script>
+
+    <link rel="stylesheet" href="css/custom.css" />
+  </head>
+  <body class="bg-slate-50 text-slate-700 flex flex-col min-h-screen">
+    <div id="navbar-container" class="no-print"></div>
+
+    <main class="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6 no-print">
+      <div
+        class="bg-white rounded-xl p-6 border border-slate-200 shadow-xs flex flex-col md:flex-row items-start md:items-center justify-between gap-4"
+      >
+        <div>
+          <div class="flex items-center gap-2">
+            <h1 class="text-xl font-bold text-slate-900 tracking-tight">Counselor Clinical Workspace</h1>
+            <span
+              class="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-medium bg-emerald-50 text-emerald-800 border border-emerald-200"
+            >
+              Registered Counselor
+            </span>
+          </div>
+          <p class="text-xs text-slate-500 mt-1" id="counselor-welcome-text">
+            Daily agenda management, live triage, referral call slips, and confidential clinical case files.
+          </p>
+        </div>
+
+        <button
+          id="btn-open-offline-intake"
+          class="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-md bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold shadow-xs transition"
+        >
+          <i data-lucide="user-plus" class="w-3.5 h-3.5"></i>
+          <span>Direct Walk-In Intake</span>
+        </button>
+      </div>
+
+      <div class="bg-white rounded-xl border border-slate-200 shadow-xs overflow-hidden">
+        <div class="flex border-b border-slate-200 overflow-x-auto bg-slate-50/50 px-2 pt-2">
+          <button
+            data-tab="agenda"
+            class="tab-btn flex items-center gap-1.5 px-4 py-2.5 text-xs font-bold border-b-2 border-slate-900 text-slate-900 whitespace-nowrap transition"
+          >
+            <i data-lucide="calendar" class="w-3.5 h-3.5"></i>
+            <span>Today's Agenda</span>
+            <span
+              id="badge-agenda-count"
+              class="px-1.5 py-0.2 rounded-full text-[10px] bg-slate-200 text-slate-800 font-bold"
+            >
+              0
+            </span>
+          </button>
+
+          <button
+            data-tab="walkin"
+            class="tab-btn flex items-center gap-1.5 px-4 py-2.5 text-xs font-medium border-b-2 border-transparent text-slate-500 hover:text-slate-900 whitespace-nowrap transition"
+          >
+            <i data-lucide="ticket" class="w-3.5 h-3.5"></i>
+            <span>Live Walk-In Queue</span>
+            <span
+              id="badge-walkin-count"
+              class="px-1.5 py-0.2 rounded-full text-[10px] bg-amber-100 text-amber-800 font-bold"
+            >
+              0
+            </span>
+          </button>
+
+          <button
+            data-tab="referrals"
+            class="tab-btn flex items-center gap-1.5 px-4 py-2.5 text-xs font-medium border-b-2 border-transparent text-slate-500 hover:text-slate-900 whitespace-nowrap transition"
+          >
+            <i data-lucide="inbox" class="w-3.5 h-3.5"></i>
+            <span>Faculty Referral Inbox</span>
+            <span
+              id="badge-referral-count"
+              class="px-1.5 py-0.2 rounded-full text-[10px] bg-purple-100 text-purple-800 font-bold"
+            >
+              0
+            </span>
+          </button>
+
+          <button
+            data-tab="cases"
+            class="tab-btn flex items-center gap-1.5 px-4 py-2.5 text-xs font-medium border-b-2 border-transparent text-slate-500 hover:text-slate-900 whitespace-nowrap transition"
+          >
+            <i data-lucide="folder-lock" class="w-3.5 h-3.5"></i>
+            <span>Active Cases & Notes</span>
+          </button>
+
+          <button
+            data-tab="availability"
+            class="tab-btn flex items-center gap-1.5 px-4 py-2.5 text-xs font-medium border-b-2 border-transparent text-slate-500 hover:text-slate-900 whitespace-nowrap transition"
+          >
+            <i data-lucide="clock" class="w-3.5 h-3.5"></i>
+            <span>Availability Schedule</span>
+          </button>
+        </div>
+
+        <div class="p-6">
+          <div id="tab-content-agenda" class="space-y-4">
+            <div class="flex flex-col md:flex-row md:items-center justify-between gap-3 pb-3 border-b border-slate-100">
+              <div>
+                <h2 class="text-sm font-bold text-slate-900">Scheduled Consultations</h2>
+                <p class="text-[11px] text-slate-500">Manage student appointments and review pending requests</p>
+              </div>
+
+              <div class="flex flex-wrap items-center gap-2">
+                <div class="inline-flex rounded-lg bg-slate-100 p-0.5 text-xs font-medium border border-slate-200">
+                  <button
+                    type="button"
+                    id="btn-view-date"
+                    class="px-3 py-1 rounded-md bg-white text-[#00205B] font-bold shadow-xs transition"
+                  >
+                    Selected Date
+                  </button>
+                  <button
+                    type="button"
+                    id="btn-view-pending"
+                    class="px-3 py-1 rounded-md text-slate-600 hover:text-slate-900 transition flex items-center gap-1.5"
+                  >
+                    <span>All Pending</span>
+                    <span
+                      id="badge-all-pending-count"
+                      class="px-1.5 py-0.2 rounded-full text-[10px] bg-amber-100 text-amber-800 font-bold"
+                    >
+                      0
+                    </span>
+                  </button>
+                </div>
+
+                <div id="agenda-date-wrapper" class="flex items-center gap-1.5">
+                  <label class="text-xs text-slate-400 font-medium">Date:</label>
+                  <input
+                    type="date"
+                    id="agenda-date-picker"
+                    class="text-xs border border-slate-200 rounded-md px-2.5 py-1 bg-white font-medium focus:border-[#00205B] focus:outline-none shadow-2xs"
+                  />
+                </div>
+              </div>
+            </div>
+
+            <div
+              id="agenda-list"
+              class="divide-y divide-slate-100 border border-slate-200 rounded-lg overflow-hidden"
+            ></div>
+          </div>
+
+          <div id="tab-content-walkin" class="space-y-5 hidden">
+            <div class="flex items-center justify-between pb-3 border-b border-slate-100">
+              <div>
+                <h2 class="text-sm font-bold text-slate-900">Live Walk-In Triage & Caller</h2>
+                <p class="text-[11px] text-slate-500">Call lobby tickets and conduct intake</p>
+              </div>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div class="bg-slate-50 p-4 rounded-lg border border-slate-200">
+                <div class="flex items-center justify-between mb-3">
+                  <span class="text-[11px] font-bold uppercase tracking-wider text-slate-700 flex items-center gap-1.5">
+                    <span class="w-2 h-2 rounded-full bg-amber-400"></span>
+                    Waiting Lobby
+                  </span>
+                  <span id="count-waiting" class="text-xs font-mono font-bold text-slate-500">0</span>
+                </div>
+                <div id="queue-list-waiting" class="space-y-2"></div>
+              </div>
+
+              <div class="bg-emerald-50/40 p-4 rounded-lg border border-emerald-200/80">
+                <div class="flex items-center justify-between mb-3">
+                  <span
+                    class="text-[11px] font-bold uppercase tracking-wider text-emerald-800 flex items-center gap-1.5"
+                  >
+                    <span class="w-2 h-2 rounded-full bg-emerald-500"></span>
+                    Now Calling
+                  </span>
+                  <span id="count-calling" class="text-xs font-mono font-bold text-emerald-700">0</span>
+                </div>
+                <div id="queue-list-calling" class="space-y-2"></div>
+              </div>
+
+              <div class="bg-slate-50 p-4 rounded-lg border border-slate-200">
+                <div class="flex items-center justify-between mb-3">
+                  <span class="text-[11px] font-bold uppercase tracking-wider text-slate-700 flex items-center gap-1.5">
+                    <span class="w-2 h-2 rounded-full bg-slate-700"></span>
+                    In Consultation
+                  </span>
+                  <span id="count-insession" class="text-xs font-mono font-bold text-slate-700">0</span>
+                </div>
+                <div id="queue-list-insession" class="space-y-2"></div>
+              </div>
+            </div>
+          </div>
+
+          <div id="tab-content-referrals" class="space-y-4 hidden">
+            <div class="flex items-center justify-between pb-3 border-b border-slate-100">
+              <div>
+                <h2 class="text-sm font-bold text-slate-900">Faculty Referrals & Call Slip Issuance</h2>
+                <p class="text-[11px] text-slate-500">
+                  Evaluate referrals, schedule consultation dates, and issue official slips
+                </p>
+              </div>
+            </div>
+
+            <div class="overflow-x-auto border border-slate-200 rounded-lg">
+              <table class="w-full text-left border-collapse text-xs">
+                <thead>
+                  <tr
+                    class="bg-slate-50/80 border-b border-slate-200 text-slate-500 uppercase tracking-wider font-semibold text-[11px]"
+                  >
+                    <th class="py-2.5 px-4">Date</th>
+                    <th class="py-2.5 px-4">Student</th>
+                    <th class="py-2.5 px-4">Referred By</th>
+                    <th class="py-2.5 px-4">Category</th>
+                    <th class="py-2.5 px-4">Status</th>
+                    <th class="py-2.5 px-4 text-right">Actions</th>
+                  </tr>
+                </thead>
+                <tbody id="counselor-referrals-tbody" class="divide-y divide-slate-100"></tbody>
+              </table>
+            </div>
+          </div>
+
+          <div id="tab-content-cases" class="space-y-5 hidden">
+            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-100">
+              <div>
+                <h2 class="text-sm font-bold text-slate-900 flex items-center gap-1.5">
+                  <i data-lucide="lock" class="w-3.5 h-3.5 text-emerald-600"></i>
+                  Confidential Case Management & Clinical Notes
+                </h2>
+                <p class="text-[11px] text-slate-500">
+                  Strictly protected under RA 9258 (Inaccessible to Faculty & Students)
+                </p>
+              </div>
+              <div class="relative w-full sm:w-60">
+                <i data-lucide="search" class="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-2"></i>
+                <input
+                  type="text"
+                  id="case-search-input"
+                  placeholder="Search case folder..."
+                  class="w-full pl-8 pr-2.5 py-1 text-xs border border-slate-200 rounded-md focus:outline-none focus:border-slate-900"
+                />
+              </div>
+            </div>
+
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-5">
+              <div class="border border-slate-200 rounded-lg overflow-hidden bg-white">
+                <div class="p-2.5 bg-slate-50 border-b border-slate-200 text-xs font-bold text-slate-700">
+                  Student Case Directory
+                </div>
+                <div id="case-folder-list" class="divide-y divide-slate-100 max-h-[500px] overflow-y-auto"></div>
+              </div>
+
+              <div
+                id="case-detail-panel"
+                class="lg:col-span-2 border border-slate-200 rounded-lg p-5 bg-white space-y-5"
+              >
+                <div class="p-8 text-center text-slate-400 text-xs">
+                  Select a student case folder to view clinical session notes and crisis status.
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div id="tab-content-availability" class="space-y-4 hidden">
+            <div class="flex items-center justify-between pb-3 border-b border-slate-100">
+              <div>
+                <h2 class="text-sm font-bold text-slate-900">Weekly Slot Availability Manager</h2>
+                <p class="text-[11px] text-slate-500">
+                  Toggle consultation availability (Mon - Fri, 8:00 AM - 5:00 PM)
+                </p>
+              </div>
+            </div>
+
+            <div class="bg-slate-50 p-5 rounded-lg border border-slate-200 space-y-3">
+              <p class="text-xs text-slate-600">
+                Click any time slot to block or unblock student appointment bookings:
+              </p>
+              <div class="grid grid-cols-2 sm:grid-cols-4 gap-2" id="availability-slots-grid"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </main>
+
+    <div
+      id="callslip-modal"
+      class="fixed inset-0 z-50 flex items-center justify-center p-4 modal-backdrop hidden no-print"
+    >
+      <div class="bg-white rounded-xl max-w-md w-full p-6 shadow-lg border border-slate-200 relative">
+        <div class="flex items-center justify-between pb-3 border-b border-slate-200 mb-3">
+          <h3 class="text-sm font-bold text-slate-900">Issue Institutional Call Slip</h3>
+          <button id="btn-close-callslip" class="text-slate-400 hover:text-slate-600">
+            <i data-lucide="x" class="w-4 h-4"></i>
+          </button>
+        </div>
+
+        <form id="callslip-form" class="space-y-3 text-xs">
+          <div>
+            <label class="block font-semibold text-slate-700 mb-1">Student</label>
+            <input
+              type="text"
+              id="cs-student"
+              readonly
+              class="w-full px-2.5 py-1.5 bg-slate-50 border border-slate-200 rounded font-bold text-slate-800"
+            />
+          </div>
+
+          <div class="grid grid-cols-2 gap-2">
+            <div>
+              <label class="block font-semibold text-slate-700 mb-1">Consultation Date</label>
+              <input
+                type="date"
+                id="cs-date"
+                required
+                class="w-full px-2.5 py-1.5 border border-slate-300 rounded focus:border-slate-900 focus:outline-none"
+              />
+            </div>
+            <div>
+              <label class="block font-semibold text-slate-700 mb-1">Time</label>
+              <select
+                id="cs-time"
+                class="w-full px-2.5 py-1.5 border border-slate-300 rounded focus:border-slate-900 focus:outline-none bg-white"
+              >
+                <option value="09:00 AM">09:00 AM</option>
+                <option value="10:00 AM">10:00 AM</option>
+                <option value="11:00 AM">11:00 AM</option>
+                <option value="01:00 PM">01:00 PM</option>
+                <option value="02:00 PM">02:00 PM</option>
+                <option value="03:00 PM">03:00 PM</option>
+                <option value="04:00 PM">04:00 PM</option>
+              </select>
+            </div>
+          </div>
+
+          <div>
+            <label class="block font-semibold text-slate-700 mb-1">Counselor</label>
+            <input
+              type="text"
+              id="cs-counselor"
+              readonly
+              class="w-full px-2.5 py-1.5 bg-slate-50 border border-slate-200 rounded text-slate-700"
+            />
+          </div>
+
+          <div class="pt-2 flex items-center justify-end gap-2">
+            <button
+              type="button"
+              id="btn-print-callslip-preview"
+              class="px-3.5 py-1.5 rounded bg-slate-900 hover:bg-slate-800 text-white font-semibold shadow-xs transition flex items-center gap-1.5"
+            >
+              <i data-lucide="printer" class="w-3.5 h-3.5"></i>
+              <span>Issue & Print Call Slip</span>
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <div
+      id="offline-intake-modal"
+      class="fixed inset-0 z-50 flex items-center justify-center p-4 modal-backdrop hidden no-print"
+    >
+      <div class="bg-white rounded-xl max-w-md w-full p-6 shadow-lg border border-slate-200 relative">
+        <div class="flex items-center justify-between pb-3 border-b border-slate-200 mb-3">
+          <div>
+            <h3 class="text-sm font-bold text-slate-900">Direct Walk-In Intake</h3>
+            <p class="text-[11px] text-slate-500">For students arriving without digital device access</p>
+          </div>
+          <button id="btn-close-offline-intake" class="text-slate-400 hover:text-slate-600">
+            <i data-lucide="x" class="w-4 h-4"></i>
+          </button>
+        </div>
+
+        <form id="offline-intake-form" class="space-y-3 text-xs">
+          <div>
+            <label class="block font-semibold text-slate-700 mb-1">Student Full Name</label>
+            <input
+              type="text"
+              id="off-name"
+              required
+              placeholder="e.g. Kenneth Diaz"
+              class="w-full px-2.5 py-1.5 border border-slate-300 rounded focus:border-slate-900 focus:outline-none"
+            />
+          </div>
+
+          <div class="grid grid-cols-2 gap-2">
+            <div>
+              <label class="block font-semibold text-slate-700 mb-1">Student ID Number</label>
+              <input
+                type="text"
+                id="off-num"
+                required
+                placeholder="2024-99812"
+                class="w-full px-2.5 py-1.5 border border-slate-300 rounded focus:border-slate-900 focus:outline-none"
+              />
+            </div>
+            <div>
+              <label class="block font-semibold text-slate-700 mb-1">Program</label>
+              <input
+                type="text"
+                id="off-program"
+                required
+                placeholder="BS Criminology"
+                class="w-full px-2.5 py-1.5 border border-slate-300 rounded focus:border-slate-900 focus:outline-none"
+              />
+            </div>
+          </div>
+
+          <div>
+            <label class="block font-semibold text-slate-700 mb-1">Intake Reason</label>
+            <select
+              id="off-concern"
+              class="w-full px-2.5 py-1.5 border border-slate-300 rounded focus:border-slate-900 focus:outline-none bg-white"
+            >
+              <option value="Urgent Distress / Panic Episode">Urgent Distress / Panic Episode</option>
+              <option value="Academic Overload / Exam Distress">Academic Overload / Exam Distress</option>
+              <option value="Personal / Family Conflict">Personal / Family Conflict</option>
+              <option value="General Guidance Consultation">General Guidance Consultation</option>
+            </select>
+          </div>
+
+          <div class="pt-2 flex justify-end">
+            <button
+              type="submit"
+              class="w-full py-2 rounded bg-slate-900 hover:bg-slate-800 text-white font-semibold shadow-xs transition"
+            >
+              Register & Begin Intake
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <div id="printable-call-slip" class="hidden">
+      <div class="max-w-xl mx-auto border-2 border-slate-900 p-8 font-serif text-slate-900">
+        <div class="text-center border-b-2 border-slate-900 pb-3 mb-4">
+          <h2 class="text-base font-bold uppercase tracking-wider">Guidance & Counseling Center</h2>
+          <p class="text-xs italic text-slate-600">Office of Student Affairs</p>
+          <div class="inline-block mt-2 px-3 py-0.5 border border-slate-900 font-bold text-xs uppercase tracking-wider">
+            Official Guidance Call Slip
+          </div>
+        </div>
+
+        <div class="space-y-3 text-xs leading-relaxed">
+          <div class="flex justify-between">
+            <span>
+              <strong>Date Issued:</strong>
+              <span id="print-cs-issued-date">August 30, 2026</span>
+            </span>
+            <span>
+              <strong>Slip No.:</strong>
+              <span id="print-cs-slip-id">CS-2026-081</span>
+            </span>
+          </div>
+
+          <div class="bg-slate-50 p-3 border border-slate-300 rounded space-y-1.5">
+            <p><strong>To the Faculty / Subject Instructor:</strong></p>
+            <p class="text-[11px]">
+              Please excuse the student named below to report to the Guidance and Counseling Center for a scheduled
+              consultation:
+            </p>
+            <div class="grid grid-cols-2 gap-1.5 pt-1 text-[11px]">
+              <div>
+                <strong>Student:</strong>
+                <span id="print-cs-name">Student Name</span>
+              </div>
+              <div>
+                <strong>ID:</strong>
+                <span id="print-cs-id">2024-00000</span>
+              </div>
+              <div>
+                <strong>Program:</strong>
+                <span id="print-cs-program">BS IT</span>
+              </div>
+              <div>
+                <strong>Scheduled Time:</strong>
+                <span id="print-cs-time">10:00 AM</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="pt-4 grid grid-cols-2 gap-6 text-[11px]">
+            <div class="border-t border-slate-900 pt-1 text-center">
+              <p class="font-bold" id="print-cs-counselor-sig">Dr. Patricia Mendoza, RGC</p>
+              <p class="text-slate-500">Registered Guidance Counselor</p>
+            </div>
+            <div class="border-t border-slate-900 pt-1 text-center">
+              <p class="font-bold">Subject Instructor Signature</p>
+              <p class="text-slate-500">Acknowledged / Excused</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <script type="module" src="js/counselor.js"></script>
+  </body>
+</html>

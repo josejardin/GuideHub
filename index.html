@@ -1,0 +1,353 @@
+<!doctype html>
+<html lang="en" class="scroll-smooth">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>GuideHub - NU Fairview Guidance & Counseling Office</title>
+
+    <script src="https://cdn.tailwindcss.com"></script>
+
+    <script src="https://unpkg.com/lucide@latest"></script>
+
+    <link rel="stylesheet" href="css/custom.css" />
+
+    <script>
+      tailwind.config = {
+        theme: {
+          extend: {
+            fontFamily: {
+              sans: ['Inter', 'sans-serif']
+            },
+            colors: {
+              nu: {
+                navy: '#00205B',
+                'navy-dark': '#0A192F',
+                gold: '#F5B800',
+                'gold-hover': '#D99B00'
+              }
+            }
+          }
+        }
+      };
+    </script>
+  </head>
+  <body class="bg-slate-50 text-slate-700 flex flex-col min-h-screen">
+    <nav class="bg-[#00205B] text-white border-b border-white/10 sticky top-0 z-40 shadow-sm">
+      <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div class="flex items-center justify-between h-16">
+          <a href="index.html" class="flex items-center space-x-3 group">
+            <img
+              src="assets/nu-logo.png"
+              alt="National University"
+              class="h-11 w-auto object-contain flex-shrink-0 drop-shadow-sm group-hover:scale-105 transition transform"
+            />
+            <div>
+              <div class="flex items-center gap-1.5">
+                <span class="text-base font-bold text-white tracking-tight leading-tight">GuideHub</span>
+                <span class="text-[9px] bg-[#F5B800] text-[#00205B] font-extrabold px-1.5 py-0.2 rounded">
+                  FAIRVIEW
+                </span>
+              </div>
+              <span class="text-[10px] text-slate-300 font-medium">Guidance & Counseling Center</span>
+            </div>
+          </a>
+
+          <div class="hidden md:flex items-center space-x-8 text-xs font-medium text-slate-200">
+            <a href="#about" class="hover:text-[#F5B800] transition">About Us</a>
+            <a href="#services" class="hover:text-[#F5B800] transition">Our Services</a>
+            <a href="#confidentiality" class="hover:text-[#F5B800] transition">Confidentiality & Care</a>
+            <a href="#hours" class="hover:text-[#F5B800] transition">Office Hours</a>
+          </div>
+
+          <div class="flex items-center space-x-2.5">
+            <a
+              href="login.html"
+              id="nav-login-btn"
+              class="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-medium text-white hover:bg-white/10 transition"
+            >
+              <i data-lucide="log-in" class="w-3.5 h-3.5"></i>
+              <span>Sign In</span>
+            </a>
+
+            <a
+              href="signup.html"
+              id="nav-signup-btn"
+              class="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-bold text-[#00205B] bg-[#F5B800] hover:bg-[#D99B00] shadow-xs transition transform active:scale-95"
+            >
+              <i data-lucide="user-plus" class="w-3.5 h-3.5"></i>
+              <span>Create Account</span>
+            </a>
+          </div>
+        </div>
+      </div>
+    </nav>
+
+    <header class="bg-white border-b border-slate-200 py-16 sm:py-24 px-4 sm:px-6 lg:px-8 relative overflow-hidden">
+      <div class="max-w-4xl mx-auto text-center relative z-10">
+        <div
+          class="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full text-xs font-semibold bg-blue-50 text-[#00205B] border border-blue-200 mb-6"
+        >
+          <span>National University Fairview Guidance Services</span>
+        </div>
+
+        <h1 class="text-3xl sm:text-5xl font-extrabold tracking-tight text-slate-900 leading-tight">
+          You don't have to carry it all alone.
+        </h1>
+
+        <p class="mt-4 text-sm sm:text-base text-slate-600 max-w-2xl mx-auto leading-relaxed">
+          Whether you're in Senior High School (SHS) or College, facing academic stress, career uncertainty, or personal
+          hurdles, our licensed guidance counselors provide a confidential, safe space to help you thrive.
+        </p>
+
+        <div class="mt-8 flex flex-col sm:flex-row items-center justify-center gap-3.5">
+          <a
+            href="login.html"
+            class="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-6 py-3.5 rounded-xl bg-[#00205B] hover:bg-[#0A192F] text-white font-semibold text-xs shadow-md transition transform active:scale-95"
+          >
+            <i data-lucide="calendar-plus" class="w-4 h-4 text-[#F5B800]"></i>
+            <span>Schedule a Counseling Session</span>
+          </a>
+
+          <a
+            href="login.html"
+            class="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-6 py-3.5 rounded-xl bg-white hover:bg-slate-50 text-slate-800 border border-slate-300 font-semibold text-xs shadow-xs transition transform active:scale-95"
+          >
+            <i data-lucide="clock" class="w-4 h-4 text-[#00205B]"></i>
+            <span>Need Immediate Support? Walk-In Queue</span>
+          </a>
+        </div>
+      </div>
+    </header>
+
+    <section class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 -mt-6 relative z-20">
+      <div
+        class="bg-gradient-to-r from-[#00205B] to-[#0A192F] text-white rounded-2xl p-6 sm:p-8 shadow-md border border-white/10 flex items-start gap-4"
+      >
+        <div
+          class="w-10 h-10 rounded-xl bg-[#F5B800] text-[#00205B] flex items-center justify-center flex-shrink-0 font-bold"
+        >
+          <i data-lucide="heart" class="w-5 h-5"></i>
+        </div>
+        <div>
+          <p class="text-xs sm:text-sm font-medium text-slate-200 leading-relaxed italic">
+            "Taking care of your mental well-being is not a sign of weakness—it is a vital part of your academic journey
+            and growth."
+          </p>
+          <span class="text-[11px] text-[#F5B800] font-semibold mt-2 block tracking-wider uppercase">
+            — NU Fairview Guidance and Counseling Team
+          </span>
+        </div>
+      </div>
+    </section>
+
+    <main class="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-16 space-y-20">
+      <section id="services" class="space-y-8">
+        <div class="text-center max-w-2xl mx-auto">
+          <span class="text-xs font-bold uppercase tracking-wider text-[#00205B]">Dedicated Support</span>
+          <h2 class="text-2xl font-bold text-slate-900 mt-1 tracking-tight">Our Guidance Services</h2>
+          <p class="text-xs sm:text-sm text-slate-500 mt-2">
+            Comprehensive, client-centered guidance programs tailored to assist every Senior High and College student's
+            academic and emotional well-being.
+          </p>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+          <div
+            class="bg-white p-7 rounded-2xl border border-slate-200 shadow-xs flex flex-col justify-between hover:border-[#00205B]/40 transition"
+          >
+            <div>
+              <div class="w-10 h-10 rounded-xl bg-blue-50 text-[#00205B] flex items-center justify-center mb-4">
+                <i data-lucide="graduation-cap" class="w-5 h-5"></i>
+              </div>
+              <h3 class="text-sm font-bold text-slate-900">Academic & Career Guidance</h3>
+              <p class="text-xs text-slate-600 mt-2 leading-relaxed">
+                Navigate SHS strand selection, college course challenges, shifting decisions, study habits, and exam
+                anxiety with structured counselor support and developmental inventories.
+              </p>
+            </div>
+            <div
+              class="mt-6 pt-4 border-t border-slate-100 flex items-center justify-between text-[11px] text-slate-500 font-medium"
+            >
+              <span>SHS & Higher Education</span>
+              <span class="text-[#00205B] font-semibold">Appointment-Based</span>
+            </div>
+          </div>
+
+          <div
+            class="bg-white p-7 rounded-2xl border border-slate-200 shadow-xs flex flex-col justify-between hover:border-[#00205B]/40 transition"
+          >
+            <div>
+              <div class="w-10 h-10 rounded-xl bg-purple-50 text-purple-700 flex items-center justify-center mb-4">
+                <i data-lucide="message-circle-heart" class="w-5 h-5"></i>
+              </div>
+              <h3 class="text-sm font-bold text-slate-900">Personal & Emotional Counseling</h3>
+              <p class="text-xs text-slate-600 mt-2 leading-relaxed">
+                One-on-one confidential sessions to talk through personal distress, interpersonal relationships, family
+                concerns, and healthy stress management.
+              </p>
+            </div>
+            <div
+              class="mt-6 pt-4 border-t border-slate-100 flex items-center justify-between text-[11px] text-slate-500 font-medium"
+            >
+              <span>Private & Empathetic</span>
+              <span class="text-[#00205B] font-semibold">1-on-1 Sessions</span>
+            </div>
+          </div>
+
+          <div
+            class="bg-white p-7 rounded-2xl border border-slate-200 shadow-xs flex flex-col justify-between hover:border-[#00205B]/40 transition"
+          >
+            <div>
+              <div class="w-10 h-10 rounded-xl bg-amber-50 text-amber-700 flex items-center justify-center mb-4">
+                <i data-lucide="zap" class="w-5 h-5"></i>
+              </div>
+              <h3 class="text-sm font-bold text-slate-900">Walk-In & Crisis Care</h3>
+              <p class="text-xs text-slate-600 mt-2 leading-relaxed">
+                In immediate distress or need timely advice? Visit our office during working hours for live walk-in
+                queue triage and direct counselor intervention.
+              </p>
+            </div>
+            <div
+              class="mt-6 pt-4 border-t border-slate-100 flex items-center justify-between text-[11px] text-slate-500 font-medium"
+            >
+              <span>Immediate Assistance</span>
+              <span class="text-amber-800 font-semibold">No Advance Booking</span>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section
+        id="confidentiality"
+        class="bg-white rounded-2xl border border-slate-200 p-8 sm:p-10 shadow-xs space-y-6"
+      >
+        <div class="flex items-start gap-4">
+          <div class="w-12 h-12 rounded-xl bg-blue-50 text-[#00205B] flex items-center justify-center flex-shrink-0">
+            <i data-lucide="lock" class="w-6 h-6"></i>
+          </div>
+          <div>
+            <span class="text-xs font-bold uppercase tracking-wider text-slate-400">Ethical Standards</span>
+            <h2 class="text-xl font-bold text-slate-900 mt-0.5 tracking-tight">Confidentiality & Care Commitment</h2>
+            <p class="text-xs sm:text-sm text-slate-600 mt-2 leading-relaxed">
+              Your trust is our cornerstone. In accordance with the
+              <strong>Philippine Guidance and Counseling Act of 2004 (Republic Act No. 9258)</strong>
+              and the
+              <strong>Data Privacy Act of 2012 (Republic Act No. 10173)</strong>
+              , all disclosures, session notes, and records remain strictly confidential within the guidance office.
+            </p>
+          </div>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2">
+          <div class="p-4 rounded-xl bg-slate-50 border border-slate-200/80 space-y-1.5">
+            <div class="flex items-center gap-2 text-xs font-bold text-slate-900">
+              <i data-lucide="check-circle" class="w-4 h-4 text-emerald-600"></i>
+              <span>Protected Privacy</span>
+            </div>
+            <p class="text-xs text-slate-600 leading-relaxed">
+              No information shared during counseling will be disclosed to your professors, department, peers, or family
+              without your explicit written consent.
+            </p>
+          </div>
+
+          <div class="p-4 rounded-xl bg-slate-50 border border-slate-200/80 space-y-1.5">
+            <div class="flex items-center gap-2 text-xs font-bold text-slate-900">
+              <i data-lucide="shield-alert" class="w-4 h-4 text-amber-600"></i>
+              <span>Mandatory Safety Exceptions</span>
+            </div>
+            <p class="text-xs text-slate-600 leading-relaxed">
+              Confidentiality is legally waived only when there is imminent risk of harm to yourself (self-harm), danger
+              to others, or reported abuse of vulnerable individuals.
+            </p>
+          </div>
+        </div>
+      </section>
+
+      <section id="hours" class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div class="bg-white p-7 rounded-2xl border border-slate-200 shadow-xs space-y-4">
+          <div class="w-9 h-9 rounded-lg bg-blue-50 text-[#00205B] flex items-center justify-center">
+            <i data-lucide="map-pin" class="w-4 h-4"></i>
+          </div>
+          <div>
+            <h3 class="text-sm font-bold text-slate-900">Office Location</h3>
+            <p class="text-xs text-slate-600 mt-1 leading-relaxed">
+              Guidance and Counseling Center
+              <br />
+              3rd Floor, Student Services Building
+              <br />
+              National University – Fairview
+            </p>
+          </div>
+        </div>
+
+        <div class="bg-white p-7 rounded-2xl border border-slate-200 shadow-xs space-y-4">
+          <div class="w-9 h-9 rounded-lg bg-blue-50 text-[#00205B] flex items-center justify-center">
+            <i data-lucide="clock" class="w-4 h-4"></i>
+          </div>
+          <div>
+            <h3 class="text-sm font-bold text-slate-900">Operating Hours</h3>
+            <p class="text-xs text-slate-600 mt-1 leading-relaxed">
+              <strong>Monday – Friday:</strong>
+              8:00 AM – 5:00 PM
+              <br />
+              <strong>Saturday & Sunday:</strong>
+              Closed
+              <br />
+              <em>Appointments available in 1-hour slots.</em>
+            </p>
+          </div>
+        </div>
+
+        <div class="bg-white p-7 rounded-2xl border border-slate-200 shadow-xs space-y-4">
+          <div class="w-9 h-9 rounded-lg bg-amber-50 text-amber-700 flex items-center justify-center">
+            <i data-lucide="phone-call" class="w-4 h-4"></i>
+          </div>
+          <div>
+            <h3 class="text-sm font-bold text-slate-900">Campus Emergency</h3>
+            <p class="text-xs text-slate-600 mt-1 leading-relaxed">
+              <strong>Campus Clinic:</strong>
+              (02) 8888-0000 loc. 104
+              <br />
+              <strong>24/7 Crisis Line:</strong>
+              1553 (National Hopeline)
+              <br />
+              <strong>Email:</strong>
+              guidance@nu-fairview.edu.ph
+            </p>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <footer class="bg-[#00205B] text-white border-t border-white/10 py-10 text-xs mt-auto">
+      <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col sm:flex-row items-center justify-between gap-4">
+        <div class="flex items-center space-x-3">
+          <img src="assets/nu-logo.png" alt="National University" class="h-8 w-auto object-contain flex-shrink-0" />
+          <div>
+            <span class="font-bold text-white">GuideHub</span>
+            <span class="text-slate-300 ml-1.5">• NU Fairview Guidance & Counseling Center</span>
+          </div>
+        </div>
+
+        <div class="text-slate-300">RA 9258 & Data Privacy Act of 2012 Certified</div>
+      </div>
+    </footer>
+
+    <script type="module">
+      import { getCurrentUser, getRolePortalPath } from './js/auth.js';
+
+      document.addEventListener('DOMContentLoaded', () => {
+        if (window.lucide) window.lucide.createIcons();
+
+        const user = getCurrentUser();
+        if (user) {
+          const loginBtn = document.getElementById('nav-login-btn');
+          if (loginBtn) {
+            loginBtn.href = getRolePortalPath(user.role);
+            loginBtn.innerHTML = `<i data-lucide="layout-dashboard" class="w-3.5 h-3.5"></i><span>Go to Workspace</span>`;
+          }
+        }
+      });
+    </script>
+  </body>
+</html>

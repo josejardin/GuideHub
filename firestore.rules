@@ -1,0 +1,48 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // OTP Verifications collection (Pure 6-Digit Numeric Engine)
+    match /otpVerifications/{email} {
+      allow read, write: if true;
+    }
+    
+    // Trigger Email collection (Firebase Trigger Email Extension / Cloud Function)
+    match /mail/{mailId} {
+      allow create: if true;
+      allow read: if false;
+    }
+
+    match /users/{userId} {
+      allow read: if request.auth != null;
+      allow create, update: if request.auth != null && request.auth.uid == userId;
+    }
+
+    match /appointments/{appointmentId} {
+      allow create, read, update: if request.auth != null;
+    }
+
+    match /referrals/{referralId} {
+      allow create, read, update: if request.auth != null;
+    }
+
+    match /cases/{caseId} {
+      allow read, write: if request.auth != null;
+      match /notes/{noteId} {
+        allow read, write: if request.auth != null;
+      }
+    }
+
+    match /walkin_queue/{ticketId} {
+      allow read, write: if request.auth != null;
+    }
+
+    match /counselorSchedules/{scheduleId} {
+      allow read, write: if request.auth != null;
+    }
+
+    match /auditLogs/{logId} {
+      allow read, create: if request.auth != null;
+    }
+  }
+}

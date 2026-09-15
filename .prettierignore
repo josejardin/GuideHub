@@ -1,0 +1,5 @@
+node_modules
+assets
+serviceAccountKey.json
+.env
+package-lock.json

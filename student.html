@@ -1,0 +1,501 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Student Portal - GuideHub</title>
+
+    <script src="https://cdn.tailwindcss.com"></script>
+
+    <script src="https://unpkg.com/lucide@latest"></script>
+
+    <link rel="stylesheet" href="css/custom.css" />
+  </head>
+  <body class="bg-slate-50 text-slate-700 flex flex-col min-h-screen">
+    <div id="navbar-container"></div>
+
+    <main class="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6">
+      <div
+        class="bg-white rounded-xl p-6 border border-slate-200 shadow-xs flex flex-col md:flex-row items-start md:items-center justify-between gap-4"
+      >
+        <div>
+          <div class="flex items-center gap-2">
+            <h1 class="text-xl font-bold text-slate-900 tracking-tight">Student Counseling Workspace</h1>
+            <span
+              class="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-medium bg-slate-100 text-slate-700 border border-slate-200"
+            >
+              Confidential
+            </span>
+          </div>
+          <p class="text-xs text-slate-500 mt-1" id="student-welcome-text">
+            Schedule confidential guidance consultations, monitor appointments, and access walk-in services.
+          </p>
+        </div>
+
+        <div class="flex flex-wrap items-center gap-2.5">
+          <button
+            id="btn-open-walkin-modal"
+            class="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-md bg-white hover:bg-slate-50 text-slate-800 text-xs font-semibold border border-slate-200 shadow-xs transition"
+          >
+            <i data-lucide="ticket" class="w-3.5 h-3.5 text-slate-500"></i>
+            <span>Walk-In Queue Ticket</span>
+          </button>
+
+          <button
+            id="btn-open-wizard-modal"
+            class="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-md bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold shadow-xs transition"
+          >
+            <i data-lucide="calendar-plus" class="w-3.5 h-3.5"></i>
+            <span>Book Appointment</span>
+          </button>
+        </div>
+      </div>
+
+      <div id="followup-alert-container" class="hidden"></div>
+
+      <div id="active-queue-card" class="hidden bg-white border border-slate-200 rounded-xl p-5 shadow-xs">
+        <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+          <div class="flex items-center gap-4">
+            <div
+              class="w-14 h-14 rounded-lg bg-slate-900 text-white flex items-center justify-center text-xl font-bold tracking-wider font-mono flex-shrink-0"
+              id="queue-ticket-num"
+            >
+              W-100
+            </div>
+            <div>
+              <div class="flex items-center gap-2">
+                <span class="w-2 h-2 rounded-full bg-emerald-500"></span>
+                <span class="text-[11px] font-bold uppercase tracking-wider text-slate-500">Digital Queue Status</span>
+              </div>
+              <h3 class="text-sm font-bold text-slate-900 mt-0.5" id="queue-status-text">
+                You are currently waiting in queue
+              </h3>
+              <p class="text-xs text-slate-500 mt-0.5" id="queue-detail-text">
+                Please remain near the Guidance Office lobby.
+              </p>
+            </div>
+          </div>
+          <button
+            id="btn-cancel-ticket"
+            class="px-3 py-1.5 rounded text-xs font-medium text-slate-600 hover:text-slate-900 bg-slate-100 hover:bg-slate-200 transition"
+          >
+            Cancel Ticket
+          </button>
+        </div>
+      </div>
+
+      <div
+        id="followUpBanner"
+        class="hidden mb-6 bg-gradient-to-r from-[#00205B] to-[#0A192F] border-2 border-[#F5B800] rounded-2xl p-5 text-white shadow-md transition-all duration-300"
+      >
+        <div class="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+          <div class="flex items-center gap-4">
+            <div
+              class="w-12 h-12 rounded-xl bg-[#F5B800]/20 border border-[#F5B800] flex items-center justify-center text-[#F5B800] shrink-0"
+            >
+              <i data-lucide="calendar-clock" class="w-6 h-6"></i>
+            </div>
+            <div>
+              <div class="flex items-center gap-2">
+                <span
+                  class="bg-[#F5B800] text-[#00205B] text-xs font-bold px-2 py-0.5 rounded-full uppercase tracking-wider"
+                >
+                  Recommended Follow-Up
+                </span>
+                <span id="followUpCounselorName" class="text-xs text-slate-300"></span>
+              </div>
+              <h3 class="text-base font-bold text-white mt-1">Scheduled Counseling Follow-Up Session</h3>
+              <p class="text-xs text-slate-200 mt-0.5">
+                Your counselor recommended a follow-up consultation on
+                <strong id="followUpTargetDate" class="text-[#F5B800] font-semibold"></strong>
+                .
+              </p>
+            </div>
+          </div>
+          <div class="flex items-center gap-2 w-full md:w-auto">
+            <button
+              id="btn-dismiss-followup"
+              class="w-full md:w-auto px-4 py-2 text-xs font-semibold bg-white/10 hover:bg-white/20 text-white rounded-xl transition-all border border-white/20"
+            >
+              Dismiss Notice
+            </button>
+            <button
+              id="btn-book-followup-slot"
+              class="w-full md:w-auto px-4 py-2 text-xs font-bold bg-[#F5B800] hover:bg-[#D99B00] text-[#00205B] rounded-xl shadow transition-all flex items-center justify-center gap-1.5"
+            >
+              <i data-lucide="calendar-plus" class="w-4 h-4"></i>
+              <span>Lock Time Slot</span>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <div class="bg-white rounded-xl border border-slate-200 shadow-xs overflow-hidden">
+        <div
+          class="p-4 sm:p-5 border-b border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3"
+        >
+          <div>
+            <h2 class="text-sm font-bold text-slate-900 flex items-center gap-2">
+              <i data-lucide="calendar" class="w-4 h-4 text-slate-500"></i>
+              My Counseling Consultations
+            </h2>
+            <p class="text-[11px] text-slate-500 mt-0.5">Real-time status updates and scheduled appointment records</p>
+          </div>
+          <div class="flex items-center gap-2">
+            <span class="text-xs text-slate-400 font-medium">Filter:</span>
+            <select
+              id="appointment-status-filter"
+              class="text-xs border border-slate-200 rounded-md px-2.5 py-1 bg-slate-50 text-slate-700 font-medium focus:outline-none"
+            >
+              <option value="ALL">All Statuses</option>
+              <option value="Pending">Pending</option>
+              <option value="Confirmed">Confirmed</option>
+              <option value="Completed">Completed</option>
+              <option value="Cancelled">Cancelled</option>
+              <option value="No-Show">No-Show</option>
+            </select>
+          </div>
+        </div>
+
+        <div id="appointments-list" class="divide-y divide-slate-100">
+          <div class="p-8 text-center text-slate-400 text-xs">Loading consultation records...</div>
+        </div>
+      </div>
+    </main>
+
+    <div id="consent-modal" class="fixed inset-0 z-50 flex items-center justify-center p-4 modal-backdrop hidden">
+      <div class="bg-white rounded-xl max-w-lg w-full p-6 shadow-lg border border-slate-200 relative">
+        <div class="flex items-center gap-2.5 mb-3">
+          <div class="w-7 h-7 rounded bg-slate-100 text-slate-800 flex items-center justify-center">
+            <i data-lucide="shield-alert" class="w-4 h-4"></i>
+          </div>
+          <div>
+            <h3 class="text-sm font-bold text-slate-900">Informed Consent & Confidentiality Agreement</h3>
+            <p class="text-[11px] text-slate-500">Philippine Guidance & Counseling Act of 2004 (RA 9258)</p>
+          </div>
+        </div>
+
+        <div
+          class="bg-slate-50 rounded-lg p-4 border border-slate-200 text-xs text-slate-600 space-y-2.5 leading-relaxed max-h-60 overflow-y-auto"
+        >
+          <p class="font-semibold text-slate-900">Confidentiality terms and disclosure boundaries:</p>
+          <p>
+            1.
+            <strong>Confidentiality Commitment:</strong>
+            All counseling discussions remain confidential between you and the Registered Guidance Counselor. No faculty
+            or students have access to your clinical records.
+          </p>
+          <p>
+            2.
+            <strong>Mandatory Reporting Exceptions:</strong>
+            Counselors are legally required to break confidentiality under specific circumstances:
+          </p>
+          <ul class="list-disc pl-5 space-y-0.5 text-slate-700">
+            <li>Imminent danger of self-harm / suicide.</li>
+            <li>Imminent threat of harm toward others.</li>
+            <li>Suspected abuse or neglect of a minor.</li>
+            <li>Court subpoena.</li>
+          </ul>
+        </div>
+
+        <div class="mt-4 flex items-center gap-2">
+          <input
+            type="checkbox"
+            id="consent-checkbox"
+            class="w-3.5 h-3.5 text-slate-900 rounded border-slate-300 focus:ring-0"
+          />
+          <label for="consent-checkbox" class="text-xs text-slate-700 cursor-pointer">
+            I understand and accept the Informed Consent and Confidentiality terms.
+          </label>
+        </div>
+
+        <div class="mt-5 flex items-center justify-end gap-2">
+          <button
+            id="btn-cancel-consent"
+            class="px-3 py-1.5 rounded bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-medium transition"
+          >
+            Decline
+          </button>
+          <button
+            id="btn-proceed-booking"
+            disabled
+            class="px-3.5 py-1.5 rounded bg-slate-900 hover:bg-slate-800 disabled:opacity-40 disabled:cursor-not-allowed text-white text-xs font-semibold transition"
+          >
+            Proceed to Booking
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <div id="wizard-modal" class="fixed inset-0 z-50 flex items-center justify-center p-4 modal-backdrop hidden">
+      <div
+        class="bg-white rounded-xl max-w-xl w-full p-6 shadow-lg border border-slate-200 relative max-h-[92vh] flex flex-col"
+      >
+        <div class="flex items-center justify-between pb-3 border-b border-slate-200">
+          <div>
+            <h3 class="text-sm font-bold text-slate-900">Book Counseling Appointment</h3>
+            <p class="text-[11px] text-slate-500">Step-by-step guidance intake</p>
+          </div>
+          <button id="btn-close-wizard" class="text-slate-400 hover:text-slate-600">
+            <i data-lucide="x" class="w-4 h-4"></i>
+          </button>
+        </div>
+
+        <div class="grid grid-cols-4 gap-1 py-3 border-b border-slate-100 text-center">
+          <div class="step-item active" data-step="1">
+            <span class="text-[10px] font-bold text-slate-900 block">1. Intake</span>
+          </div>
+          <div class="step-item" data-step="2">
+            <span class="text-[10px] font-medium text-slate-400 block">2. Counselor</span>
+          </div>
+          <div class="step-item" data-step="3">
+            <span class="text-[10px] font-medium text-slate-400 block">3. Schedule</span>
+          </div>
+          <div class="step-item" data-step="4">
+            <span class="text-[10px] font-medium text-slate-400 block">4. Concern</span>
+          </div>
+        </div>
+
+        <form id="wizard-form" class="flex-1 overflow-y-auto py-4 space-y-3.5 text-xs">
+          <div id="step-content-1" class="space-y-3">
+            <span class="text-[11px] font-semibold uppercase tracking-wider text-slate-400 block">
+              Step 1: Student Information
+            </span>
+            <div class="grid grid-cols-2 gap-3">
+              <div>
+                <label class="block font-semibold text-slate-700 mb-1">Student Number</label>
+                <input
+                  type="text"
+                  id="wiz-student-number"
+                  readonly
+                  class="w-full px-2.5 py-1.5 bg-slate-50 border border-slate-200 rounded text-slate-500"
+                />
+              </div>
+              <div>
+                <label class="block font-semibold text-slate-700 mb-1">Full Name</label>
+                <input
+                  type="text"
+                  id="wiz-student-name"
+                  readonly
+                  class="w-full px-2.5 py-1.5 bg-slate-50 border border-slate-200 rounded text-slate-500"
+                />
+              </div>
+            </div>
+
+            <div class="grid grid-cols-2 gap-3">
+              <div>
+                <label class="block font-semibold text-slate-700 mb-1">Strand / Degree Program</label>
+                <input
+                  type="text"
+                  id="wiz-student-program"
+                  required
+                  class="w-full px-2.5 py-1.5 border border-slate-300 rounded focus:border-slate-900 focus:outline-none"
+                />
+              </div>
+              <div>
+                <label class="block font-semibold text-slate-700 mb-1">Contact Phone</label>
+                <input
+                  type="text"
+                  id="wiz-student-contact"
+                  required
+                  inputmode="tel"
+                  pattern="[0-9+-]*"
+                  oninput="this.value = this.value.replace(/[^0-9+-]/g, '')"
+                  placeholder="0917-123-4567"
+                  class="w-full px-2.5 py-1.5 border border-slate-300 rounded focus:border-slate-900 focus:outline-none"
+                />
+              </div>
+            </div>
+
+            <div>
+              <label class="block font-semibold text-slate-700 mb-1">Gender</label>
+              <select
+                id="wiz-student-gender"
+                class="w-full px-2.5 py-1.5 border border-slate-300 rounded focus:border-slate-900 focus:outline-none bg-white"
+              >
+                <option value="Female">Female</option>
+                <option value="Male">Male</option>
+                <option value="Prefer not to say">Prefer not to say</option>
+              </select>
+            </div>
+          </div>
+
+          <div id="step-content-2" class="space-y-3 hidden">
+            <span class="text-[11px] font-semibold uppercase tracking-wider text-slate-400 block">
+              Step 2: Counselor Selection
+            </span>
+
+            <div>
+              <label class="block font-semibold text-slate-700 mb-1">Assigned Guidance Counselor</label>
+              <select
+                id="counselorSelect"
+                class="w-full px-3 py-2.5 text-xs border border-slate-300 rounded-xl focus:border-[#00205B] focus:outline-none bg-white font-medium"
+              >
+                <option value="any">Any Available Counselor (Fastest Matching)</option>
+              </select>
+            </div>
+
+            <div class="pt-1">
+              <label class="block font-semibold text-slate-700 mb-1 text-[11px]">
+                Counselor Gender Preference (Optional)
+              </label>
+              <div class="grid grid-cols-3 gap-2">
+                <label
+                  class="border border-slate-200 hover:border-[#00205B] rounded-lg p-2.5 text-center cursor-pointer transition has-[:checked]:border-[#00205B] has-[:checked]:bg-blue-50/40"
+                >
+                  <input type="radio" name="counselor_pref" value="Any" checked class="hidden" />
+                  <div class="font-bold text-slate-900 text-xs">Any</div>
+                  <div class="text-[9px] text-slate-400 mt-0.5">No preference</div>
+                </label>
+
+                <label
+                  class="border border-slate-200 hover:border-[#00205B] rounded-lg p-2.5 text-center cursor-pointer transition has-[:checked]:border-[#00205B] has-[:checked]:bg-blue-50/40"
+                >
+                  <input type="radio" name="counselor_pref" value="Female" class="hidden" />
+                  <div class="font-bold text-slate-900 text-xs">Female</div>
+                  <div class="text-[9px] text-slate-400 mt-0.5">Female RGC</div>
+                </label>
+
+                <label
+                  class="border border-slate-200 hover:border-[#00205B] rounded-lg p-2.5 text-center cursor-pointer transition has-[:checked]:border-[#00205B] has-[:checked]:bg-blue-50/40"
+                >
+                  <input type="radio" name="counselor_pref" value="Male" class="hidden" />
+                  <div class="font-bold text-slate-900 text-xs">Male</div>
+                  <div class="text-[9px] text-slate-400 mt-0.5">Male RGC</div>
+                </label>
+              </div>
+            </div>
+          </div>
+
+          <div id="step-content-3" class="space-y-3 hidden">
+            <span class="text-[11px] font-semibold uppercase tracking-wider text-slate-400 block">
+              Step 3: Schedule Selection (Mon-Fri, 8AM - 5PM)
+            </span>
+
+            <div>
+              <label class="block font-semibold text-slate-700 mb-1">Date</label>
+              <input
+                type="date"
+                id="wiz-schedule-date"
+                class="w-full px-2.5 py-1.5 border border-slate-300 rounded focus:border-slate-900 focus:outline-none"
+              />
+            </div>
+
+            <div>
+              <label class="block font-semibold text-slate-700 mb-1">Available 1-Hour Time Slot</label>
+              <div class="grid grid-cols-2 sm:grid-cols-4 gap-1.5" id="slot-container"></div>
+            </div>
+          </div>
+
+          <div id="step-content-4" class="space-y-3 hidden">
+            <span class="text-[11px] font-semibold uppercase tracking-wider text-slate-400 block">
+              Step 4: Consultation Details
+            </span>
+
+            <div>
+              <label class="block font-semibold text-slate-700 mb-1">Concern Category</label>
+              <select
+                id="wiz-concern-category"
+                required
+                class="w-full px-2.5 py-1.5 border border-slate-300 rounded focus:border-slate-900 focus:outline-none bg-white"
+              >
+                <option value="Academic Distress & Anxiety">Academic Distress & Anxiety</option>
+                <option value="Program Shifting / Career">Program Shifting / Career Consultation</option>
+                <option value="Relationship & Personal">Relationship & Personal Concerns</option>
+                <option value="Special Learning Needs">Special Learning Needs Accommodations</option>
+                <option value="Other / General Concern">Other / General Consultation</option>
+              </select>
+            </div>
+
+            <div>
+              <label class="block font-semibold text-slate-700 mb-1">Academic Cycle</label>
+              <select
+                id="wiz-academic-cycle"
+                class="w-full px-2.5 py-1.5 border border-slate-300 rounded focus:border-slate-900 focus:outline-none bg-white"
+              >
+                <option value="Pre-Exam Anxiety">Pre-Exam Anxiety</option>
+                <option value="During Exam">During Exam Week</option>
+                <option value="Post-Exam Distress / Shifting">Post-Exam Distress / Shifting</option>
+                <option value="Regular Period">Regular Term Period</option>
+              </select>
+            </div>
+
+            <div>
+              <label class="block font-semibold text-slate-700 mb-1">Brief Description (Optional)</label>
+              <textarea
+                id="wiz-concern-details"
+                rows="2"
+                placeholder="Brief context for your counselor..."
+                class="w-full px-2.5 py-1.5 border border-slate-300 rounded focus:border-slate-900 focus:outline-none"
+              ></textarea>
+            </div>
+          </div>
+        </form>
+
+        <div class="pt-3 border-t border-slate-200 flex items-center justify-between">
+          <button
+            id="btn-wiz-prev"
+            disabled
+            class="px-3 py-1.5 rounded bg-slate-100 hover:bg-slate-200 disabled:opacity-40 text-slate-700 text-xs font-medium"
+          >
+            Back
+          </button>
+
+          <button
+            id="btn-wiz-next"
+            class="px-3.5 py-1.5 rounded bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold shadow-xs transition"
+          >
+            Next Step
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <div id="walkin-modal" class="fixed inset-0 z-50 flex items-center justify-center p-4 modal-backdrop hidden">
+      <div class="bg-white rounded-xl max-w-sm w-full p-6 shadow-lg border border-slate-200 relative">
+        <button id="btn-close-walkin" class="absolute top-4 right-4 text-slate-400 hover:text-slate-600">
+          <i data-lucide="x" class="w-4 h-4"></i>
+        </button>
+
+        <div class="flex items-center gap-2.5 mb-3">
+          <div class="w-7 h-7 rounded bg-slate-100 text-slate-800 flex items-center justify-center">
+            <i data-lucide="ticket" class="w-4 h-4"></i>
+          </div>
+          <div>
+            <h3 class="text-sm font-bold text-slate-900">Walk-In Digital Queue</h3>
+            <p class="text-[11px] text-slate-500">Same-day guidance consultation ticket</p>
+          </div>
+        </div>
+
+        <form id="walkin-form" class="space-y-3 text-xs">
+          <div>
+            <label class="block font-semibold text-slate-700 mb-1">Reason / Concern</label>
+            <select
+              id="walkin-concern"
+              class="w-full px-2.5 py-1.5 border border-slate-300 rounded focus:border-slate-900 focus:outline-none bg-white"
+            >
+              <option value="Urgent Stress / Anxiety Relief">Urgent Stress / Anxiety Relief</option>
+              <option value="Academic Difficulty Consultation">Academic Difficulty Consultation</option>
+              <option value="Personal Distress">Personal Distress</option>
+              <option value="General Guidance Inquiry">General Guidance Inquiry</option>
+            </select>
+          </div>
+
+          <div class="bg-slate-50 border border-slate-200 rounded p-2.5 text-[11px] text-slate-600">
+            Walk-in tickets are served on a first-come, first-served basis by available counselors.
+          </div>
+
+          <button
+            type="submit"
+            id="btn-submit-walkin"
+            class="w-full py-2 px-3 rounded bg-slate-900 hover:bg-slate-800 text-white font-semibold text-xs shadow-xs transition"
+          >
+            Generate Ticket
+          </button>
+        </form>
+      </div>
+    </div>
+
+    <script type="module" src="js/student.js"></script>
+  </body>
+</html>
