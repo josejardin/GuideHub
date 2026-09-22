@@ -9,7 +9,7 @@
 
     <script src="https://unpkg.com/lucide@latest"></script>
 
-    <link rel="stylesheet" href="css/custom.css" />
+    <link rel="stylesheet" href="../css/custom.css" />
     <style>
       /* 6-Box OTP Input Styling */
       .otp-digit-box {
@@ -50,7 +50,7 @@
         <!-- Absolute Background Image Layer (Prevents Zoom / Stretch on Height Changes) -->
         <div
           class="absolute inset-0 bg-cover bg-center opacity-25 pointer-events-none transition-none"
-          style="background-image: url('assets/nu-fairview-campus.png')"
+          style="background-image: url('../assets/nu-fairview-campus.png')"
         ></div>
         <div
           class="absolute inset-0 bg-gradient-to-t from-[#00205B] via-[#00205B]/80 to-transparent pointer-events-none"
@@ -58,9 +58,9 @@
 
         <!-- Hero Header -->
         <div class="relative z-10">
-          <a href="index.html" class="inline-flex items-center space-x-3 group">
+          <a href="../index.html" class="inline-flex items-center space-x-3 group">
             <img
-              src="assets/nu-logo.png"
+              src="../assets/nu-logo.png"
               alt="NU Fairview Logo"
               class="h-12 w-auto object-contain flex-shrink-0 drop-shadow-md group-hover:scale-105 transition transform"
             />
@@ -137,7 +137,11 @@
       <div class="flex-1 flex items-center justify-center p-6 sm:p-10 lg:p-12 bg-white overflow-y-auto">
         <div class="max-w-md w-full space-y-6">
           <div class="lg:hidden flex items-center space-x-3 mb-2">
-            <img src="assets/nu-logo.png" alt="National University" class="h-10 w-auto object-contain flex-shrink-0" />
+            <img
+              src="../assets/nu-logo.png"
+              alt="National University"
+              class="h-10 w-auto object-contain flex-shrink-0"
+            />
             <div>
               <div class="flex items-center gap-1.5">
                 <span class="text-base font-bold text-[#00205B] tracking-tight">GuideHub</span>
@@ -632,7 +636,7 @@
 
           <div class="text-center">
             <a
-              href="index.html"
+              href="../index.html"
               class="text-xs text-slate-500 hover:text-slate-800 font-medium inline-flex items-center gap-1.5"
             >
               <i data-lucide="arrow-left" class="w-3.5 h-3.5"></i>
@@ -650,7 +654,7 @@
         where,
         getDocs
       } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js';
-      import { db } from './js/firebase-config.js';
+      import { db } from '../js/firebase-config.js';
       import {
         sendInstitutionalOTP,
         verifyOTPAndCreateUser,
@@ -662,7 +666,7 @@
         getCurrentUser,
         STUDENT_DOMAIN,
         STAFF_DOMAIN
-      } from './js/auth.js';
+      } from '../js/auth.js';
 
       document.addEventListener('DOMContentLoaded', () => {
         if (window.lucide) window.lucide.createIcons();

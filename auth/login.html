@@ -9,7 +9,7 @@
 
     <script src="https://unpkg.com/lucide@latest"></script>
 
-    <link rel="stylesheet" href="css/custom.css" />
+    <link rel="stylesheet" href="../css/custom.css" />
   </head>
   <body class="bg-slate-50 text-slate-700 min-h-screen flex flex-col antialiased">
     <div class="min-h-screen flex flex-col lg:flex-row">
@@ -18,16 +18,16 @@
       >
         <div
           class="absolute inset-0 bg-cover bg-center opacity-25 pointer-events-none"
-          style="background-image: url('assets/nu-fairview-campus.png')"
+          style="background-image: url('../assets/nu-fairview-campus.png')"
         ></div>
         <div
           class="absolute inset-0 bg-gradient-to-t from-[#00205B] via-[#00205B]/80 to-transparent pointer-events-none"
         ></div>
 
         <div class="relative z-10">
-          <a href="index.html" class="inline-flex items-center space-x-3 group">
+          <a href="../index.html" class="inline-flex items-center space-x-3 group">
             <img
-              src="assets/nu-logo.png"
+              src="../assets/nu-logo.png"
               alt="National University"
               class="h-12 w-auto object-contain flex-shrink-0 drop-shadow-md group-hover:scale-105 transition transform"
             />
@@ -185,7 +185,7 @@
 
           <div class="text-center pt-2">
             <a
-              href="index.html"
+              href="../index.html"
               class="text-xs text-slate-500 hover:text-slate-800 font-medium inline-flex items-center gap-1.5"
             >
               <i data-lucide="arrow-left" class="w-3.5 h-3.5"></i>
@@ -197,7 +197,7 @@
     </div>
 
     <script type="module">
-      import { loginUser, showToast, getRolePortalPath, getCurrentUser } from './js/auth.js';
+      import { loginUser, showToast, getRolePortalPath, getCurrentUser } from '../js/auth.js';
 
       document.addEventListener('DOMContentLoaded', () => {
         if (window.lucide) window.lucide.createIcons();

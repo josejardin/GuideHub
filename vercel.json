@@ -4,6 +4,14 @@
     {
       "source": "/api/send-otp",
       "destination": "/api/send-otp.js"
+    },
+    {
+      "source": "/api/admin-alert",
+      "destination": "/api/admin-alert.js"
+    },
+    {
+      "source": "/api/reset-password",
+      "destination": "/api/reset-password.js"
     }
   ]
 }

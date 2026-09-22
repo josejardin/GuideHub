@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 # GuideHub - Official NU Fairview Guidance & Counseling Office Management System
 
 GuideHub is the official, production-ready, multi-role web application for the **National University Fairview Guidance and Counseling Center**. Built using pure vanilla web technologies (HTML5, Tailwind CSS via CDN, Vanilla JavaScript ES6 Modules) and the **Firebase Web SDK v12.18.0** (Modular ESM via CDN), it operates 100% client-side with Cloud Firestore and Firebase Authentication.
@@ -61,3 +62,22 @@ guidehub/
 python -m http.server 8000
 ```
 Open **`http://localhost:8000`** in your browser.
+=======
+# GuideHub: Web-Based Integrated Guidance Office Management System
+### NU Fairview - Software Design Laboratory (CPSOFT30L)
+
+## Project Description
+GuideHub is a centralized guidance office management portal facilitating counseling requests, appointment scheduling, digital walk-in queue management, faculty referrals, and confidential case records.
+
+## Group Members
+- Dela Cruz, Carl Justine J.
+- Felonia, Miguel Andrei E.
+- Jardin, Jose V. (Project Leader)
+- Laberinto, Gio Daniel C.
+- Ongpauco, Zion Lennard M.
+
+## Technologies Used
+- HTML5, CSS3, JavaScript (ES6)
+- LocalStorage / SessionStorage Data Abstraction Layer
+- Firebase (Planned Architecture)
+>>>>>>> cc3a4d62e2f4268210d4cdd4bd6cde9aa79095c3

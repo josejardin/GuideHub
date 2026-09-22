@@ -1,5 +1,6 @@
 node_modules
 assets
 serviceAccountKey.json
+scripts/serviceAccountKey.json
 .env
 package-lock.json

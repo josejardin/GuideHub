@@ -166,19 +166,27 @@ export function showToast(message, type = 'info') {
 
 export function getRolePortalPath(role) {
   const normalized = (role || '').toLowerCase();
-  switch (normalized) {
-    case 'student':
-      return 'student.html';
-    case 'faculty':
-      return 'faculty.html';
-    case 'counselor':
-      return 'counselor.html';
-    case 'head':
-      return 'head.html';
-    case 'admin':
-      return 'admin.html';
-    default:
-      return 'student.html';
+  const validRoles = ['student', 'faculty', 'counselor', 'head', 'admin'];
+  const targetRole = validRoles.includes(normalized) ? normalized : 'student';
+
+  const pathname = typeof window !== 'undefined' ? window.location.pathname || '' : '';
+  if (pathname.includes('/portals/') || pathname.endsWith('portals')) {
+    return `${targetRole}.html`;
+  } else if (pathname.includes('/auth/') || pathname.endsWith('auth')) {
+    return `../portals/${targetRole}.html`;
+  } else {
+    return `portals/${targetRole}.html`;
+  }
+}
+
+export function getLoginPath() {
+  const pathname = typeof window !== 'undefined' ? window.location.pathname || '' : '';
+  if (pathname.includes('/auth/') || pathname.endsWith('auth')) {
+    return 'login.html';
+  } else if (pathname.includes('/portals/') || pathname.endsWith('portals')) {
+    return '../auth/login.html';
+  } else {
+    return 'auth/login.html';
   }
 }
 
@@ -484,14 +492,14 @@ export async function logoutUser() {
     console.error('Sign out error', e);
   }
   setCurrentUser(null);
-  window.location.href = 'login.html';
+  window.location.href = getLoginPath();
 }
 
 export function requireRole(allowedRoles = []) {
   const cachedUser = getCurrentUser();
 
   if (!cachedUser) {
-    window.location.href = 'login.html';
+    window.location.href = getLoginPath();
     return null;
   }
 
@@ -506,7 +514,7 @@ export function requireRole(allowedRoles = []) {
   onAuthStateChanged(auth, async firebaseUser => {
     if (!firebaseUser) {
       setCurrentUser(null);
-      window.location.href = 'login.html';
+      window.location.href = getLoginPath();
     }
   });
 
@@ -533,15 +541,19 @@ export function initNavbar(containerId = 'navbar-container', activePortal = '') 
   const user = getCurrentUser();
   if (!user) return;
 
+  const pathname = typeof window !== 'undefined' ? window.location.pathname || '' : '';
+  const isSubdir = pathname.includes('/portals/') || pathname.includes('/auth/');
+  const logoSrc = isSubdir ? '../assets/nu-logo.png' : 'assets/nu-logo.png';
+
   container.innerHTML = `
- <nav class="bg-[#00205B] text-white border-b border-white/10 sticky top-0 z-30 shadow-md">
- <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
- <div class="flex items-center justify-between h-16">
- 
- <!-- Brand Logo & Official NU Crest Image -->
- <div class="flex items-center space-x-3">
- <a href="${getRolePortalPath(user.role)}" class="flex items-center space-x-3 group">
- <img src="assets/nu-logo.png" alt="National University" class="h-10 w-auto object-contain flex-shrink-0 group-hover:scale-105 transition transform drop-shadow-sm" />
+  <nav class="bg-[#00205B] text-white border-b border-white/10 sticky top-0 z-30 shadow-md">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div class="flex items-center justify-between h-16">
+        
+        <!-- Brand Logo & Official NU Crest Image -->
+        <div class="flex items-center space-x-3">
+          <a href="${getRolePortalPath(user.role)}" class="flex items-center space-x-3 group">
+            <img src="${logoSrc}" alt="National University" class="h-10 w-auto object-contain flex-shrink-0 group-hover:scale-105 transition transform drop-shadow-sm" />
  <div>
  <div class="flex items-center gap-1.5">
  <span class="text-sm font-bold tracking-tight text-white">GuideHub</span>

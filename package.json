@@ -2,11 +2,13 @@
   "name": "guidehub-nu-fairview",
   "version": "2.0.0",
   "description": "Integrated Guidance and Counseling Management System for National University Fairview with Gmail SMTP OTP verification",
-  "main": "server.js",
+  "main": "server/server.js",
   "type": "module",
   "scripts": {
-    "start": "node server.js",
-    "dev": "node server.js"
+    "start": "node server/server.js",
+    "dev": "node server/server.js",
+    "clean-db": "node scripts/clean-db.js",
+    "seed": "node scripts/seed-accounts.js"
   },
   "dependencies": {
     "cors": "^2.8.5",
