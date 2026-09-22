@@ -7,7 +7,7 @@ GuideHub is a centralized guidance office management portal facilitating counsel
 ## Group Members
 - Dela Cruz, Carl Justine J.
 - Felonia, Miguel Andrei E.
-- Jardin, Jose V.
+- Jardin, Jose V. (Project Leader)
 - Laberinto, Gio Daniel C.
 - Ongpauco, Zion Lennard M.
 
