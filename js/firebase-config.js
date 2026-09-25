@@ -25,7 +25,8 @@ import {
   onSnapshot,
   getDocs,
   serverTimestamp,
-  Timestamp
+  Timestamp,
+  collectionGroup
 } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js';
 
 export const firebaseConfig = {
@@ -81,5 +82,6 @@ export {
   onSnapshot,
   getDocs,
   serverTimestamp,
-  Timestamp
+  Timestamp,
+  collectionGroup
 };

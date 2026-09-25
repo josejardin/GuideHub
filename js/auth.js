@@ -6,12 +6,18 @@ import {
   signOut,
   updateProfile,
   onAuthStateChanged,
+  collection,
   doc,
   getDoc,
   setDoc,
   deleteDoc,
-  updateDoc
+  updateDoc,
+  query,
+  where,
+  getDocs,
+  collectionGroup
 } from './firebase-config.js';
+import { generateUserDocId, getRoleCategory } from './utils/validation.js';
 
 const CURRENT_USER_KEY = 'guidehub_active_user';
 
@@ -248,28 +254,36 @@ export async function sendInstitutionalOTP(
     if (!res.ok) {
       throw new Error(result.error || `Email delivery failed for ${cleanEmail} (Status: ${res.status}).`);
     }
+
+    const finalOtp = result.otp || otp;
+
+    // 2. Only save OTP verification record to Firestore upon confirmed successful dispatch
+    if (db) {
+      try {
+        const otpDocRef = doc(db, 'otpVerifications', cleanEmail);
+        await setDoc(otpDocRef, {
+          code: finalOtp,
+          createdAt: now,
+          expiresAt: expiresAt,
+          attempts: 0,
+          purpose: purpose,
+          recipientName: recipientName,
+          simulated: !!result.simulated
+        });
+      } catch (fsErr) {
+        console.warn('Firestore record notice:', fsErr.message);
+      }
+    }
+
+    return {
+      email: cleanEmail,
+      expiresAt: expiresAt,
+      simulated: !!result.simulated,
+      otp: finalOtp
+    };
   } catch (apiErr) {
     throw new Error(apiErr.message || 'Failed to connect to email dispatch service.');
   }
-
-  // 2. Only save OTP verification record to Firestore upon confirmed successful dispatch
-  if (db) {
-    try {
-      const otpDocRef = doc(db, 'otpVerifications', cleanEmail);
-      await setDoc(otpDocRef, {
-        code: otp,
-        createdAt: now,
-        expiresAt: expiresAt,
-        attempts: 0,
-        purpose: purpose,
-        recipientName: recipientName
-      });
-    } catch (fsErr) {
-      console.warn('Firestore record notice:', fsErr.message);
-    }
-  }
-
-  return { email: cleanEmail, expiresAt: expiresAt };
 }
 
 export async function verifyOTPAndCreateUser(email, enteredCode, profileData, password) {
@@ -331,8 +345,12 @@ export async function verifyOTPAndCreateUser(email, enteredCode, profileData, pa
 
   await updateProfile(user, { displayName: profileData.fullName });
 
+  const userDocId = generateUserDocId(profileData.role, profileData.fullName, cleanEmail.split('@')[0]);
+
+  const category = getRoleCategory(profileData.role);
   const completeProfile = {
-    uid: user.uid,
+    uid: userDocId,
+    authUid: user.uid,
     fullName: profileData.fullName,
     email: cleanEmail,
     role: profileData.role || 'student',
@@ -348,8 +366,35 @@ export async function verifyOTPAndCreateUser(email, enteredCode, profileData, pa
     createdAt: new Date().toISOString()
   };
 
-  const userDocRef = doc(db, 'users', user.uid);
-  await setDoc(userDocRef, completeProfile);
+  // 1. Role Document Field representation (users/{category} -> [userDocId]: profile)
+  await setDoc(
+    doc(db, 'users', category),
+    {
+      [userDocId]: completeProfile
+    },
+    { merge: true }
+  );
+
+  // 2. Direct Subcollection under Role: users/{category}/users/{userDocId}
+  await setDoc(doc(db, 'users', category, 'users', userDocId), completeProfile);
+
+  // 3. Primary document under standardized semantic ID in root (users/{userDocId})
+  await setDoc(doc(db, 'users', userDocId), completeProfile);
+
+  // 4. Role collection at root ({category}/{userDocId})
+  await setDoc(doc(db, category, userDocId), completeProfile);
+
+  // 5. Maintain alias under Firebase Auth UID for direct resolution
+  if (user.uid && user.uid !== userDocId) {
+    await setDoc(
+      doc(db, 'users', user.uid),
+      {
+        ...completeProfile,
+        canonicalDocId: userDocId
+      },
+      { merge: true }
+    );
+  }
 
   // Dispatch Administrative Security & Registration Audit Alert
   dispatchAdminAlert('REGISTRATION_SUCCESS', {
@@ -439,10 +484,92 @@ export async function loginUser(email, password, remember = true) {
     let profileData = null;
     if (db) {
       try {
+        // 1. Direct document lookup by Auth UID in root
         const userDocRef = doc(db, 'users', user.uid);
         const snap = await getDoc(userDocRef);
         if (snap.exists()) {
-          profileData = { uid: user.uid, ...snap.data() };
+          const data = snap.data();
+          if (data.canonicalDocId) {
+            const canonicalSnap = await getDoc(doc(db, 'users', data.canonicalDocId));
+            if (canonicalSnap.exists()) {
+              profileData = { uid: canonicalSnap.id, ...canonicalSnap.data() };
+            }
+          }
+          if (!profileData) {
+            profileData = { uid: snap.id, ...data };
+          }
+        }
+
+        // 2. Query root users collection by institutional email
+        if (!profileData) {
+          const qEmail = query(collection(db, 'users'), where('email', '==', cleanEmail));
+          const querySnap = await getDocs(qEmail);
+          if (!querySnap.empty) {
+            const docSnap = querySnap.docs[0];
+            profileData = { uid: docSnap.id, ...docSnap.data() };
+          }
+        }
+
+        // 3. Query role subcollections: users/{category}/users
+        if (!profileData) {
+          const categories = ['students', 'counselors', 'faculty', 'head', 'admin'];
+          for (const cat of categories) {
+            try {
+              const qCat = query(collection(db, 'users', cat, 'users'), where('email', '==', cleanEmail));
+              const catSnap = await getDocs(qCat);
+              if (!catSnap.empty) {
+                const docSnap = catSnap.docs[0];
+                profileData = { uid: docSnap.id, ...docSnap.data() };
+                break;
+              }
+            } catch (catErr) {}
+          }
+        }
+
+        // 4. Query root role collections: {category}/{docId}
+        if (!profileData) {
+          const categories = ['students', 'counselors', 'faculty', 'head', 'admin'];
+          for (const cat of categories) {
+            try {
+              const qCat = query(collection(db, cat), where('email', '==', cleanEmail));
+              const catSnap = await getDocs(qCat);
+              if (!catSnap.empty) {
+                const docSnap = catSnap.docs[0];
+                profileData = { uid: docSnap.id, ...docSnap.data() };
+                break;
+              }
+            } catch (catErr) {}
+          }
+        }
+
+        // 5. Check role document maps: users/{category} contains docId fields
+        if (!profileData) {
+          const categories = ['students', 'counselors', 'faculty', 'head', 'admin'];
+          for (const cat of categories) {
+            try {
+              const catDoc = await getDoc(doc(db, 'users', cat));
+              if (catDoc.exists()) {
+                const data = catDoc.data();
+                for (const [key, val] of Object.entries(data)) {
+                  if (val && typeof val === 'object' && val.email && val.email.toLowerCase() === cleanEmail) {
+                    profileData = { uid: key, ...val };
+                    break;
+                  }
+                }
+                if (profileData) break;
+              }
+            } catch (catDocErr) {}
+          }
+        }
+
+        // 6. Query root users collection by authUid
+        if (!profileData) {
+          const qAuth = query(collection(db, 'users'), where('authUid', '==', user.uid));
+          const authSnap = await getDocs(qAuth);
+          if (!authSnap.empty) {
+            const docSnap = authSnap.docs[0];
+            profileData = { uid: docSnap.id, ...docSnap.data() };
+          }
         }
       } catch (fsErr) {
         console.warn('Firestore profile fetch error:', fsErr.message);
@@ -451,8 +578,15 @@ export async function loginUser(email, password, remember = true) {
 
     if (!profileData) {
       const isStudent = isStudentDomain(cleanEmail);
+      const generatedDocId = generateUserDocId(
+        isStudent ? 'student' : 'faculty',
+        user.displayName || cleanEmail.split('@')[0],
+        cleanEmail.split('@')[0]
+      );
+      const category = getRoleCategory(isStudent ? 'student' : 'faculty');
       profileData = {
-        uid: user.uid,
+        uid: generatedDocId,
+        authUid: user.uid,
         email: cleanEmail,
         fullName: user.displayName || cleanEmail.split('@')[0],
         role: isStudent ? 'student' : 'faculty',
@@ -463,7 +597,17 @@ export async function loginUser(email, password, remember = true) {
       };
       if (db) {
         try {
-          await setDoc(doc(db, 'users', user.uid), profileData, { merge: true });
+          await setDoc(doc(db, 'users', category), { [generatedDocId]: profileData }, { merge: true });
+          await setDoc(doc(db, 'users', category, 'users', generatedDocId), profileData, { merge: true });
+          await setDoc(doc(db, 'users', generatedDocId), profileData, { merge: true });
+          await setDoc(doc(db, category, generatedDocId), profileData, { merge: true });
+          if (user.uid !== generatedDocId) {
+            await setDoc(
+              doc(db, 'users', user.uid),
+              { ...profileData, canonicalDocId: generatedDocId },
+              { merge: true }
+            );
+          }
         } catch (e) {}
       }
     }

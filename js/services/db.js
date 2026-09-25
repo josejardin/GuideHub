@@ -13,8 +13,10 @@ import {
   onSnapshot,
   getDocs,
   serverTimestamp,
-  Timestamp
+  Timestamp,
+  collectionGroup
 } from '../firebase-config.js';
+import { getRoleCategory } from '../utils/validation.js';
 
 const LOCAL_STORE_KEY = 'guidehub_local_firestore_state';
 
@@ -49,10 +51,65 @@ function saveLocalState(state) {
 export async function getUserProfile(uid) {
   try {
     if (db) {
+      // 1. Direct root lookup (handles bridge docs and canonicalDocId)
       const userRef = doc(db, 'users', uid);
       const snap = await getDoc(userRef);
       if (snap.exists()) {
-        return { uid: snap.id, ...snap.data() };
+        const data = snap.data();
+        if (data.canonicalDocId) {
+          const canonicalSnap = await getDoc(doc(db, 'users', data.canonicalDocId));
+          if (canonicalSnap.exists()) {
+            return { uid: canonicalSnap.id, ...canonicalSnap.data() };
+          }
+        }
+        // If not a container category doc, return it
+        if (data.email || data.fullName) {
+          return { uid: snap.id, ...data };
+        }
+      }
+
+      // 2. Direct lookup across category subcollections: users/{cat}/users/{uid}
+      const categories = ['students', 'counselors', 'faculty', 'head', 'admin'];
+      for (const cat of categories) {
+        try {
+          const catDocRef = doc(db, 'users', cat, 'users', uid);
+          const catSnap = await getDoc(catDocRef);
+          if (catSnap.exists()) {
+            return { uid: catSnap.id, ...catSnap.data() };
+          }
+        } catch (e) {}
+      }
+
+      // 3. Direct lookup across root role collections: {cat}/{uid}
+      for (const cat of categories) {
+        try {
+          const catDocRef = doc(db, cat, uid);
+          const catSnap = await getDoc(catDocRef);
+          if (catSnap.exists()) {
+            return { uid: catSnap.id, ...catSnap.data() };
+          }
+        } catch (e) {}
+      }
+
+      // 4. Check role document maps: users/{cat} contains [uid]
+      for (const cat of categories) {
+        try {
+          const catDocRef = doc(db, 'users', cat);
+          const catSnap = await getDoc(catDocRef);
+          if (catSnap.exists()) {
+            const catData = catSnap.data();
+            if (catData[uid] && typeof catData[uid] === 'object') {
+              return { uid, ...catData[uid] };
+            }
+          }
+        } catch (e) {}
+      }
+
+      // 5. Query root users collection by authUid
+      const qAuth = query(collection(db, 'users'), where('authUid', '==', uid));
+      const authSnap = await getDocs(qAuth);
+      if (!authSnap.empty) {
+        return { uid: authSnap.docs[0].id, ...authSnap.docs[0].data() };
       }
     }
   } catch (err) {
@@ -63,6 +120,7 @@ export async function getUserProfile(uid) {
 }
 
 export async function saveUserProfile(uid, data) {
+  const category = getRoleCategory(data.role || 'student');
   const profileData = {
     uid,
     email: data.email || '',
@@ -77,8 +135,17 @@ export async function saveUserProfile(uid, data) {
 
   try {
     if (db) {
-      const userRef = doc(db, 'users', uid);
-      await setDoc(userRef, profileData, { merge: true });
+      // 1. Role document map field: users/{category} -> [uid]: profile
+      await setDoc(doc(db, 'users', category), { [uid]: profileData }, { merge: true });
+
+      // 2. Role subcollection: users/{category}/users/{uid}
+      await setDoc(doc(db, 'users', category, 'users', uid), profileData, { merge: true });
+
+      // 3. Root users document: users/{uid}
+      await setDoc(doc(db, 'users', uid), profileData, { merge: true });
+
+      // 4. Role collection at root: {category}/{uid}
+      await setDoc(doc(db, category, uid), profileData, { merge: true });
     }
   } catch (err) {
     console.warn('Firestore saveUserProfile fallback:', err.message);
@@ -93,9 +160,51 @@ export async function saveUserProfile(uid, data) {
 export async function getAllUsers() {
   try {
     if (db) {
-      const snap = await getDocs(collection(db, 'users'));
-      if (!snap.empty) {
-        return snap.docs.map(d => ({ uid: d.id, ...d.data() }));
+      const usersMap = new Map();
+      const categories = ['students', 'counselors', 'faculty', 'head', 'admin'];
+
+      // Read root users collection (skip category container docs)
+      try {
+        const rootSnap = await getDocs(collection(db, 'users'));
+        rootSnap.forEach(d => {
+          if (!categories.includes(d.id)) {
+            const data = d.data();
+            if (data.email || data.fullName) {
+              usersMap.set(d.id, { uid: d.id, ...data });
+            }
+          }
+        });
+      } catch (e) {}
+
+      // Read from all category subcollections
+      await Promise.all(
+        categories.map(async cat => {
+          try {
+            const snap = await getDocs(collection(db, 'users', cat, 'users'));
+            snap.forEach(d => usersMap.set(d.id, { uid: d.id, ...d.data() }));
+          } catch (e) {}
+        })
+      );
+
+      // Read from role doc maps
+      await Promise.all(
+        categories.map(async cat => {
+          try {
+            const snap = await getDoc(doc(db, 'users', cat));
+            if (snap.exists()) {
+              const data = snap.data();
+              for (const [key, val] of Object.entries(data)) {
+                if (val && typeof val === 'object' && val.email && !usersMap.has(key)) {
+                  usersMap.set(key, { uid: key, ...val });
+                }
+              }
+            }
+          } catch (e) {}
+        })
+      );
+
+      if (usersMap.size > 0) {
+        return Array.from(usersMap.values());
       }
     }
   } catch (err) {
@@ -108,8 +217,23 @@ export async function getAllUsers() {
 export async function updateUserRole(uid, newRole) {
   try {
     if (db) {
+      const category = getRoleCategory(newRole);
+      // Update in root
       const userRef = doc(db, 'users', uid);
-      await updateDoc(userRef, { role: newRole });
+      await updateDoc(userRef, { role: newRole }).catch(() => {});
+
+      // Update in category subcollection if present
+      const categories = ['students', 'counselors', 'faculty', 'head', 'admin'];
+      for (const cat of categories) {
+        try {
+          const catRef = doc(db, 'users', cat, 'users', uid);
+          const snap = await getDoc(catRef);
+          if (snap.exists()) {
+            await updateDoc(catRef, { role: newRole });
+            break;
+          }
+        } catch (e) {}
+      }
     }
   } catch (err) {
     console.warn('Firestore updateUserRole fallback:', err.message);

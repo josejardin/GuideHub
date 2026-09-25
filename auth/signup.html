@@ -652,7 +652,8 @@
         collection,
         query,
         where,
-        getDocs
+        getDocs,
+        collectionGroup
       } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js';
       import { db } from '../js/firebase-config.js';
       import {
@@ -937,12 +938,46 @@
             return;
           }
 
-          // Real-time pre-check for duplicate ID in Firestore
+          // Real-time pre-check for duplicate ID in Firestore (both hierarchical & root)
           if (db && idNumber) {
             try {
+              let duplicateFound = false;
+              const categories = ['students', 'counselors', 'faculty', 'head', 'admin'];
+
+              // 1. Check root users
               const qId = query(collection(db, 'users'), where('studentOrEmpId', '==', idNumber));
               const snap = await getDocs(qId);
-              if (!snap.empty) {
+              if (!snap.empty) duplicateFound = true;
+
+              // 2. Check role subcollections (users/{cat}/users)
+              if (!duplicateFound) {
+                for (const cat of categories) {
+                  try {
+                    const qCat = query(collection(db, 'users', cat, 'users'), where('studentOrEmpId', '==', idNumber));
+                    const catSnap = await getDocs(qCat);
+                    if (!catSnap.empty) {
+                      duplicateFound = true;
+                      break;
+                    }
+                  } catch (e) {}
+                }
+              }
+
+              // 3. Check role collections at root
+              if (!duplicateFound) {
+                for (const cat of categories) {
+                  try {
+                    const qCat = query(collection(db, cat), where('studentOrEmpId', '==', idNumber));
+                    const catSnap = await getDocs(qCat);
+                    if (!catSnap.empty) {
+                      duplicateFound = true;
+                      break;
+                    }
+                  } catch (e) {}
+                }
+              }
+
+              if (duplicateFound) {
                 showToast(`Student / Employee ID (${idNumber}) is already registered.`, 'error');
                 return;
               }
@@ -1205,10 +1240,19 @@
             wizardSubmitBtn.innerHTML = `<span>Dispatching 6-Digit OTP...</span>`;
 
             // Strict UI Gating: Awaits confirmed 200 OK from /api/send-otp
-            await sendInstitutionalOTP(email, fullName, 'registration', pendingProfileData);
+            const otpResult = await sendInstitutionalOTP(email, fullName, 'registration', pendingProfileData);
 
             hideInlineError();
-            showToast(`6-Digit OTP sent to ${email}! Check your inbox and spam folder.`, 'success');
+            if (otpResult && otpResult.simulated && otpResult.otp) {
+              showToast(`Local Dev Mode: Verification OTP is ${otpResult.otp}`, 'info');
+              console.info(`[GuideHub DEV] Verification OTP: ${otpResult.otp}`);
+              // Auto-fill digits for ease of testing in development
+              otpResult.otp.split('').forEach((digit, idx) => {
+                if (otpBoxes[idx]) otpBoxes[idx].value = digit;
+              });
+            } else {
+              showToast(`6-Digit OTP sent to ${email}! Check your inbox and spam folder.`, 'success');
+            }
 
             // Only transition to Step 4 after verified 200 OK response
             goToStep(4);
