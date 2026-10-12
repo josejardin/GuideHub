@@ -271,7 +271,12 @@ app.post('/api/send-otp', async (req, res) => {
       </body>
       </html>
     `,
-    attachments: [{ filename: 'nu-logo.png', path: logoPath, cid: 'nulogo' }]
+    attachments: [{ filename: 'nu-logo.png', path: logoPath, cid: 'nulogo' }],
+    headers: {
+      'X-Priority': '1',
+      'X-MSMail-Priority': 'High',
+      Importance: 'high'
+    }
   };
 
   try {

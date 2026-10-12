@@ -938,43 +938,21 @@
             return;
           }
 
-          // Real-time pre-check for duplicate ID in Firestore (both hierarchical & root)
+          // Real-time pre-check for duplicate ID in Firestore role subcollections
           if (db && idNumber) {
             try {
               let duplicateFound = false;
               const categories = ['students', 'counselors', 'faculty', 'head', 'admin'];
 
-              // 1. Check root users
-              const qId = query(collection(db, 'users'), where('studentOrEmpId', '==', idNumber));
-              const snap = await getDocs(qId);
-              if (!snap.empty) duplicateFound = true;
-
-              // 2. Check role subcollections (users/{cat}/users)
-              if (!duplicateFound) {
-                for (const cat of categories) {
-                  try {
-                    const qCat = query(collection(db, 'users', cat, 'users'), where('studentOrEmpId', '==', idNumber));
-                    const catSnap = await getDocs(qCat);
-                    if (!catSnap.empty) {
-                      duplicateFound = true;
-                      break;
-                    }
-                  } catch (e) {}
-                }
-              }
-
-              // 3. Check role collections at root
-              if (!duplicateFound) {
-                for (const cat of categories) {
-                  try {
-                    const qCat = query(collection(db, cat), where('studentOrEmpId', '==', idNumber));
-                    const catSnap = await getDocs(qCat);
-                    if (!catSnap.empty) {
-                      duplicateFound = true;
-                      break;
-                    }
-                  } catch (e) {}
-                }
+              for (const cat of categories) {
+                try {
+                  const qCat = query(collection(db, 'users', cat, 'users'), where('studentOrEmpId', '==', idNumber));
+                  const catSnap = await getDocs(qCat);
+                  if (!catSnap.empty) {
+                    duplicateFound = true;
+                    break;
+                  }
+                } catch (e) {}
               }
 
               if (duplicateFound) {
@@ -1323,8 +1301,17 @@
         // RESEND OTP ACTION
         btnResendOtp?.addEventListener('click', async () => {
           try {
-            await sendInstitutionalOTP(pendingEmail, pendingProfileData?.fullName || 'Nationalian', 'registration');
-            showToast(`New 6-digit OTP code sent to ${pendingEmail}.`, 'info');
+            const otpResult = await sendInstitutionalOTP(
+              pendingEmail,
+              pendingProfileData?.fullName || 'Nationalian',
+              'registration',
+              pendingProfileData || {}
+            );
+            if (otpResult && otpResult.simulated && otpResult.otp) {
+              showToast(`Local Dev Mode: Verification OTP is ${otpResult.otp}`, 'info');
+            } else {
+              showToast(`New 6-digit OTP code sent to ${pendingEmail}. Please check Inbox and Junk/Spam.`, 'info');
+            }
             clearOtpBoxes();
             otpBoxes[0]?.focus();
             start5MinCountdown();

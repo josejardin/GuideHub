@@ -141,18 +141,7 @@ export async function findAccountByEmail(rawEmail) {
   const cleanEmail = (rawEmail || '').trim().toLowerCase();
   if (!cleanEmail) return null;
 
-  // 1. Check root users collection (users/{docId})
-  try {
-    const qRoot = query(collection(clientDb, 'users'), where('email', '==', cleanEmail));
-    const snapRoot = await getDocs(qRoot);
-    if (!snapRoot.empty) {
-      return { id: snapRoot.docs[0].id, path: snapRoot.docs[0].ref.path, ...snapRoot.docs[0].data() };
-    }
-  } catch (err) {
-    console.warn('[WARNING] Root users email query notice:', err.message);
-  }
-
-  // 2. Check role subcollections (users/{roleCategory}/users)
+  // 1. Check role subcollections (users/{roleCategory}/users)
   try {
     for (const cat of ROLE_CATEGORIES) {
       const qCat = query(collection(clientDb, 'users', cat, 'users'), where('email', '==', cleanEmail));
@@ -165,20 +154,7 @@ export async function findAccountByEmail(rawEmail) {
     console.warn('[WARNING] Subcollection users email query notice:', err.message);
   }
 
-  // 3. Check role collections at root ({roleCategory}/{docId})
-  try {
-    for (const cat of ROLE_CATEGORIES) {
-      const qCat = query(collection(clientDb, cat), where('email', '==', cleanEmail));
-      const snapCat = await getDocs(qCat);
-      if (!snapCat.empty) {
-        return { id: snapCat.docs[0].id, path: snapCat.docs[0].ref.path, ...snapCat.docs[0].data() };
-      }
-    }
-  } catch (err) {
-    console.warn('[WARNING] Root category email query notice:', err.message);
-  }
-
-  // 4. Check role document maps: users/{category} contains docId fields
+  // 2. Check role document maps: users/{category} contains docId fields
   try {
     for (const cat of ROLE_CATEGORIES) {
       const catDoc = await getDoc(doc(clientDb, 'users', cat));
@@ -195,7 +171,7 @@ export async function findAccountByEmail(rawEmail) {
     console.warn('[WARNING] Role doc map email notice:', err.message);
   }
 
-  // 5. Safely check Admin Auth if available
+  // 3. Safely check Admin Auth if available
   if (isFirebaseAdminInitialized) {
     try {
       const adminUser = await getAdminAuth()
@@ -219,18 +195,7 @@ export async function findAccountById(idNumber) {
   const cleanId = (idNumber || '').trim();
   if (!cleanId) return null;
 
-  // 1. Check root users collection
-  try {
-    const qRoot = query(collection(clientDb, 'users'), where('studentOrEmpId', '==', cleanId));
-    const snapRoot = await getDocs(qRoot);
-    if (!snapRoot.empty) {
-      return { id: snapRoot.docs[0].id, path: snapRoot.docs[0].ref.path, ...snapRoot.docs[0].data() };
-    }
-  } catch (err) {
-    console.warn('[WARNING] Root users ID query notice:', err.message);
-  }
-
-  // 2. Check role subcollections (users/{roleCategory}/users)
+  // 1. Check role subcollections (users/{roleCategory}/users)
   try {
     for (const cat of ROLE_CATEGORIES) {
       const qCat = query(collection(clientDb, 'users', cat, 'users'), where('studentOrEmpId', '==', cleanId));
@@ -243,20 +208,7 @@ export async function findAccountById(idNumber) {
     console.warn('[WARNING] Subcollection users ID query notice:', err.message);
   }
 
-  // 3. Check role collections at root ({roleCategory}/{docId})
-  try {
-    for (const cat of ROLE_CATEGORIES) {
-      const qCat = query(collection(clientDb, cat), where('studentOrEmpId', '==', cleanId));
-      const snapCat = await getDocs(qCat);
-      if (!snapCat.empty) {
-        return { id: snapCat.docs[0].id, path: snapCat.docs[0].ref.path, ...snapCat.docs[0].data() };
-      }
-    }
-  } catch (err) {
-    console.warn('[WARNING] Root category ID query notice:', err.message);
-  }
-
-  // 4. Check role document maps: users/{category} contains docId fields
+  // 2. Check role document maps: users/{category} contains docId fields
   try {
     for (const cat of ROLE_CATEGORIES) {
       const catDoc = await getDoc(doc(clientDb, 'users', cat));
