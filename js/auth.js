@@ -17,7 +17,8 @@ import {
   getDocs,
   collectionGroup
 } from './firebase-config.js';
-import { generateUserDocId, getRoleCategory } from './utils/validation.js';
+import { generateUserDocId, getRoleCategory, escapeHtml } from './utils/validation.js';
+import { logAuditEvent } from './db.js';
 
 const CURRENT_USER_KEY = 'guidehub_active_user';
 
@@ -406,6 +407,14 @@ export async function verifyOTPAndCreateUser(email, enteredCode, profileData, pa
     timestamp: new Date().toISOString()
   });
 
+  await logAuditEvent(
+    completeProfile.uid,
+    completeProfile.fullName,
+    completeProfile.role,
+    'USER_REGISTERED',
+    `Registered verified ${completeProfile.role} account (${completeProfile.email})`
+  );
+
   setCurrentUser(completeProfile, true);
 
   return completeProfile;
@@ -435,12 +444,12 @@ export async function verifyPasswordResetOTP(email, enteredCode, newPassword) {
   const data = otpSnap.data();
 
   if ((data.attempts || 0) >= 3) {
-    await deleteDoc(otpDocRef);
+    await deleteDoc(otpDocRef).catch(() => {});
     throw new Error('Maximum failed attempts exceeded (3). Please request a new recovery code.');
   }
 
   if (Date.now() > data.expiresAt) {
-    await deleteDoc(otpDocRef);
+    await deleteDoc(otpDocRef).catch(() => {});
     throw new Error('Recovery code has expired (5-minute limit). Please request a new code.');
   }
 
@@ -470,7 +479,7 @@ export async function verifyPasswordResetOTP(email, enteredCode, newPassword) {
     throw new Error(apiErr.message || 'Failed to connect to password reset service.');
   }
 
-  await deleteDoc(otpDocRef);
+  await deleteDoc(otpDocRef).catch(() => {});
   return { success: true, email: cleanEmail };
 }
 
@@ -505,8 +514,10 @@ export async function loginUser(email, password, remember = true) {
           const qEmail = query(collection(db, 'users'), where('email', '==', cleanEmail));
           const querySnap = await getDocs(qEmail);
           if (!querySnap.empty) {
-            const docSnap = querySnap.docs[0];
-            profileData = { uid: docSnap.id, ...docSnap.data() };
+            const primaryDoc =
+              querySnap.docs.find(d => !d.data().canonicalDocId || d.data().canonicalDocId === d.id) ||
+              querySnap.docs[0];
+            profileData = { uid: primaryDoc.id, ...primaryDoc.data() };
           }
         }
 
@@ -613,6 +624,13 @@ export async function loginUser(email, password, remember = true) {
     }
 
     setCurrentUser(profileData, remember);
+    logAuditEvent(
+      profileData.uid,
+      profileData.fullName,
+      profileData.role,
+      'USER_LOGIN',
+      `Authenticated into ${profileData.role} portal (${profileData.email})`
+    ).catch(() => {});
     return profileData;
   } catch (error) {
     let msg = error.message;
@@ -710,15 +728,15 @@ export function initNavbar(containerId = 'navbar-container', activePortal = '') 
 
  <!-- User Identity & Logout -->
  <div class="flex items-center space-x-3">
- <div class="hidden sm:flex items-center space-x-2.5 px-3.5 py-1.5 bg-white/10 backdrop-blur-xs rounded-xl border border-white/10">
+ <div class="hidden sm:flex items-center space-x-2.5 px-3.5 py-1.5 bg-white/10 backdrop-blur-sm rounded-xl border border-white/10">
  <div class="text-right">
- <div class="text-xs font-bold text-white leading-tight">${user.fullName}</div>
- <div class="text-[10px] text-slate-300 font-mono">${user.studentOrEmpId || user.email}</div>
+ <div class="text-xs font-bold text-white leading-tight">${escapeHtml(user.fullName)}</div>
+ <div class="text-[10px] text-slate-300 font-mono">${escapeHtml(user.studentOrEmpId || user.email)}</div>
  </div>
  <div class="ml-1">${getRoleBadge(user.role)}</div>
  </div>
 
- <button id="nav-logout-btn" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold text-[#00205B] bg-[#F5B800] hover:bg-[#D99B00] shadow-xs transition">
+ <button id="nav-logout-btn" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold text-[#00205B] bg-[#F5B800] hover:bg-[#D99B00] shadow-sm transition">
  <i data-lucide="log-out" class="w-3.5 h-3.5"></i>
  <span class="hidden sm:inline">Sign Out</span>
  </button>

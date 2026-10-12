@@ -60,19 +60,18 @@ const standardizedAccounts = [
     isVerified: true
   },
   {
-    // Convenience test alias for student
-    docId: 'usr_student_test',
-    email: 'student.test@students.nu-fairview.edu.ph',
+    docId: 'usr_student_angelica_r',
+    email: 'angelica.reyes@students.nu-fairview.edu.ph',
     password: 'Password123!',
-    fullName: 'Gio Daniel Canag Laberinto',
+    fullName: 'Angelica Reyes',
     role: 'student',
     roleType: 'student',
     department: 'College of Computing and Information Technology',
-    program: 'BS Computer Engineering',
-    yearLevel: '2nd Year',
+    program: 'BS Information Technology',
+    yearLevel: '4th Year',
     studentOrEmpId: '2024-10892',
-    gender: 'Male',
-    contactNumber: '0917-111-2222',
+    gender: 'Female',
+    contactNumber: '0919-555-7788',
     isVerified: true
   },
   // 2. Counselors
@@ -90,16 +89,15 @@ const standardizedAccounts = [
     isVerified: true
   },
   {
-    // Convenience test alias for counselor
-    docId: 'usr_counselor_test',
-    email: 'counselor.test@nu-fairview.edu.ph',
+    docId: 'usr_counselor_claire_m',
+    email: 'claire.m@nu-fairview.edu.ph',
     password: 'Password123!',
-    fullName: 'Mark Dimalanta, RGC',
+    fullName: 'Claire Mendoza, RGC',
     role: 'counselor',
     roleType: 'counselor',
     department: 'Guidance and Counseling Center',
     studentOrEmpId: 'EMP-2024-0103',
-    gender: 'Male',
+    gender: 'Female',
     contactNumber: '0920-444-5556',
     isVerified: true
   },
@@ -118,16 +116,15 @@ const standardizedAccounts = [
     isVerified: true
   },
   {
-    // Convenience test alias for faculty
-    docId: 'usr_faculty_test',
-    email: 'faculty.test@nu-fairview.edu.ph',
+    docId: 'usr_faculty_alyssa_v',
+    email: 'alyssa.v@nu-fairview.edu.ph',
     password: 'Password123!',
-    fullName: 'Engr. Benedict Zurbito',
+    fullName: 'Prof. Alyssa Villanueva',
     role: 'faculty',
     roleType: 'faculty',
-    department: 'Computer Engineering',
+    department: 'College of Arts and Sciences',
     studentOrEmpId: 'EMP-2024-0204',
-    gender: 'Male',
+    gender: 'Female',
     contactNumber: '0921-555-6667',
     isVerified: true
   },
@@ -145,20 +142,6 @@ const standardizedAccounts = [
     contactNumber: '0919-333-4444',
     isVerified: true
   },
-  {
-    // Convenience test alias for head
-    docId: 'usr_head_test',
-    email: 'head.test@nu-fairview.edu.ph',
-    password: 'Password123!',
-    fullName: 'Maria Santos, RGC',
-    role: 'head',
-    roleType: 'head',
-    department: 'Guidance and Counseling Center',
-    studentOrEmpId: 'EMP-2024-0010',
-    gender: 'Female',
-    contactNumber: '0923-777-8888',
-    isVerified: true
-  },
   // 5. System Administrator
   {
     docId: 'usr_admin_alex_m',
@@ -172,24 +155,23 @@ const standardizedAccounts = [
     gender: 'Male',
     contactNumber: '0925-999-0000',
     isVerified: true
-  },
-  {
-    // Convenience test alias for admin
-    docId: 'usr_admin_test',
-    email: 'admin.test@nu-fairview.edu.ph',
-    password: 'Password123!',
-    fullName: 'Alex Mendoza',
-    role: 'admin',
-    roleType: 'admin',
-    department: 'Administration',
-    studentOrEmpId: 'EMP-2024-0002',
-    gender: 'Male',
-    contactNumber: '0925-999-0001',
-    isVerified: true
   }
 ];
 
-// Sample Relational Data
+function getRelativeDateIso(offsetDays = 0) {
+  const d = new Date();
+  d.setDate(d.getDate() + offsetDays);
+  return d.toISOString().split('T')[0];
+}
+
+const todayIso = getRelativeDateIso(0);
+const tomorrowIso = getRelativeDateIso(1);
+const yesterdayIso = getRelativeDateIso(-1);
+const twoDaysAgoIso = getRelativeDateIso(-2);
+const threeDaysAgoIso = getRelativeDateIso(-3);
+const nowIso = new Date().toISOString();
+
+// Sample Relational Data Matching Portal Schemas
 const sampleAppointments = [
   {
     id: 'apt_sample_01',
@@ -201,12 +183,95 @@ const sampleAppointments = [
     contactNumber: '0917-111-2222',
     counselorId: 'usr_counselor_mark_d',
     counselorName: 'Mark Dimalanta, RGC',
-    date: '2026-10-05',
-    timeSlot: '10:00 AM - 11:00 AM',
-    concernCategory: 'Academic Coaching & Study Strategies',
-    specificConcern: 'Consultation regarding career pathing and academic workload balancing.',
+    counselorGenderPreference: 'Any',
+    date: todayIso,
+    timeSlot: '09:00 - 10:00',
+    concernCategory: 'Academic Stress & Time Management',
+    academicCycle: 'Midterms',
+    specificConcern: 'Consultation regarding balancing engineering coursework and capstone project deadlines.',
     status: 'Confirmed',
-    isWalkIn: false
+    isWalkIn: false,
+    createdAt: yesterdayIso
+  },
+  {
+    id: 'apt_sample_02',
+    studentId: 'usr_student_angelica_r',
+    studentName: 'Angelica Reyes',
+    studentNumber: '2024-10892',
+    program: 'BS Information Technology',
+    gender: 'Female',
+    contactNumber: '0919-555-7788',
+    counselorId: 'usr_counselor_mark_d',
+    counselorName: 'Mark Dimalanta, RGC',
+    counselorGenderPreference: 'Any',
+    date: todayIso,
+    timeSlot: '11:00 - 12:00',
+    concernCategory: 'Career & Internship Guidance',
+    academicCycle: 'Finals',
+    specificConcern: 'Guidance on OJT placement and IT career specialization tracks.',
+    status: 'Pending',
+    isWalkIn: false,
+    createdAt: todayIso
+  },
+  {
+    id: 'apt_sample_03',
+    studentId: 'usr_student_joshua_g',
+    studentName: 'Joshua Garcia',
+    studentNumber: '2023-10442',
+    program: 'BS Psychology',
+    gender: 'Male',
+    contactNumber: '0918-222-3333',
+    counselorId: 'usr_counselor_mark_d',
+    counselorName: 'Mark Dimalanta, RGC',
+    counselorGenderPreference: 'Male',
+    date: yesterdayIso,
+    timeSlot: '14:00 - 15:00',
+    concernCategory: 'Mental Health & Emotional Well-being',
+    academicCycle: 'First Year Transition',
+    specificConcern: 'Follow-up consultation on sleep hygiene and stress management.',
+    status: 'Completed',
+    isWalkIn: false,
+    createdAt: twoDaysAgoIso
+  },
+  {
+    id: 'apt_sample_04',
+    studentId: 'usr_student_gio_l',
+    studentName: 'Gio Daniel Canag Laberinto',
+    studentNumber: '2024-1033694',
+    program: 'BS Computer Engineering',
+    gender: 'Male',
+    contactNumber: '0917-111-2222',
+    counselorId: 'usr_counselor_claire_m',
+    counselorName: 'Claire Mendoza, RGC',
+    counselorGenderPreference: 'Any',
+    date: twoDaysAgoIso,
+    timeSlot: '10:00 - 11:00',
+    concernCategory: 'Academic Stress & Time Management',
+    academicCycle: 'Midterms',
+    specificConcern: 'Initial academic adjustment check-in.',
+    status: 'Completed',
+    isWalkIn: false,
+    createdAt: threeDaysAgoIso
+  },
+  {
+    id: 'apt_sample_05',
+    studentId: 'usr_student_joshua_g',
+    studentName: 'Joshua Garcia',
+    studentNumber: '2023-10442',
+    program: 'BS Psychology',
+    gender: 'Male',
+    contactNumber: '0918-222-3333',
+    counselorId: 'usr_counselor_claire_m',
+    counselorName: 'Claire Mendoza, RGC',
+    counselorGenderPreference: 'Any',
+    date: threeDaysAgoIso,
+    timeSlot: '15:00 - 16:00',
+    concernCategory: 'Relationship & Personal',
+    academicCycle: 'Enrollment / Prelims',
+    specificConcern: 'Same-day walk-in consultation for peer adjustment.',
+    status: 'Completed',
+    isWalkIn: true,
+    createdAt: threeDaysAgoIso
   }
 ];
 
@@ -217,26 +282,114 @@ const sampleReferrals = [
     studentName: 'Gio Daniel Canag Laberinto',
     studentNumber: '2024-1033694',
     program: 'BS Computer Engineering',
+    subjectCourse: 'CPE104 - Microprocessors',
     facultyId: 'usr_faculty_benedict_z',
     facultyName: 'Engr. Benedict Zurbito',
-    reasonCategory: 'Academic Performance & Retention',
-    urgencyLevel: 'Medium',
-    status: 'Acknowledged',
-    comments: 'Student demonstrated strong aptitude, recommended for academic mentorship program.'
+    facultyEmail: 'b.zurbito@nu-fairview.edu.ph',
+    reasonCategory: 'Sudden Drop in Academic Grades',
+    specificObservations:
+      'Student showed strong early performance but missed two recent laboratory submissions and appeared fatigued during lecture.',
+    status: 'Referred',
+    createdAt: yesterdayIso,
+    updatedAt: yesterdayIso
+  },
+  {
+    id: 'ref_sample_02',
+    studentId: 'usr_student_joshua_g',
+    studentName: 'Joshua Garcia',
+    studentNumber: '2023-10442',
+    program: 'BS Psychology',
+    subjectCourse: 'GE102 - Ethics',
+    facultyId: 'usr_faculty_benedict_z',
+    facultyName: 'Engr. Benedict Zurbito',
+    facultyEmail: 'b.zurbito@nu-fairview.edu.ph',
+    reasonCategory: 'Emotional Distress in Class',
+    specificObservations:
+      'Student requested to step out during lecture due to acute anxiety; recommended supportive guidance check-in.',
+    status: 'Call Slip Issued',
+    callSlipIssuedAt: todayIso,
+    callSlipAppointmentDate: tomorrowIso,
+    callSlipAppointmentTime: '10:00 AM',
+    assignedCounselor: 'Mark Dimalanta, RGC',
+    createdAt: twoDaysAgoIso,
+    updatedAt: todayIso
   }
 ];
 
 const sampleCases = [
   {
     id: 'case_sample_01',
+    caseId: 'case_sample_01',
     studentId: 'usr_student_gio_l',
     studentName: 'Gio Daniel Canag Laberinto',
     studentNumber: '2024-1033694',
+    program: 'BS Computer Engineering',
     counselorId: 'usr_counselor_mark_d',
     counselorName: 'Mark Dimalanta, RGC',
-    category: 'Academic Consultation',
-    severity: 'Tier 1 - Routine',
-    status: 'Open'
+    category: 'Academic Stress & Time Management',
+    status: 'Active',
+    riskFlags: {
+      selfHarm: false,
+      abuseHarmFromOthers: false,
+      threatToOthers: false
+    },
+    lastSessionDate: twoDaysAgoIso,
+    createdAt: threeDaysAgoIso,
+    updatedAt: twoDaysAgoIso,
+    notes: [
+      {
+        id: 'note_01',
+        noteType: 'Intake Assessment',
+        sessionDate: twoDaysAgoIso,
+        counselorId: 'usr_counselor_mark_d',
+        counselorName: 'Mark Dimalanta, RGC',
+        subjectiveObservation:
+          'Student expressed feeling overwhelmed by simultaneous laboratory deadlines and capstone milestones.',
+        counselorRemarks:
+          'Conducted structured time-blocking exercise and cognitive reframing for academic performance anxiety.',
+        actionPlan: '1. Implement weekly priority matrix; 2. Follow-up check-in during midterm week.',
+        followUpDate: null,
+        riskFlags: { selfHarm: false, abuseHarmFromOthers: false, threatToOthers: false },
+        createdAt: twoDaysAgoIso
+      }
+    ]
+  },
+  {
+    id: 'case_sample_02',
+    caseId: 'case_sample_02',
+    studentId: 'usr_student_joshua_g',
+    studentName: 'Joshua Garcia',
+    studentNumber: '2023-10442',
+    program: 'BS Psychology',
+    counselorId: 'usr_counselor_mark_d',
+    counselorName: 'Mark Dimalanta, RGC',
+    category: 'Mental Health & Emotional Well-being',
+    status: 'High Risk',
+    riskFlags: {
+      selfHarm: true,
+      abuseHarmFromOthers: false,
+      threatToOthers: false
+    },
+    lastSessionDate: yesterdayIso,
+    createdAt: threeDaysAgoIso,
+    updatedAt: yesterdayIso,
+    notes: [
+      {
+        id: 'note_01',
+        noteType: 'Crisis Intervention',
+        sessionDate: yesterdayIso,
+        counselorId: 'usr_counselor_mark_d',
+        counselorName: 'Mark Dimalanta, RGC',
+        subjectiveObservation:
+          'Student disclosed acute emotional exhaustion and passive distress thoughts following family conflict.',
+        counselorRemarks:
+          'Activated RA 9258 crisis safety protocol, established grounding techniques, and coordinated supportive monitoring.',
+        actionPlan: '1. Daily grounding log; 2. Scheduled priority follow-up consultation.',
+        followUpDate: tomorrowIso,
+        riskFlags: { selfHarm: true, abuseHarmFromOthers: false, threatToOthers: false },
+        createdAt: yesterdayIso
+      }
+    ]
   }
 ];
 
@@ -248,9 +401,76 @@ const sampleWalkinQueue = [
     studentName: 'Joshua Garcia',
     studentNumber: '2023-10442',
     program: 'BS Psychology',
-    counselorGenderPreference: 'Any',
+    gender: 'Male',
+    contactNumber: '0918-222-3333',
+    concernCategory: 'Urgent Stress / Anxiety Relief',
     status: 'Waiting',
-    estimatedWaitTime: '5 mins'
+    assignedCounselorId: null,
+    date: todayIso,
+    createdAt: nowIso
+  },
+  {
+    id: 'walkin_sample_02',
+    ticketNumber: 'W-102',
+    studentId: 'usr_student_angelica_r',
+    studentName: 'Angelica Reyes',
+    studentNumber: '2024-10892',
+    program: 'BS Information Technology',
+    gender: 'Female',
+    contactNumber: '0919-555-7788',
+    concernCategory: 'Academic Difficulty Consultation',
+    status: 'Calling',
+    assignedCounselorId: 'usr_counselor_mark_d',
+    date: todayIso,
+    createdAt: nowIso
+  }
+];
+
+const sampleAuditLogs = [
+  {
+    id: 'log_sample_01',
+    actorId: 'usr_admin_alex_m',
+    actorName: 'Alex Mendoza',
+    actorRole: 'admin',
+    action: 'USER_LOGIN',
+    details: 'Authenticated into admin portal (admin.alex@nu-fairview.edu.ph)',
+    timestamp: nowIso
+  },
+  {
+    id: 'log_sample_02',
+    actorId: 'usr_student_gio_l',
+    actorName: 'Gio Daniel Canag Laberinto',
+    actorRole: 'student',
+    action: 'APPOINTMENT_BOOKED',
+    details: `Booked ${todayIso} (09:00 - 10:00) with Mark Dimalanta, RGC - Academic Stress & Time Management`,
+    timestamp: yesterdayIso + 'T10:15:00.000Z'
+  },
+  {
+    id: 'log_sample_03',
+    actorId: 'usr_faculty_benedict_z',
+    actorName: 'Engr. Benedict Zurbito',
+    actorRole: 'faculty',
+    action: 'REFERRAL_SUBMITTED',
+    details: 'Submitted referral for Gio Daniel Canag Laberinto (2024-1033694)',
+    timestamp: yesterdayIso + 'T14:30:00.000Z'
+  },
+  {
+    id: 'log_sample_04',
+    actorId: 'usr_counselor_mark_d',
+    actorName: 'Mark Dimalanta, RGC',
+    actorRole: 'counselor',
+    action: 'CALL_SLIP_ISSUED',
+    details: `Issued Call Slip for Joshua Garcia on ${tomorrowIso} 10:00 AM`,
+    timestamp: nowIso
+  },
+  {
+    id: 'log_sample_05',
+    actorId: 'usr_counselor_mark_d',
+    actorName: 'Mark Dimalanta, RGC',
+    actorRole: 'counselor',
+    action: 'CASE_NOTE_RECORDED',
+    details: `Recorded session note for case 2023-10442 (Follow-up: ${tomorrowIso})`,
+    timestamp: yesterdayIso + 'T16:00:00.000Z'
   }
 ];
 
@@ -302,7 +522,7 @@ async function seedDatabase() {
         academicTrack: null,
         isVerified: true,
         emailVerified: true,
-        createdAt: serverTimestamp()
+        createdAt: nowIso
       };
 
       // 1. Role Document Field representation: users/{category} contains docId as map
@@ -341,26 +561,22 @@ async function seedDatabase() {
           { merge: true }
         );
       }
-
-      await signOut(auth);
     } catch (err) {
       console.error(` Error provisioning ${account.email}:`, err.message);
     }
   }
+
+  // Ensure we are signed in as Admin before seeding protected relational collections
+  try {
+    await signInWithEmailAndPassword(auth, 'admin.alex@nu-fairview.edu.ph', 'Password123!');
+  } catch (e) {}
 
   // 2. Seed Relational Collections
   console.log('\n Provisioning Relational Collections (Referencing Standardized IDs)...');
 
   for (const apt of sampleAppointments) {
     try {
-      await setDoc(
-        doc(db, 'appointments', apt.id),
-        {
-          ...apt,
-          createdAt: serverTimestamp()
-        },
-        { merge: true }
-      );
+      await setDoc(doc(db, 'appointments', apt.id), apt, { merge: true });
       console.log(` [APPOINTMENT SYNCED] ${apt.id} -> Student: ${apt.studentId}, Counselor: ${apt.counselorId}`);
     } catch (err) {
       console.error(` Error creating appointment ${apt.id}:`, err.message);
@@ -369,14 +585,7 @@ async function seedDatabase() {
 
   for (const ref of sampleReferrals) {
     try {
-      await setDoc(
-        doc(db, 'referrals', ref.id),
-        {
-          ...ref,
-          createdAt: serverTimestamp()
-        },
-        { merge: true }
-      );
+      await setDoc(doc(db, 'referrals', ref.id), ref, { merge: true });
       console.log(` [REFERRAL SYNCED] ${ref.id} -> Student: ${ref.studentId}, Faculty: ${ref.facultyId}`);
     } catch (err) {
       console.error(` Error creating referral ${ref.id}:`, err.message);
@@ -385,24 +594,11 @@ async function seedDatabase() {
 
   for (const c of sampleCases) {
     try {
-      await setDoc(
-        doc(db, 'cases', c.id),
-        {
-          ...c,
-          createdAt: serverTimestamp()
-        },
-        { merge: true }
-      );
-      await setDoc(
-        doc(db, `cases/${c.id}/notes`, 'note_01'),
-        {
-          counselorId: c.counselorId,
-          counselorName: c.counselorName,
-          note: 'Initial clinical intake conducted. Collaborative action plan established for weekly review.',
-          createdAt: serverTimestamp()
-        },
-        { merge: true }
-      );
+      const { notes, ...caseDoc } = c;
+      await setDoc(doc(db, 'cases', c.id), caseDoc, { merge: true });
+      for (const n of notes || []) {
+        await setDoc(doc(db, `cases/${c.id}/notes`, n.id), n, { merge: true });
+      }
       console.log(` [CASE SYNCED] ${c.id} -> Student: ${c.studentId}, Counselor: ${c.counselorId}`);
     } catch (err) {
       console.error(` Error creating case ${c.id}:`, err.message);
@@ -411,19 +607,23 @@ async function seedDatabase() {
 
   for (const w of sampleWalkinQueue) {
     try {
-      await setDoc(
-        doc(db, 'walkinQueue', w.id),
-        {
-          ...w,
-          createdAt: serverTimestamp()
-        },
-        { merge: true }
-      );
-      console.log(` [WALKIN SYNCED] ${w.id} -> Student: ${w.studentId}`);
+      await setDoc(doc(db, 'walkin_queue', w.id), w, { merge: true });
+      console.log(` [WALKIN SYNCED] ${w.id} (${w.ticketNumber}) -> Student: ${w.studentId}`);
     } catch (err) {
       console.error(` Error creating walkin ${w.id}:`, err.message);
     }
   }
+
+  for (const log of sampleAuditLogs) {
+    try {
+      await setDoc(doc(db, 'auditLogs', log.id), log, { merge: true });
+      console.log(` [AUDIT LOG SYNCED] ${log.id} (${log.action})`);
+    } catch (err) {
+      console.error(` Error creating audit log ${log.id}:`, err.message);
+    }
+  }
+
+  await signOut(auth).catch(() => {});
 
   console.log('\n================================================================');
   console.log(' Clean Demo Seeding Completed Successfully!');

@@ -17,6 +17,7 @@ import {
   toggleCounselorBlockedSlot,
   logAuditEvent
 } from './db.js';
+import { escapeHtml, formatDateIso } from './utils/validation.js';
 
 document.addEventListener('DOMContentLoaded', () => {
   const currentUser = requireRole(['counselor', 'head', 'admin']);
@@ -99,15 +100,15 @@ document.addEventListener('DOMContentLoaded', () => {
 
   function updateFilterUI() {
     if (activeViewFilter === 'selected_date') {
-      btnViewDate?.classList.add('bg-white', 'text-[#00205B]', 'font-bold', 'shadow-xs');
+      btnViewDate?.classList.add('bg-white', 'text-[#00205B]', 'font-bold', 'shadow-sm');
       btnViewDate?.classList.remove('text-slate-600');
-      btnViewPending?.classList.remove('bg-white', 'text-[#00205B]', 'font-bold', 'shadow-xs');
+      btnViewPending?.classList.remove('bg-white', 'text-[#00205B]', 'font-bold', 'shadow-sm');
       btnViewPending?.classList.add('text-slate-600');
       agendaDateWrapper?.classList.remove('opacity-50');
     } else {
-      btnViewPending?.classList.add('bg-white', 'text-[#00205B]', 'font-bold', 'shadow-xs');
+      btnViewPending?.classList.add('bg-white', 'text-[#00205B]', 'font-bold', 'shadow-sm');
       btnViewPending?.classList.remove('text-slate-600');
-      btnViewDate?.classList.remove('bg-white', 'text-[#00205B]', 'font-bold', 'shadow-xs');
+      btnViewDate?.classList.remove('bg-white', 'text-[#00205B]', 'font-bold', 'shadow-sm');
       btnViewDate?.classList.add('text-slate-600');
       agendaDateWrapper?.classList.add('opacity-50');
     }
@@ -189,27 +190,27 @@ document.addEventListener('DOMContentLoaded', () => {
  <div class="p-4 bg-white flex flex-col md:flex-row items-start md:items-center justify-between gap-3 hover:bg-slate-50/60 transition ${isPending ? 'border-l-4 border-amber-400 bg-amber-50/20' : ''}">
  <div class="flex items-start gap-3">
  <div class="w-16 py-1.5 rounded bg-[#00205B] text-white flex flex-col items-center justify-center flex-shrink-0 text-center font-mono">
- <span class="text-xs font-bold leading-tight">${apt.timeSlot ? apt.timeSlot.split(' - ')[0] : 'TBD'}</span>
- <span class="text-[9px] text-[#F5B800]">${apt.timeSlot ? apt.timeSlot.split(' - ')[1] : ''}</span>
+ <span class="text-xs font-bold leading-tight">${escapeHtml(apt.timeSlot ? apt.timeSlot.split(' - ')[0] : 'TBD')}</span>
+ <span class="text-[9px] text-[#F5B800]">${escapeHtml(apt.timeSlot ? apt.timeSlot.split(' - ')[1] : '')}</span>
  </div>
  
  <div class="space-y-0.5">
  <div class="flex items-center gap-2">
- <span class="font-bold text-xs text-slate-900">${apt.studentName}</span>
- <span class="text-[11px] text-slate-500 font-mono">(${apt.studentNumber} • ${apt.program})</span>
+ <span class="font-bold text-xs text-slate-900">${escapeHtml(apt.studentName)}</span>
+ <span class="text-[11px] text-slate-500 font-mono">(${escapeHtml(apt.studentNumber)} • ${escapeHtml(apt.program)})</span>
  <span class="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-medium border ${badgeStyles[statusLower] || badgeStyles.pending}">
- ${apt.status}
+ ${escapeHtml(apt.status)}
  </span>
- ${apt.date !== todayIso ? `<span class="px-1.5 py-0.2 rounded text-[10px] font-semibold bg-slate-100 text-slate-600 border border-slate-200">${apt.date}</span>` : ''}
+ ${apt.date !== todayIso ? `<span class="px-1.5 py-0.2 rounded text-[10px] font-semibold bg-slate-100 text-slate-600 border border-slate-200">${escapeHtml(apt.date)}</span>` : ''}
  </div>
  
  <div class="text-[11px] text-slate-500 flex flex-wrap items-center gap-x-3">
- <span class="font-medium text-[#00205B]">${apt.concernCategory}</span>
- <span>Counselor: <strong class="text-slate-700">${apt.counselorName || 'Any Available'}</strong></span>
- <span>Pref: <strong>${apt.counselorGenderPreference || 'Any'}</strong></span>
+ <span class="font-medium text-[#00205B]">${escapeHtml(apt.concernCategory)}</span>
+ <span>Counselor: <strong class="text-slate-700">${escapeHtml(apt.counselorName || 'Any Available')}</strong></span>
+ <span>Pref: <strong>${escapeHtml(apt.counselorGenderPreference || 'Any')}</strong></span>
  </div>
 
- ${apt.specificConcern ? `<p class="text-[11px] text-slate-600 italic mt-0.5">"${apt.specificConcern}"</p>` : ''}
+ ${apt.specificConcern ? `<p class="text-[11px] text-slate-600 italic mt-0.5">"${escapeHtml(apt.specificConcern)}"</p>` : ''}
  </div>
  </div>
 
@@ -218,10 +219,10 @@ document.addEventListener('DOMContentLoaded', () => {
  ${
    isPending
      ? `
- <button data-action="Confirmed" data-id="${apt.id}" class="btn-apt-status px-3 py-1.5 rounded-lg bg-[#00205B] hover:bg-[#0A192F] text-white text-xs font-semibold shadow-xs transition flex items-center gap-1">
+ <button data-action="Confirmed" data-id="${escapeHtml(apt.id)}" class="btn-apt-status px-3 py-1.5 rounded-lg bg-[#00205B] hover:bg-[#0A192F] text-white text-xs font-semibold shadow-sm transition flex items-center gap-1">
  <span>Accept & Confirm</span>
  </button>
- <button data-action="Cancelled" data-id="${apt.id}" class="btn-apt-status px-2.5 py-1.5 rounded-lg border border-rose-200 hover:bg-rose-50 text-rose-700 text-xs font-medium transition">
+ <button data-action="Cancelled" data-id="${escapeHtml(apt.id)}" class="btn-apt-status px-2.5 py-1.5 rounded-lg border border-rose-200 hover:bg-rose-50 text-rose-700 text-xs font-medium transition">
  Decline
  </button>
  `
@@ -231,17 +232,17 @@ document.addEventListener('DOMContentLoaded', () => {
  ${
    isConfirmed
      ? `
- <button data-action="Completed" data-id="${apt.id}" class="btn-apt-status px-3 py-1.5 rounded-lg bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-semibold shadow-xs transition">
+ <button data-action="Completed" data-id="${escapeHtml(apt.id)}" class="btn-apt-status px-3 py-1.5 rounded-lg bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-semibold shadow-sm transition">
  Mark Completed
  </button>
- <button data-action="No-Show" data-id="${apt.id}" class="btn-apt-status px-2.5 py-1.5 rounded-lg border border-slate-200 hover:bg-slate-100 text-slate-700 text-xs font-medium transition">
+ <button data-action="No-Show" data-id="${escapeHtml(apt.id)}" class="btn-apt-status px-2.5 py-1.5 rounded-lg border border-slate-200 hover:bg-slate-100 text-slate-700 text-xs font-medium transition">
  No-Show
  </button>
  `
      : ''
  }
 
- <button data-student-num="${apt.studentNumber}" data-student-name="${apt.studentName}" data-program="${apt.program}" class="btn-open-case-direct px-2.5 py-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-medium transition">
+ <button data-student-num="${escapeHtml(apt.studentNumber)}" data-student-name="${escapeHtml(apt.studentName)}" data-program="${escapeHtml(apt.program)}" class="btn-open-case-direct px-2.5 py-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-medium transition">
  Open Case
  </button>
  </div>
@@ -317,15 +318,15 @@ document.addEventListener('DOMContentLoaded', () => {
         listWaiting.innerHTML = waiting
           .map(
             t => `
- <div class="bg-white p-2.5 rounded border border-slate-200 shadow-xs flex items-center justify-between gap-2">
+ <div class="bg-white p-2.5 rounded border border-slate-200 shadow-sm flex items-center justify-between gap-2">
  <div>
  <div class="flex items-center gap-1.5">
- <span class="font-mono font-bold text-slate-900 text-xs">${t.ticketNumber}</span>
- <span class="text-xs font-semibold text-slate-800">${t.studentName}</span>
+ <span class="font-mono font-bold text-slate-900 text-xs">${escapeHtml(t.ticketNumber)}</span>
+ <span class="text-xs font-semibold text-slate-800">${escapeHtml(t.studentName)}</span>
  </div>
- <div class="text-[10px] text-slate-500">${t.program}</div>
+ <div class="text-[10px] text-slate-500">${escapeHtml(t.program)}</div>
  </div>
- <button data-call-id="${t.id}" class="btn-call-walkin px-2.5 py-1 rounded bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold transition">
+ <button data-call-id="${escapeHtml(t.id)}" class="btn-call-walkin px-2.5 py-1 rounded bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold transition">
  Call
  </button>
  </div>
@@ -342,15 +343,15 @@ document.addEventListener('DOMContentLoaded', () => {
         listCalling.innerHTML = calling
           .map(
             t => `
- <div class="bg-white p-2.5 rounded border border-emerald-200 shadow-xs space-y-1.5">
+ <div class="bg-white p-2.5 rounded border border-emerald-200 shadow-sm space-y-1.5">
  <div class="flex items-center justify-between">
- <span class="font-mono font-bold text-emerald-800 text-xs">${t.ticketNumber}</span>
+ <span class="font-mono font-bold text-emerald-800 text-xs">${escapeHtml(t.ticketNumber)}</span>
  <span class="text-[9px] font-bold uppercase text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded">Calling</span>
  </div>
- <div class="text-xs font-bold text-slate-900">${t.studentName}</div>
- <div class="text-[10px] text-slate-500">${t.program}</div>
+ <div class="text-xs font-bold text-slate-900">${escapeHtml(t.studentName)}</div>
+ <div class="text-[10px] text-slate-500">${escapeHtml(t.program)}</div>
  <div class="pt-1 flex gap-1.5">
- <button data-start-id="${t.id}" class="btn-start-walkin flex-1 py-1 rounded bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold transition">
+ <button data-start-id="${escapeHtml(t.id)}" class="btn-start-walkin flex-1 py-1 rounded bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold transition">
  Start Session
  </button>
  </div>
@@ -368,15 +369,15 @@ document.addEventListener('DOMContentLoaded', () => {
         listInSession.innerHTML = insession
           .map(
             t => `
- <div class="bg-white p-2.5 rounded border border-slate-200 shadow-xs space-y-1.5">
+ <div class="bg-white p-2.5 rounded border border-slate-200 shadow-sm space-y-1.5">
  <div class="flex items-center justify-between">
- <span class="font-mono font-bold text-slate-900 text-xs">${t.ticketNumber}</span>
+ <span class="font-mono font-bold text-slate-900 text-xs">${escapeHtml(t.ticketNumber)}</span>
  <span class="text-[9px] font-bold uppercase text-slate-600 bg-slate-100 px-1.5 py-0.5 rounded">In Session</span>
  </div>
- <div class="text-xs font-bold text-slate-900">${t.studentName}</div>
- <div class="text-[10px] text-slate-500">${t.program}</div>
+ <div class="text-xs font-bold text-slate-900">${escapeHtml(t.studentName)}</div>
+ <div class="text-[10px] text-slate-500">${escapeHtml(t.program)}</div>
  <div class="pt-1">
- <button data-complete-id="${t.id}" data-snum="${t.studentNumber}" data-sname="${t.studentName}" data-sprog="${t.program}" class="btn-complete-walkin w-full py-1 rounded bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-semibold transition">
+ <button data-complete-id="${escapeHtml(t.id)}" data-snum="${escapeHtml(t.studentNumber)}" data-sname="${escapeHtml(t.studentName)}" data-sprog="${escapeHtml(t.program)}" class="btn-complete-walkin w-full py-1 rounded bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-semibold transition">
  Complete & Open Case
  </button>
  </div>
@@ -505,32 +506,32 @@ document.addEventListener('DOMContentLoaded', () => {
 
         return `
  <tr class="hover:bg-slate-50/60 transition">
- <td class="py-2.5 px-4 text-slate-500 font-mono text-[11px] whitespace-nowrap">${(r.createdAt || '').split('T')[0]}</td>
+ <td class="py-2.5 px-4 text-slate-500 font-mono text-[11px] whitespace-nowrap">${escapeHtml(formatDateIso(r.createdAt) || 'Recent')}</td>
  <td class="py-2.5 px-4">
- <div class="font-bold text-slate-900">${r.studentName}</div>
- <div class="text-[11px] text-slate-500">${r.studentNumber} • ${r.program}</div>
+ <div class="font-bold text-slate-900">${escapeHtml(r.studentName)}</div>
+ <div class="text-[11px] text-slate-500">${escapeHtml(r.studentNumber)} • ${escapeHtml(r.program)}</div>
  </td>
  <td class="py-2.5 px-4">
- <div class="font-semibold text-slate-800">${r.facultyName}</div>
- <div class="text-[11px] text-slate-500">${r.subjectCourse || 'General'}</div>
+ <div class="font-semibold text-slate-800">${escapeHtml(r.facultyName)}</div>
+ <div class="text-[11px] text-slate-500">${escapeHtml(r.subjectCourse || 'General')}</div>
  </td>
  <td class="py-2.5 px-4">
- <span class="font-medium text-slate-800">${r.reasonCategory}</span>
+ <span class="font-medium text-slate-800">${escapeHtml(r.reasonCategory)}</span>
  </td>
  <td class="py-2.5 px-4">
  <span class="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-medium border ${stageStyles[r.status] || stageStyles.Referred}">
- ${r.status}
+ ${escapeHtml(r.status)}
  </span>
  </td>
  <td class="py-2.5 px-4 text-right space-x-1 whitespace-nowrap">
- <button data-cs-id="${r.id}" class="btn-issue-callslip px-2 py-1 rounded bg-slate-900 hover:bg-slate-800 text-white text-xs font-medium transition">
+ <button data-cs-id="${escapeHtml(r.id)}" class="btn-issue-callslip px-2 py-1 rounded bg-slate-900 hover:bg-slate-800 text-white text-xs font-medium transition">
  Call Slip
  </button>
  
  ${
    r.status === 'Call Slip Issued'
      ? `
- <button data-intake-id="${r.id}" data-snum="${r.studentNumber}" data-sname="${r.studentName}" data-sprog="${r.program}" class="btn-intake-conducted px-2 py-1 rounded bg-purple-700 hover:bg-purple-800 text-white text-xs font-medium transition">
+ <button data-intake-id="${escapeHtml(r.id)}" data-snum="${escapeHtml(r.studentNumber)}" data-sname="${escapeHtml(r.studentName)}" data-sprog="${escapeHtml(r.program)}" class="btn-intake-conducted px-2 py-1 rounded bg-purple-700 hover:bg-purple-800 text-white text-xs font-medium transition">
  Intake
  </button>
  `
@@ -540,7 +541,7 @@ document.addEventListener('DOMContentLoaded', () => {
  ${
    r.status !== 'Closed'
      ? `
- <button data-close-ref-id="${r.id}" class="btn-close-referral px-2 py-1 rounded border border-slate-200 hover:bg-slate-100 text-slate-700 text-xs font-medium transition">
+ <button data-close-ref-id="${escapeHtml(r.id)}" class="btn-close-referral px-2 py-1 rounded border border-slate-200 hover:bg-slate-100 text-slate-700 text-xs font-medium transition">
  Close
  </button>
  `
@@ -712,14 +713,14 @@ document.addEventListener('DOMContentLoaded', () => {
         const badgeClass = badgeStyles[displayStatus] || badgeStyles.Active;
 
         return `
- <div data-case-id="${c.id}" class="case-item p-3 cursor-pointer transition border-l-2 ${isSelected ? 'bg-slate-100 border-[#00205B]' : 'hover:bg-slate-50 border-transparent'}">
+ <div data-case-id="${escapeHtml(c.id)}" class="case-item p-3 cursor-pointer transition border-l-2 ${isSelected ? 'bg-slate-100 border-[#00205B]' : 'hover:bg-slate-50 border-transparent'}">
  <div class="flex items-center justify-between">
- <span class="font-bold text-xs text-slate-900">${c.studentName}</span>
+ <span class="font-bold text-xs text-slate-900">${escapeHtml(c.studentName)}</span>
  <span class="px-1.5 py-0.2 rounded text-[9px] border ${badgeClass}">
- ${displayStatus.toUpperCase()}
+ ${escapeHtml(displayStatus.toUpperCase())}
  </span>
  </div>
- <div class="text-[11px] text-slate-500 font-mono mt-0.5">${c.studentNumber} • ${c.program}</div>
+ <div class="text-[11px] text-slate-500 font-mono mt-0.5">${escapeHtml(c.studentNumber)} • ${escapeHtml(c.program)}</div>
  </div>
  `;
       })
@@ -762,18 +763,18 @@ document.addEventListener('DOMContentLoaded', () => {
  <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-200">
  <div>
  <div class="flex items-center gap-2">
- <h3 class="text-base font-bold text-slate-900">${caseRecord.studentName}</h3>
- <span class="text-xs text-slate-500 font-mono">(${caseRecord.studentNumber})</span>
+ <h3 class="text-base font-bold text-slate-900">${escapeHtml(caseRecord.studentName)}</h3>
+ <span class="text-xs text-slate-500 font-mono">(${escapeHtml(caseRecord.studentNumber)})</span>
  <span id="case-header-badge" class="px-2 py-0.5 rounded text-[10px] border ${badgeStyles[currentStatus] || badgeStyles.Active}">
- ${currentStatus}
+ ${escapeHtml(currentStatus)}
  </span>
  </div>
- <p class="text-xs text-slate-500 mt-0.5">${caseRecord.program} • ${caseRecord.category || 'Clinical Record'}</p>
+ <p class="text-xs text-slate-500 mt-0.5">${escapeHtml(caseRecord.program)} • ${escapeHtml(caseRecord.category || 'Clinical Record')}</p>
  </div>
 
  <div class="flex items-center gap-2">
  <span class="text-xs text-slate-500 font-semibold">Status:</span>
- <select id="case-status-select" class="text-xs border border-slate-300 rounded-lg px-2.5 py-1.5 bg-white font-bold text-slate-800 focus:border-[#00205B] focus:outline-none shadow-2xs">
+ <select id="case-status-select" class="text-xs border border-slate-300 rounded-lg px-2.5 py-1.5 bg-white font-bold text-slate-800 focus:border-[#00205B] focus:outline-none shadow-sm">
  <option value="Active" ${currentStatus === 'Active' ? 'selected' : ''}>Active</option>
  <option value="High Risk" ${currentStatus === 'High Risk' ? 'selected' : ''}>High Risk</option>
  <option value="Monitoring" ${currentStatus === 'Monitoring' ? 'selected' : ''}>Monitoring</option>
@@ -854,7 +855,7 @@ document.addEventListener('DOMContentLoaded', () => {
  </div>
 
  <div class="pt-1 flex justify-end">
- <button type="submit" class="px-3.5 py-1.5 rounded-lg bg-[#00205B] hover:bg-[#0A192F] text-white font-semibold shadow-xs transition">
+ <button type="submit" class="px-3.5 py-1.5 rounded-lg bg-[#00205B] hover:bg-[#0A192F] text-white font-semibold shadow-sm transition">
  Save Session Note
  </button>
  </div>
@@ -1109,15 +1110,15 @@ document.addEventListener('DOMContentLoaded', () => {
           n => `
  <div class="bg-white p-3.5 rounded border border-slate-200 space-y-1.5 text-xs">
  <div class="flex items-center justify-between border-b border-slate-100 pb-1.5">
- <span class="font-bold text-slate-900">${n.noteType} • ${n.sessionDate}</span>
- <span class="text-[11px] text-slate-400">${n.counselorName}</span>
+ <span class="font-bold text-slate-900">${escapeHtml(n.noteType || 'Clinical Session')} • ${escapeHtml(n.sessionDate || formatDateIso(n.createdAt) || 'Recent')}</span>
+ <span class="text-[11px] text-slate-400">${escapeHtml(n.counselorName || 'Guidance Counselor')}</span>
  </div>
  
  <div class="space-y-1 text-slate-700 pt-1">
- <p><strong class="text-slate-900 text-[11px] uppercase">Observations:</strong> ${n.subjectiveObservation}</p>
- <p><strong class="text-slate-900 text-[11px] uppercase">Remarks:</strong> ${n.counselorRemarks}</p>
- <p><strong class="text-slate-900 text-[11px] uppercase">Action Plan:</strong> ${n.actionPlan}</p>
- ${n.followUpDate ? `<div class="text-[11px] font-semibold text-slate-900 pt-0.5">Follow-Up: ${n.followUpDate}</div>` : ''}
+ <p><strong class="text-slate-900 text-[11px] uppercase">Observations:</strong> ${escapeHtml(n.subjectiveObservation || n.note || 'N/A')}</p>
+ <p><strong class="text-slate-900 text-[11px] uppercase">Remarks:</strong> ${escapeHtml(n.counselorRemarks || 'Standard guidance consultation conducted.')}</p>
+ <p><strong class="text-slate-900 text-[11px] uppercase">Action Plan:</strong> ${escapeHtml(n.actionPlan || 'Continue monitoring academic and personal adjustment.')}</p>
+ ${n.followUpDate ? `<div class="text-[11px] font-semibold text-slate-900 pt-0.5">Follow-Up: ${escapeHtml(n.followUpDate)}</div>` : ''}
  </div>
  </div>
  `

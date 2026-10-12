@@ -1,5 +1,5 @@
 import { requireRole, initNavbar } from './auth.js';
-import { getAnalyticsDataset } from './db.js';
+import { getAnalyticsDataset, subscribeAnalyticsDataset } from './db.js';
 
 document.addEventListener('DOMContentLoaded', () => {
   const currentUser = requireRole(['head', 'admin']);
@@ -20,8 +20,8 @@ document.addEventListener('DOMContentLoaded', () => {
   let concernChartInstance = null;
   let channelChartInstance = null;
 
-  function loadAndRenderAnalytics() {
-    const data = getAnalyticsDataset();
+  function renderAnalytics(dataset) {
+    const data = dataset || getAnalyticsDataset();
 
     const kpiCompleted = document.getElementById('kpi-completed-sessions');
     const kpiReferrals = document.getElementById('kpi-total-referrals');
@@ -148,6 +148,6 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   }
 
-  loadAndRenderAnalytics();
-  window.addEventListener('guidehub_data_changed', loadAndRenderAnalytics);
+  subscribeAnalyticsDataset(renderAnalytics);
+  window.addEventListener('guidehub_data_changed', () => renderAnalytics());
 });

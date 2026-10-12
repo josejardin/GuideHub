@@ -4,7 +4,15 @@ import nodemailer from 'nodemailer';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import dotenv from 'dotenv';
-import { getAuth, getFirestore, isFirebaseAdminInitialized, findAccountByEmail, findAccountById } from './db.js';
+import {
+  getAuth,
+  getFirestore,
+  isFirebaseAdminInitialized,
+  findAccountByEmail,
+  findAccountById,
+  verifyServerOtp,
+  escapeHtml
+} from './db.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -17,10 +25,40 @@ dotenv.config();
 const app = express();
 const PORT = process.env.PORT || 3000;
 
+app.disable('x-powered-by');
 app.use(cors());
-app.use(express.json());
-// Serve all static assets, client portals, and views from the project root
-app.use(express.static(ROOT_DIR));
+app.use(express.json({ limit: '100kb' }));
+
+// Security headers & sensitive path protection middleware
+app.use((req, res, next) => {
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+  res.setHeader('X-Frame-Options', 'SAMEORIGIN');
+  res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
+
+  const reqPath = (req.path || '').toLowerCase();
+  const blockedPrefixes = ['/server', '/scripts', '/.git', '/.env', '/node_modules'];
+  const blockedFiles = [
+    '/package.json',
+    '/package-lock.json',
+    '/firestore.rules',
+    '/vercel.json',
+    '/serviceaccountkey.json',
+    '/.prettierrc',
+    '/.prettierignore',
+    '/.gitignore'
+  ];
+
+  if (
+    blockedPrefixes.some(prefix => reqPath === prefix || reqPath.startsWith(`${prefix}/`) || reqPath.startsWith(prefix)) ||
+    blockedFiles.includes(reqPath)
+  ) {
+    return res.status(403).json({ error: 'Access denied.' });
+  }
+  next();
+});
+
+// Serve static assets, client portals, and views from project root (denying dotfiles)
+app.use(express.static(ROOT_DIR, { dotfiles: 'deny' }));
 
 const transporter = nodemailer.createTransport({
   host: 'smtp.gmail.com',
@@ -41,7 +79,7 @@ transporter.verify(error => {
 });
 
 app.post('/api/send-otp', async (req, res) => {
-  const { to, otp, name, role, idNumber, departmentOrProgram, purpose } = req.body;
+  const { to, otp, name, role, idNumber, departmentOrProgram, purpose } = req.body || {};
 
   const isRegistration = purpose !== 'password_reset';
 
@@ -52,9 +90,22 @@ app.post('/api/send-otp', async (req, res) => {
     });
   }
 
+  if (!/^\d{6}$/.test(String(otp).trim())) {
+    return res.status(400).json({ error: 'Invalid OTP format. Must be a 6-digit numeric code.' });
+  }
+
   const cleanTo = (to || '').trim().toLowerCase();
-  const recipientName = (name || 'Student').trim();
+  const recipientName = (name || 'Nationalian').trim();
   const emailPrefix = cleanTo.split('@')[0];
+
+  const isStudentDomainEmail = cleanTo.endsWith('@students.nu-fairview.edu.ph');
+  const isStaffDomainEmail = cleanTo.endsWith('@nu-fairview.edu.ph') && !isStudentDomainEmail;
+
+  if (!isStudentDomainEmail && !isStaffDomainEmail) {
+    return res.status(400).json({
+      error: 'Only official @students.nu-fairview.edu.ph or @nu-fairview.edu.ph institutional emails are permitted.'
+    });
+  }
 
   const isStudent = role === 'student' || role === 'college_student' || role === 'shs_student';
   const expectedDomain = isStudent ? '@students.nu-fairview.edu.ph' : '@nu-fairview.edu.ph';
@@ -89,21 +140,22 @@ app.post('/api/send-otp', async (req, res) => {
   }
 
   // 4. Instant Pattern & Troll Filter
-  const trollPatterns = /^(test|temp|dummy|admin|fake|asdf|qwerty|sample|none|null|undefined|12345|user)/i;
+  const trollPatterns = /^(test|temp|dummy|admin|fake|asdf|qwerty|sample|none|null|undefined|12345|user)$/i;
   const repetitiveChars = /(.)\1{4,}/;
 
   if (
-    trollPatterns.test(emailPrefix) ||
-    trollPatterns.test(recipientName) ||
-    repetitiveChars.test(emailPrefix) ||
-    emailPrefix.length < 3
+    isRegistration &&
+    (trollPatterns.test(emailPrefix) ||
+      trollPatterns.test(recipientName) ||
+      repetitiveChars.test(emailPrefix) ||
+      emailPrefix.length < 3)
   ) {
     return res
       .status(400)
       .json({ error: 'Invalid account details detected. Please use your official NU Fairview credentials.' });
   }
 
-  // 5. Prevent Duplicate & Cross-Role Registration
+  // 5. Prevent Duplicate & Cross-Role Registration (or verify account exists for Password Reset)
   if (isRegistration) {
     try {
       // 5a. Check exact target email across hierarchical and root users
@@ -138,15 +190,28 @@ app.post('/api/send-otp', async (req, res) => {
     } catch (err) {
       console.warn('[WARNING] Account uniqueness pre-check notice:', err.message);
     }
+  } else {
+    try {
+      const existingAccount = await findAccountByEmail(cleanTo);
+      if (!existingAccount) {
+        return res.status(404).json({
+          error: 'No registered GuideHub account was found for this institutional email address.'
+        });
+      }
+    } catch (err) {
+      console.warn('[WARNING] Password reset account lookup notice:', err.message);
+    }
   }
 
   const logoPath = path.join(ROOT_DIR, 'assets', 'nu-logo.png');
+  const safeName = escapeHtml(recipientName);
+  const safeOtp = escapeHtml(otp);
 
   const mailOptions = {
     from: `"NU Fairview Guidance Center" <${process.env.GMAIL_USER}>`,
     to: cleanTo,
     replyTo: process.env.GMAIL_USER,
-    subject: `GuideHub Verification Code: ${otp}`,
+    subject: `GuideHub Verification Code: ${safeOtp}`,
     text: `Hello ${recipientName},\n\nYour 6-digit NU Fairview GuideHub verification code is: ${otp}\n\nThis code expires in 5 minutes.\n\n- National University Fairview Guidance and Counseling Center`,
     html: `
       <!DOCTYPE html>
@@ -174,12 +239,12 @@ app.post('/api/send-otp', async (req, res) => {
                 <tr>
                   <td style="padding: 32px 28px 24px 28px;">
                     <h2 style="margin: 0 0 12px 0; color: #0f172a; font-size: 18px; font-weight: 700; text-align: left;">Account Verification Code</h2>
-                    <p style="margin: 0 0 16px 0; color: #334155; font-size: 14px; line-height: 1.5;">Hello <strong>${recipientName}</strong>,</p>
+                    <p style="margin: 0 0 16px 0; color: #334155; font-size: 14px; line-height: 1.5;">Hello <strong>${safeName}</strong>,</p>
                     <p style="margin: 0 0 24px 0; color: #475569; font-size: 13px; line-height: 1.6;">
-                      You are completing your institutional identity registration for the <strong>NU Fairview GuideHub</strong> counseling and student care portal. Please use the official single-use verification code below:
+                      You are completing your institutional identity verification for the <strong>NU Fairview GuideHub</strong> counseling and student care portal. Please use the official single-use verification code below:
                     </p>
                     <div style="background-color: #f8fafc; border: 2px dashed #00205B; border-radius: 12px; padding: 20px; text-align: center; margin-bottom: 24px;">
-                      <span style="font-family: 'Courier New', Courier, monospace; font-size: 36px; font-weight: 900; color: #00205B; letter-spacing: 10px; display: inline-block; padding-left: 10px;">${otp}</span>
+                      <span style="font-family: 'Courier New', Courier, monospace; font-size: 36px; font-weight: 900; color: #00205B; letter-spacing: 10px; display: inline-block; padding-left: 10px;">${safeOtp}</span>
                     </div>
                     <div style="background-color: #fffbeb; border-left: 4px solid #F5B800; padding: 12px 16px; margin-bottom: 24px; border-radius: 0 8px 8px 0;">
                       <p style="margin: 0; color: #92400e; font-size: 12px; line-height: 1.5;">
@@ -237,6 +302,13 @@ app.post('/api/admin-alert', async (req, res) => {
   const adminEmail = process.env.GMAIL_USER || 'nufairviewgco@gmail.com';
   const logoPath = path.join(ROOT_DIR, 'assets', 'nu-logo.png');
 
+  const safeFullName = escapeHtml(details.fullName || 'N/A');
+  const safeEmail = escapeHtml(details.email || 'N/A');
+  const safeRole = escapeHtml(details.role || 'N/A');
+  const safeId = escapeHtml(details.studentOrEmpId || 'N/A');
+  const safeDept = escapeHtml(details.departmentOrProgram || 'N/A');
+  const safeReason = escapeHtml(details.reason || 'Failed institutional identity checks.');
+
   let subject = '';
   let badgeColor = '';
   let badgeText = '';
@@ -244,7 +316,7 @@ app.post('/api/admin-alert', async (req, res) => {
   let bodyHtml = '';
 
   if (eventType === 'REGISTRATION_SUCCESS') {
-    subject = ` [SECURITY AUDIT] New Account Verified - ${details.fullName} (${details.role.toUpperCase()})`;
+    subject = ` [SECURITY AUDIT] New Account Verified - ${safeFullName} (${safeRole.toUpperCase()})`;
     badgeColor = '#10b981';
     badgeText = 'VERIFIED REGISTRATION';
     headline = 'Institutional Account Provisioned';
@@ -253,16 +325,16 @@ app.post('/api/admin-alert', async (req, res) => {
         A user has completed 6-digit OTP verification and successfully registered an institutional account:
       </p>
       <table width="100%" cellpadding="8" cellspacing="0" style="background-color: #f8fafc; border-radius: 8px; border: 1px solid #e2e8f0; font-size: 13px; margin-bottom: 20px;">
-        <tr><td width="35%" style="color: #64748b; font-weight: 600;">Full Legal Name:</td><td style="color: #0f172a; font-weight: bold;">${details.fullName}</td></tr>
-        <tr><td style="color: #64748b; font-weight: 600;">Institutional Email:</td><td style="color: #00205B; font-weight: bold;">${details.email}</td></tr>
-        <tr><td style="color: #64748b; font-weight: 600;">Assigned Role:</td><td style="color: #0f172a; text-transform: uppercase; font-weight: bold;">${details.role}</td></tr>
-        <tr><td style="color: #64748b; font-weight: 600;">Student / Employee ID:</td><td style="color: #0f172a; font-family: monospace;">${details.studentOrEmpId || 'N/A'}</td></tr>
-        <tr><td style="color: #64748b; font-weight: 600;">Program / Department:</td><td style="color: #0f172a;">${details.departmentOrProgram || 'N/A'}</td></tr>
+        <tr><td width="35%" style="color: #64748b; font-weight: 600;">Full Legal Name:</td><td style="color: #0f172a; font-weight: bold;">${safeFullName}</td></tr>
+        <tr><td style="color: #64748b; font-weight: 600;">Institutional Email:</td><td style="color: #00205B; font-weight: bold;">${safeEmail}</td></tr>
+        <tr><td style="color: #64748b; font-weight: 600;">Assigned Role:</td><td style="color: #0f172a; text-transform: uppercase; font-weight: bold;">${safeRole}</td></tr>
+        <tr><td style="color: #64748b; font-weight: 600;">Student / Employee ID:</td><td style="color: #0f172a; font-family: monospace;">${safeId}</td></tr>
+        <tr><td style="color: #64748b; font-weight: 600;">Program / Department:</td><td style="color: #0f172a;">${safeDept}</td></tr>
         <tr><td style="color: #64748b; font-weight: 600;">Verification Timestamp:</td><td style="color: #0f172a;">${timestamp} (PHT)</td></tr>
       </table>
     `;
   } else if (eventType === 'REGISTRATION_BLOCKED') {
-    subject = ` [SECURITY WARNING] Registration Attempt Blocked - ${details.email || 'Unknown'}`;
+    subject = ` [SECURITY WARNING] Registration Attempt Blocked - ${safeEmail}`;
     badgeColor = '#ef4444';
     badgeText = 'REGISTRATION BLOCKED';
     headline = 'Unauthorized or Malformed Attempt Intercepted';
@@ -272,22 +344,22 @@ app.post('/api/admin-alert', async (req, res) => {
       </p>
       <div style="background-color: #fef2f2; border-left: 4px solid #ef4444; padding: 12px 16px; margin-bottom: 20px; border-radius: 0 8px 8px 0;">
         <strong style="color: #991b1b; font-size: 13px;">Rejection Reason:</strong>
-        <p style="margin: 4px 0 0 0; color: #b91c1c; font-size: 12px;">${details.reason || 'Failed institutional identity checks.'}</p>
+        <p style="margin: 4px 0 0 0; color: #b91c1c; font-size: 12px;">${safeReason}</p>
       </div>
       <table width="100%" cellpadding="8" cellspacing="0" style="background-color: #f8fafc; border-radius: 8px; border: 1px solid #e2e8f0; font-size: 13px; margin-bottom: 20px;">
-        <tr><td width="35%" style="color: #64748b; font-weight: 600;">Submitted Name:</td><td style="color: #0f172a;">${details.fullName || 'N/A'}</td></tr>
-        <tr><td style="color: #64748b; font-weight: 600;">Target Email:</td><td style="color: #00205B; font-family: monospace;">${details.email || 'N/A'}</td></tr>
-        <tr><td style="color: #64748b; font-weight: 600;">Attempted Role:</td><td style="color: #0f172a;">${details.role || 'N/A'}</td></tr>
-        <tr><td style="color: #64748b; font-weight: 600;">Submitted ID:</td><td style="color: #0f172a; font-family: monospace;">${details.studentOrEmpId || 'N/A'}</td></tr>
+        <tr><td width="35%" style="color: #64748b; font-weight: 600;">Submitted Name:</td><td style="color: #0f172a;">${safeFullName}</td></tr>
+        <tr><td style="color: #64748b; font-weight: 600;">Target Email:</td><td style="color: #00205B; font-family: monospace;">${safeEmail}</td></tr>
+        <tr><td style="color: #64748b; font-weight: 600;">Attempted Role:</td><td style="color: #0f172a;">${safeRole}</td></tr>
+        <tr><td style="color: #64748b; font-weight: 600;">Submitted ID:</td><td style="color: #0f172a; font-family: monospace;">${safeId}</td></tr>
         <tr><td style="color: #64748b; font-weight: 600;">Attempt Timestamp:</td><td style="color: #0f172a;">${timestamp} (PHT)</td></tr>
       </table>
     `;
   } else {
-    subject = ` [SECURITY EVENT] GuideHub Notification - ${eventType}`;
+    subject = ` [SECURITY EVENT] GuideHub Notification - ${escapeHtml(eventType)}`;
     badgeColor = '#00205B';
-    badgeText = eventType;
+    badgeText = escapeHtml(eventType);
     headline = 'System Security Event';
-    bodyHtml = `<pre style="background:#f8fafc; padding:12px; font-size:12px; border:1px solid #e2e8f0;">${JSON.stringify(details, null, 2)}</pre>`;
+    bodyHtml = `<pre style="background:#f8fafc; padding:12px; font-size:12px; border:1px solid #e2e8f0;">${escapeHtml(JSON.stringify(details, null, 2))}</pre>`;
   }
 
   const mailOptions = {
@@ -300,7 +372,7 @@ app.post('/api/admin-alert', async (req, res) => {
       <html>
       <head>
         <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
-        <title>${subject}</title>
+        <title>${escapeHtml(subject)}</title>
       </head>
       <body style="margin: 0; padding: 0; background-color: #f1f5f9; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;">
         <table width="100%" border="0" cellspacing="0" cellpadding="0" style="padding: 32px 16px;">
@@ -353,7 +425,7 @@ app.post('/api/admin-alert', async (req, res) => {
 });
 
 app.post('/api/reset-password', async (req, res) => {
-  const { email, otp, newPassword } = req.body;
+  const { email, otp, newPassword } = req.body || {};
 
   if (!email || !otp || !newPassword) {
     return res.status(400).json({ success: false, error: 'Email, OTP, and new password are required.' });
@@ -365,36 +437,78 @@ app.post('/api/reset-password', async (req, res) => {
 
   const normalizedEmail = email.trim().toLowerCase();
 
-  try {
-    const auth = getAuth();
+  // Verify institutional domain
+  if (!normalizedEmail.endsWith('@students.nu-fairview.edu.ph') && !normalizedEmail.endsWith('@nu-fairview.edu.ph')) {
+    return res.status(400).json({ success: false, error: 'Only official NU Fairview institutional emails are supported.' });
+  }
 
-    let userRecord;
-    try {
-      userRecord = await auth.getUserByEmail(normalizedEmail);
-    } catch (userErr) {
-      if (userErr.code === 'auth/user-not-found') {
+  // Server-side OTP verification against Firestore
+  const otpCheck = await verifyServerOtp(normalizedEmail, otp);
+  if (!otpCheck.valid) {
+    return res.status(otpCheck.status || 400).json({ success: false, error: otpCheck.error });
+  }
+
+  try {
+    if (isFirebaseAdminInitialized) {
+      const auth = getAuth();
+      let userRecord;
+      try {
+        userRecord = await auth.getUserByEmail(normalizedEmail);
+      } catch (userErr) {
+        if (userErr.code === 'auth/user-not-found') {
+          return res
+            .status(404)
+            .json({ success: false, error: 'No registered account found with this institutional email.' });
+        }
+        throw userErr;
+      }
+
+      await auth.updateUser(userRecord.uid, {
+        password: newPassword
+      });
+    } else {
+      const apiKey = process.env.FIREBASE_API_KEY || 'AIzaSyAqPNF4SRiyF8nZbFPLraUHldNoxvHQiQk';
+      const lookupRes = await fetch(`https://identitytoolkit.googleapis.com/v1/accounts:lookup?key=${apiKey}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: [normalizedEmail] })
+      });
+      const lookupData = await lookupRes.json();
+      if (!lookupData.users || lookupData.users.length === 0) {
         return res
           .status(404)
           .json({ success: false, error: 'No registered account found with this institutional email.' });
       }
-      throw userErr;
+      const localId = lookupData.users[0].localId;
+      const updateRes = await fetch(`https://identitytoolkit.googleapis.com/v1/accounts:update?key=${apiKey}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          localId,
+          password: newPassword,
+          returnSecureToken: false
+        })
+      });
+      const updateData = await updateRes.json();
+      if (!updateRes.ok) {
+        return res
+          .status(500)
+          .json({ success: false, error: updateData.error?.message || 'Failed to update credentials in Firebase Auth.' });
+      }
     }
-
-    await auth.updateUser(userRecord.uid, {
-      password: newPassword
-    });
 
     console.log(` [PASSWORD UPDATED] Credentials successfully updated for ${normalizedEmail}`);
 
+    const safeNormEmail = escapeHtml(normalizedEmail);
     const mailOptions = {
       from: `"GuideHub Security" <${process.env.GMAIL_USER}>`,
       to: process.env.GMAIL_USER,
-      subject: ` [PASSWORD RESET] Account Password Changed - ${normalizedEmail}`,
+      subject: ` [PASSWORD RESET] Account Password Changed - ${safeNormEmail}`,
       html: `
         <div style="font-family: sans-serif; padding: 20px; background-color: #f8fafc;">
           <div style="max-width: 480px; margin: auto; background: white; border-radius: 8px; padding: 24px; border: 1px solid #e2e8f0;">
             <h3 style="color: #00205B; margin-top: 0;">Password Reset Completed</h3>
-            <p style="color: #334155; font-size: 14px;">The account associated with <strong>${normalizedEmail}</strong> has successfully updated its credentials.</p>
+            <p style="color: #334155; font-size: 14px;">The account associated with <strong>${safeNormEmail}</strong> has successfully updated its credentials.</p>
             <p style="color: #64748b; font-size: 12px; margin-top: 20px;">Timestamp: ${new Date().toLocaleString('en-US', { timeZone: 'Asia/Manila' })}</p>
           </div>
         </div>

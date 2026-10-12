@@ -161,32 +161,51 @@ export async function getAllUsers() {
   try {
     if (db) {
       const usersMap = new Map();
+      const seenEmails = new Set();
       const categories = ['students', 'counselors', 'faculty', 'head', 'admin'];
 
-      // Read root users collection (skip category container docs)
-      try {
-        const rootSnap = await getDocs(collection(db, 'users'));
-        rootSnap.forEach(d => {
-          if (!categories.includes(d.id)) {
-            const data = d.data();
-            if (data.email || data.fullName) {
-              usersMap.set(d.id, { uid: d.id, ...data });
+      const addCleanUser = (id, data) => {
+        if (!data || categories.includes(id)) return;
+        // Skip Auth UID bridge documents that point to a canonical semantic ID
+        if (data.canonicalDocId && id !== data.canonicalDocId) return;
+        if (!data.email && !data.fullName) return;
+
+        const emailKey = (data.email || '').trim().toLowerCase();
+        // Prefer semantic usr_* IDs when deduplicating by email
+        if (emailKey && seenEmails.has(emailKey)) {
+          for (const [existingId, existingUser] of usersMap.entries()) {
+            if ((existingUser.email || '').trim().toLowerCase() === emailKey) {
+              if (!existingId.startsWith('usr_') && id.startsWith('usr_')) {
+                usersMap.delete(existingId);
+                usersMap.set(id, { ...data, uid: id });
+              }
+              return;
             }
           }
-        });
-      } catch (e) {}
+          return;
+        }
 
-      // Read from all category subcollections
+        if (emailKey) seenEmails.add(emailKey);
+        usersMap.set(id, { ...data, uid: id });
+      };
+
+      // 1. Read from all category subcollections first (canonical usr_* docs)
       await Promise.all(
         categories.map(async cat => {
           try {
             const snap = await getDocs(collection(db, 'users', cat, 'users'));
-            snap.forEach(d => usersMap.set(d.id, { uid: d.id, ...d.data() }));
+            snap.forEach(d => addCleanUser(d.id, d.data()));
           } catch (e) {}
         })
       );
 
-      // Read from role doc maps
+      // 2. Read root users collection (skip category container & bridge docs)
+      try {
+        const rootSnap = await getDocs(collection(db, 'users'));
+        rootSnap.forEach(d => addCleanUser(d.id, d.data()));
+      } catch (e) {}
+
+      // 3. Read from role doc maps
       await Promise.all(
         categories.map(async cat => {
           try {
@@ -194,8 +213,8 @@ export async function getAllUsers() {
             if (snap.exists()) {
               const data = snap.data();
               for (const [key, val] of Object.entries(data)) {
-                if (val && typeof val === 'object' && val.email && !usersMap.has(key)) {
-                  usersMap.set(key, { uid: key, ...val });
+                if (val && typeof val === 'object' && val.email) {
+                  addCleanUser(key, val);
                 }
               }
             }
@@ -217,22 +236,50 @@ export async function getAllUsers() {
 export async function updateUserRole(uid, newRole) {
   try {
     if (db) {
-      const category = getRoleCategory(newRole);
-      // Update in root
-      const userRef = doc(db, 'users', uid);
-      await updateDoc(userRef, { role: newRole }).catch(() => {});
-
-      // Update in category subcollection if present
+      const targetCategory = getRoleCategory(newRole);
       const categories = ['students', 'counselors', 'faculty', 'head', 'admin'];
+
+      // 1. Update in root users/{uid}
+      const userRef = doc(db, 'users', uid);
+      let userData = null;
+      const rootSnap = await getDoc(userRef).catch(() => null);
+      if (rootSnap && rootSnap.exists()) {
+        userData = { ...rootSnap.data(), role: newRole, roleType: newRole };
+        await updateDoc(userRef, { role: newRole, roleType: newRole }).catch(() => {});
+      }
+
+      // 2. Update across category subcollections and root category collections
       for (const cat of categories) {
         try {
-          const catRef = doc(db, 'users', cat, 'users', uid);
-          const snap = await getDoc(catRef);
+          const catSubRef = doc(db, 'users', cat, 'users', uid);
+          const snap = await getDoc(catSubRef);
           if (snap.exists()) {
-            await updateDoc(catRef, { role: newRole });
-            break;
+            userData = { ...snap.data(), role: newRole, roleType: newRole };
+            if (cat === targetCategory) {
+              await updateDoc(catSubRef, { role: newRole, roleType: newRole });
+            } else {
+              await deleteDoc(catSubRef).catch(() => {});
+            }
           }
         } catch (e) {}
+
+        try {
+          const rootCatRef = doc(db, cat, uid);
+          const snap = await getDoc(rootCatRef);
+          if (snap.exists()) {
+            if (cat === targetCategory) {
+              await updateDoc(rootCatRef, { role: newRole, roleType: newRole });
+            } else {
+              await deleteDoc(rootCatRef).catch(() => {});
+            }
+          }
+        } catch (e) {}
+      }
+
+      if (userData) {
+        await setDoc(doc(db, 'users', targetCategory, 'users', uid), userData, { merge: true }).catch(() => {});
+        await setDoc(doc(db, targetCategory, uid), userData, { merge: true }).catch(() => {});
+        await setDoc(doc(db, 'users', targetCategory), { [uid]: userData }, { merge: true }).catch(() => {});
       }
     }
   } catch (err) {
@@ -398,13 +445,50 @@ export async function updateAppointmentStatus(appointmentId, status, extraFields
 
 export async function checkSlotAvailable(date, timeSlot, counselorId = 'any') {
   const state = getLocalState();
-  const activeApts = Object.values(state.appointments).filter(
+  let activeApts = Object.values(state.appointments).filter(
     apt => apt.date === date && apt.timeSlot === timeSlot && apt.status !== 'Cancelled' && apt.status !== 'No-Show'
   );
 
+  const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+  const dayOfWeek = date ? dayNames[new Date(`${date}T00:00:00`).getDay()] : '';
+
+  let isBlocked = false;
   if (counselorId && counselorId !== 'any') {
-    const hasCollision = activeApts.some(apt => apt.counselorId === counselorId || apt.counselorId === 'any');
-    const isBlocked = (state.counselorSchedules[`${counselorId}_${date}_${timeSlot}`] || {}).isBlocked;
+    isBlocked = !!(
+      (state.counselorSchedules[`${counselorId}_${date}_${timeSlot}`] || {}).isBlocked ||
+      (dayOfWeek && (state.counselorSchedules[`${counselorId}_${dayOfWeek}_${timeSlot}`] || {}).isBlocked)
+    );
+  }
+
+  try {
+    if (db) {
+      const qApts = query(collection(db, 'appointments'), where('date', '==', date));
+      const snap = await getDocs(qApts);
+      if (!snap.empty) {
+        activeApts = snap.docs
+          .map(d => ({ id: d.id, ...d.data() }))
+          .filter(apt => apt.timeSlot === timeSlot && apt.status !== 'Cancelled' && apt.status !== 'No-Show');
+      }
+
+      if (counselorId && counselorId !== 'any') {
+        if (dayOfWeek) {
+          const dayBlockSnap = await getDoc(doc(db, 'counselorSchedules', `${counselorId}_${dayOfWeek}_${timeSlot}`));
+          if (dayBlockSnap.exists() && dayBlockSnap.data().isBlocked) {
+            isBlocked = true;
+          }
+        }
+        const dateBlockSnap = await getDoc(doc(db, 'counselorSchedules', `${counselorId}_${date}_${timeSlot}`));
+        if (dateBlockSnap.exists() && dateBlockSnap.data().isBlocked) {
+          isBlocked = true;
+        }
+      }
+    }
+  } catch (err) {
+    console.warn('Firestore checkSlotAvailable fallback:', err.message);
+  }
+
+  if (counselorId && counselorId !== 'any') {
+    const hasCollision = activeApts.some(apt => apt.counselorId === counselorId);
     return !hasCollision && !isBlocked;
   }
 
@@ -415,8 +499,18 @@ export async function generateWalkInTicket(studentData) {
   const today = new Date().toISOString().split('T')[0];
   const state = getLocalState();
 
-  const todayTickets = Object.values(state.walkinQueue).filter(t => t.date === today);
-  const queueSeq = todayTickets.length + 101;
+  let existingCount = Object.values(state.walkinQueue).filter(t => t.date === today).length;
+  try {
+    if (db) {
+      const qToday = query(collection(db, 'walkin_queue'), where('date', '==', today));
+      const snap = await getDocs(qToday);
+      if (snap.size > existingCount) {
+        existingCount = snap.size;
+      }
+    }
+  } catch (e) {}
+
+  const queueSeq = existingCount + 101;
   const ticketNumber = `W-${queueSeq}`;
 
   const ticket = {
@@ -640,6 +734,28 @@ export async function updateReferralStatus(referralId, status, extraFields = {})
 }
 
 export async function getOrCreateCase(studentNumber, studentName, program, counselorId) {
+  let id = 'case_' + (studentNumber || 'unknown').replace(/[^a-zA-Z0-9]/g, '_');
+
+  try {
+    if (db) {
+      // 1. Check direct case ID in Firestore
+      const directSnap = await getDoc(doc(db, 'cases', id));
+      if (directSnap.exists()) {
+        return { id: directSnap.id, ...directSnap.data() };
+      }
+
+      // 2. Query Firestore cases by studentNumber
+      const qCase = query(collection(db, 'cases'), where('studentNumber', '==', studentNumber));
+      const querySnap = await getDocs(qCase);
+      if (!querySnap.empty) {
+        const docSnap = querySnap.docs[0];
+        return { id: docSnap.id, ...docSnap.data() };
+      }
+    }
+  } catch (err) {
+    console.warn('Firestore getOrCreateCase lookup notice:', err.message);
+  }
+
   const state = getLocalState();
   let existingCase = Object.values(state.cases).find(c => c.studentNumber === studentNumber);
 
@@ -662,8 +778,6 @@ export async function getOrCreateCase(studentNumber, studentName, program, couns
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString()
   };
-
-  let id = 'case_' + studentNumber.replace(/[^a-zA-Z0-9]/g, '_');
 
   try {
     if (db) {
@@ -810,6 +924,23 @@ export async function updateCaseRiskFlags(caseId, riskFlags) {
 }
 
 export async function getCounselorBlockedSlots(counselorId) {
+  try {
+    if (db && counselorId) {
+      const q = query(collection(db, 'counselorSchedules'), where('counselorId', '==', counselorId));
+      const snap = await getDocs(q);
+      if (!snap.empty) {
+        const state = getLocalState();
+        snap.docs.forEach(d => {
+          state.counselorSchedules[d.id] = d.data();
+        });
+        saveLocalState(state);
+        return snap.docs.map(d => d.data()).filter(s => s.isBlocked);
+      }
+    }
+  } catch (err) {
+    console.warn('Firestore getCounselorBlockedSlots fallback:', err.message);
+  }
+
   const state = getLocalState();
   return Object.values(state.counselorSchedules).filter(s => s.counselorId === counselorId && s.isBlocked);
 }
@@ -892,13 +1023,7 @@ export function subscribeAuditLogs(callback) {
   return () => window.removeEventListener('guidehub_data_changed', handler);
 }
 
-export function getAnalyticsDataset() {
-  const state = getLocalState();
-  const appointments = Object.values(state.appointments);
-  const referrals = Object.values(state.referrals);
-  const cases = Object.values(state.cases);
-  const walkins = Object.values(state.walkinQueue);
-
+export function computeAnalyticsFromCollections(appointments = [], referrals = [], cases = [], walkins = []) {
   const cycleCounts = {
     'Pre-Exam Anxiety': 0,
     'During Exam': 0,
@@ -931,11 +1056,21 @@ export function getAnalyticsDataset() {
     else cycleCounts['Regular Period']++;
 
     const cat = a.concernCategory || '';
-    if (cat.includes('Academic') || cat.includes('Anxiety')) categoryCounts['Academic Distress & Anxiety']++;
-    else if (cat.includes('Shifting') || cat.includes('Career')) categoryCounts['Program Shifting / Career']++;
-    else if (cat.includes('Relationship') || cat.includes('Personal')) categoryCounts['Relationship & Personal']++;
-    else if (cat.includes('Special') || cat.includes('Needs')) categoryCounts['Special Learning Needs']++;
-    else categoryCounts['Other / General Concern']++;
+    if (cat.includes('Academic') || cat.includes('Anxiety') || cat.includes('Coaching')) {
+      categoryCounts['Academic Distress & Anxiety']++;
+    } else if (cat.includes('Shifting') || cat.includes('Career')) {
+      categoryCounts['Program Shifting / Career']++;
+    } else if (cat.includes('Relationship') || cat.includes('Personal')) {
+      categoryCounts['Relationship & Personal']++;
+    } else if (cat.includes('Special') || cat.includes('Needs')) {
+      categoryCounts['Special Learning Needs']++;
+    } else {
+      categoryCounts['Other / General Concern']++;
+    }
+  });
+
+  walkins.forEach(w => {
+    if (w.status === 'Completed') completedCount++;
   });
 
   let highRiskCases = 0;
@@ -964,4 +1099,63 @@ export function getAnalyticsDataset() {
     cycleTrends: cycleCounts,
     concernBreakdown: categoryCounts
   };
+}
+
+export function getAnalyticsDataset() {
+  const state = getLocalState();
+  return computeAnalyticsFromCollections(
+    Object.values(state.appointments),
+    Object.values(state.referrals),
+    Object.values(state.cases),
+    Object.values(state.walkinQueue)
+  );
+}
+
+export function subscribeAnalyticsDataset(callback) {
+  const state = getLocalState();
+  let liveAppointments = Object.values(state.appointments);
+  let liveReferrals = Object.values(state.referrals);
+  let liveCases = Object.values(state.cases);
+  let liveWalkins = Object.values(state.walkinQueue);
+
+  const emit = () => {
+    callback(computeAnalyticsFromCollections(liveAppointments, liveReferrals, liveCases, liveWalkins));
+  };
+
+  if (db) {
+    const unsubs = [];
+    try {
+      unsubs.push(
+        onSnapshot(collection(db, 'appointments'), snap => {
+          if (!snap.empty) liveAppointments = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+          emit();
+        })
+      );
+      unsubs.push(
+        onSnapshot(collection(db, 'referrals'), snap => {
+          if (!snap.empty) liveReferrals = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+          emit();
+        })
+      );
+      unsubs.push(
+        onSnapshot(collection(db, 'cases'), snap => {
+          if (!snap.empty) liveCases = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+          emit();
+        })
+      );
+      unsubs.push(
+        onSnapshot(collection(db, 'walkin_queue'), snap => {
+          if (!snap.empty) liveWalkins = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+          emit();
+        })
+      );
+      return () => unsubs.forEach(u => u && u());
+    } catch (e) {
+      console.warn('subscribeAnalyticsDataset fallback:', e.message);
+    }
+  }
+
+  window.addEventListener('guidehub_data_changed', emit);
+  emit();
+  return () => window.removeEventListener('guidehub_data_changed', emit);
 }

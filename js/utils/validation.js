@@ -11,7 +11,37 @@ export function isStudentDomain(email = '') {
 }
 
 export function isStaffDomain(email = '') {
-  return email.toLowerCase().endsWith(`@${STAFF_DOMAIN}`);
+  const lower = email.toLowerCase();
+  return lower.endsWith(`@${STAFF_DOMAIN}`) && !lower.endsWith(`@${STUDENT_DOMAIN}`);
+}
+
+export function escapeHtml(str = '') {
+  return String(str ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+export function formatDateIso(val) {
+  if (!val) return 'Recent';
+  if (typeof val === 'string') {
+    return val.split('T')[0] || val;
+  }
+  if (typeof val === 'object') {
+    if (typeof val.toDate === 'function') {
+      return val.toDate().toISOString().split('T')[0];
+    }
+    if (typeof val.seconds === 'number') {
+      return new Date(val.seconds * 1000).toISOString().split('T')[0];
+    }
+  }
+  try {
+    return new Date(val).toISOString().split('T')[0];
+  } catch (e) {
+    return 'Recent';
+  }
 }
 
 export function validateIdentityFormat({ fullName, emailPrefix, idNumber, role }) {
@@ -100,5 +130,5 @@ export function getRoleCategory(role = 'student') {
 
 export function getUserDocPath(role, docId) {
   const category = getRoleCategory(role);
-  return `users/${category}/accounts/${docId}`;
+  return `users/${category}/users/${docId}`;
 }

@@ -3,6 +3,7 @@
 
 import nodemailer from 'nodemailer';
 import dotenv from 'dotenv';
+import { verifyServerOtp, escapeHtml } from '../server/db.js';
 dotenv.config();
 
 const transporter = nodemailer.createTransport({
@@ -39,6 +40,17 @@ export default async function handler(req, res) {
   }
 
   const normalizedEmail = email.trim().toLowerCase();
+
+  if (!normalizedEmail.endsWith('@students.nu-fairview.edu.ph') && !normalizedEmail.endsWith('@nu-fairview.edu.ph')) {
+    return res
+      .status(400)
+      .json({ success: false, error: 'Only official NU Fairview institutional emails are supported.' });
+  }
+
+  const otpCheck = await verifyServerOtp(normalizedEmail, otp);
+  if (!otpCheck.valid) {
+    return res.status(otpCheck.status || 400).json({ success: false, error: otpCheck.error });
+  }
 
   try {
     const apiKey = process.env.FIREBASE_API_KEY || 'AIzaSyAqPNF4SRiyF8nZbFPLraUHldNoxvHQiQk';
@@ -79,15 +91,16 @@ export default async function handler(req, res) {
     }
 
     // 3. Log security alert to GCO Gmail
+    const safeEmail = escapeHtml(normalizedEmail);
     const mailOptions = {
       from: `"GuideHub Security" <${process.env.GMAIL_USER}>`,
       to: process.env.GMAIL_USER,
-      subject: ` [PASSWORD RESET] Account Password Changed - ${normalizedEmail}`,
+      subject: ` [PASSWORD RESET] Account Password Changed - ${safeEmail}`,
       html: `
  <div style="font-family: sans-serif; padding: 20px; background-color: #f8fafc;">
  <div style="max-width: 480px; margin: auto; background: white; border-radius: 8px; padding: 24px; border: 1px solid #e2e8f0;">
  <h3 style="color: #00205B; margin-top: 0;">Password Reset Completed</h3>
- <p style="color: #334155; font-size: 14px;">The account associated with <strong>${normalizedEmail}</strong> has successfully updated its credentials.</p>
+ <p style="color: #334155; font-size: 14px;">The account associated with <strong>${safeEmail}</strong> has successfully updated its credentials.</p>
  <p style="color: #64748b; font-size: 12px; margin-top: 20px;">Timestamp: ${new Date().toLocaleString('en-US', { timeZone: 'Asia/Manila' })}</p>
  </div>
  </div>

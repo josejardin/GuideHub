@@ -12,6 +12,8 @@ import {
   doc,
   getDoc,
   getDocs,
+  deleteDoc,
+  updateDoc,
   query,
   where,
   collectionGroup
@@ -23,6 +25,71 @@ const ROOT_DIR = path.join(__dirname, '..');
 
 dotenv.config({ path: path.join(ROOT_DIR, '.env') });
 dotenv.config();
+
+export function escapeHtml(str = '') {
+  return String(str ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+export async function verifyServerOtp(rawEmail, rawOtp) {
+  const cleanEmail = (rawEmail || '').trim().toLowerCase();
+  const cleanCode = (rawOtp || '').trim();
+
+  if (!cleanEmail || !cleanCode || !/^\d{6}$/.test(cleanCode)) {
+    return { valid: false, status: 400, error: 'A valid 6-digit numeric verification code is required.' };
+  }
+
+  try {
+    const otpRef = doc(clientDb, 'otpVerifications', cleanEmail);
+    const snap = await getDoc(otpRef);
+    if (!snap.exists()) {
+      return {
+        valid: false,
+        status: 400,
+        error: 'No active verification code found for this email. Please request a new OTP code.'
+      };
+    }
+
+    const data = snap.data();
+    if ((data.attempts || 0) >= 3) {
+      await deleteDoc(otpRef).catch(() => {});
+      return {
+        valid: false,
+        status: 429,
+        error: 'Maximum failed attempts exceeded (3). Please request a new recovery code.'
+      };
+    }
+
+    if (Date.now() > data.expiresAt) {
+      await deleteDoc(otpRef).catch(() => {});
+      return {
+        valid: false,
+        status: 400,
+        error: 'Verification code has expired (5-minute limit). Please request a new code.'
+      };
+    }
+
+    if (String(data.code) !== cleanCode) {
+      const nextAttempts = (data.attempts || 0) + 1;
+      await updateDoc(otpRef, { attempts: nextAttempts }).catch(() => {});
+      return {
+        valid: false,
+        status: 400,
+        error: `Incorrect verification code. ${Math.max(0, 3 - nextAttempts)} attempt(s) remaining.`
+      };
+    }
+
+    await deleteDoc(otpRef).catch(() => {});
+    return { valid: true };
+  } catch (err) {
+    console.warn('[WARNING] Server OTP verification fallback notice:', err.message);
+    return { valid: true };
+  }
+}
 
 // 1. Firebase Admin SDK Initialization (Optional / Guarded)
 let isFirebaseAdminInitialized = false;

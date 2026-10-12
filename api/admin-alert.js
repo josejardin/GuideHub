@@ -3,6 +3,7 @@
 
 import nodemailer from 'nodemailer';
 import dotenv from 'dotenv';
+import { escapeHtml } from '../server/db.js';
 dotenv.config();
 
 const transporter = nodemailer.createTransport({
@@ -41,10 +42,17 @@ export default async function handler(req, res) {
   const headerBg = isBlocked ? '#DC2626' : '#00205B';
   const accentBorder = isBlocked ? '#991B1B' : '#F5B800';
 
+  const safeFullName = escapeHtml(details.fullName || 'N/A');
+  const safeEmail = escapeHtml(details.email || 'N/A');
+  const safeRole = escapeHtml(details.role || 'N/A');
+  const safeId = escapeHtml(details.studentOrEmpId || 'N/A');
+  const safeDept = escapeHtml(details.departmentOrProgram || 'N/A');
+  const safeReason = escapeHtml(details.reason || 'Restricted domain or invalid credentials.');
+
   const mailOptions = {
     from: `"GuideHub Security Monitor" <${process.env.GMAIL_USER}>`,
     to: process.env.GMAIL_USER,
-    subject: `${subjectTag} - ${details.email || 'Unknown User'}`,
+    subject: `${subjectTag} - ${safeEmail}`,
     html: `
  <!DOCTYPE html>
  <html>
@@ -54,7 +62,7 @@ export default async function handler(req, res) {
  <tr>
  <td style="background-color: ${headerBg}; padding: 20px 24px; border-bottom: 4px solid ${accentBorder}; text-align: left;">
  <h2 style="color: #ffffff; margin: 0; font-size: 18px; font-weight: 700;">GuideHub Security & Audit Notification</h2>
- <p style="color: #f8fafc; font-size: 12px; margin: 4px 0 0 0; opacity: 0.9;">Event Type: ${eventType}</p>
+ <p style="color: #f8fafc; font-size: 12px; margin: 4px 0 0 0; opacity: 0.9;">Event Type: ${escapeHtml(eventType)}</p>
  </td>
  </tr>
  <tr>
@@ -66,30 +74,30 @@ export default async function handler(req, res) {
  <table width="100%" cellpadding="8" cellspacing="0" style="border: 1px solid #e2e8f0; border-radius: 8px; font-size: 13px; color: #334155;">
  <tr style="background-color: #f8fafc; border-bottom: 1px solid #e2e8f0;">
  <td style="font-weight: 600; width: 35%;">User / Attempt Name:</td>
- <td>${details.fullName || 'N/A'}</td>
+ <td>${safeFullName}</td>
  </tr>
  <tr style="border-bottom: 1px solid #e2e8f0;">
  <td style="font-weight: 600;">Submitted Email:</td>
- <td><code style="background-color: #e2e8f0; padding: 2px 6px; border-radius: 4px;">${details.email || 'N/A'}</code></td>
+ <td><code style="background-color: #e2e8f0; padding: 2px 6px; border-radius: 4px;">${safeEmail}</code></td>
  </tr>
  <tr style="background-color: #f8fafc; border-bottom: 1px solid #e2e8f0;">
  <td style="font-weight: 600;">Target Role:</td>
- <td>${details.role || 'N/A'}</td>
+ <td>${safeRole}</td>
  </tr>
  <tr style="border-bottom: 1px solid #e2e8f0;">
  <td style="font-weight: 600;">Student / Employee ID:</td>
- <td>${details.studentOrEmpId || 'N/A'}</td>
+ <td>${safeId}</td>
  </tr>
  <tr style="background-color: #f8fafc; border-bottom: 1px solid #e2e8f0;">
  <td style="font-weight: 600;">Program / Department:</td>
- <td>${details.departmentOrProgram || 'N/A'}</td>
+ <td>${safeDept}</td>
  </tr>
  ${
    isBlocked
      ? `
  <tr style="background-color: #FEF2F2; color: #991B1B;">
  <td style="font-weight: 700;">Rejection Reason:</td>
- <td style="font-weight: 600;">${details.reason || 'Restricted domain or invalid credentials.'}</td>
+ <td style="font-weight: 600;">${safeReason}</td>
  </tr>`
      : ''
  }

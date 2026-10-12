@@ -2,7 +2,7 @@ import nodemailer from 'nodemailer';
 import path from 'path';
 import fs from 'fs';
 import dotenv from 'dotenv';
-import { findAccountByEmail, findAccountById } from '../server/db.js';
+import { findAccountByEmail, findAccountById, escapeHtml } from '../server/db.js';
 dotenv.config();
 
 const transporter = nodemailer.createTransport({
@@ -36,9 +36,22 @@ export default async function handler(req, res) {
     return res.status(400).json({ error: 'All fields are required. Please complete the registration form.' });
   }
 
+  if (!/^\d{6}$/.test(String(otp).trim())) {
+    return res.status(400).json({ error: 'Invalid OTP format. Must be a 6-digit numeric code.' });
+  }
+
   const cleanTo = (to || '').trim().toLowerCase();
-  const recipientName = (name || 'Student').trim();
+  const recipientName = (name || 'Nationalian').trim();
   const emailPrefix = cleanTo.split('@')[0];
+
+  const isStudentDomainEmail = cleanTo.endsWith('@students.nu-fairview.edu.ph');
+  const isStaffDomainEmail = cleanTo.endsWith('@nu-fairview.edu.ph') && !isStudentDomainEmail;
+
+  if (!isStudentDomainEmail && !isStaffDomainEmail) {
+    return res.status(400).json({
+      error: 'Only official @students.nu-fairview.edu.ph or @nu-fairview.edu.ph institutional emails are permitted.'
+    });
+  }
 
   const isStudent = role === 'student' || role === 'college_student' || role === 'shs_student';
   const expectedDomain = isStudent ? '@students.nu-fairview.edu.ph' : '@nu-fairview.edu.ph';
@@ -73,21 +86,22 @@ export default async function handler(req, res) {
   }
 
   // 3. Instant Troll / Dummy Account Synchronous Filter
-  const trollPatterns = /^(test|temp|dummy|admin|fake|asdf|qwerty|sample|none|null|undefined|12345|user)/i;
+  const trollPatterns = /^(test|temp|dummy|admin|fake|asdf|qwerty|sample|none|null|undefined|12345|user)$/i;
   const repetitiveChars = /(.)\1{4,}/;
 
   if (
-    trollPatterns.test(emailPrefix) ||
-    trollPatterns.test(recipientName) ||
-    repetitiveChars.test(emailPrefix) ||
-    emailPrefix.length < 3
+    isRegistration &&
+    (trollPatterns.test(emailPrefix) ||
+      trollPatterns.test(recipientName) ||
+      repetitiveChars.test(emailPrefix) ||
+      emailPrefix.length < 3)
   ) {
     return res
       .status(400)
       .json({ error: 'Invalid account details detected. Please use your official NU Fairview credentials.' });
   }
 
-  // 4. Prevent Duplicate & Cross-Role Registration
+  // 4. Prevent Duplicate & Cross-Role Registration (or verify account exists for Password Reset)
   if (isRegistration) {
     try {
       const exactUser = await findAccountByEmail(cleanTo);
@@ -119,6 +133,17 @@ export default async function handler(req, res) {
     } catch (lookupErr) {
       console.warn('Account pre-check error:', lookupErr.message);
     }
+  } else {
+    try {
+      const existingAccount = await findAccountByEmail(cleanTo);
+      if (!existingAccount) {
+        return res.status(404).json({
+          error: 'No registered GuideHub account was found for this institutional email address.'
+        });
+      }
+    } catch (lookupErr) {
+      console.warn('Password reset account lookup notice:', lookupErr.message);
+    }
   }
 
   const logoPath = path.join(process.cwd(), 'assets', 'nu-logo.png');
@@ -133,14 +158,17 @@ export default async function handler(req, res) {
     });
   }
 
+  const safeName = escapeHtml(recipientName);
+  const safeOtp = escapeHtml(otp);
+
   const mailOptions = {
     from: `"NU Fairview Guidance Center" <${process.env.GMAIL_USER}>`,
-    to: to,
+    to: cleanTo,
     replyTo: process.env.GMAIL_USER,
-    subject: `GuideHub Verification Code: ${otp}`,
+    subject: `GuideHub Verification Code: ${safeOtp}`,
     text: `Hello ${recipientName},\n\nYour 6-digit NU Fairview GuideHub verification code is: ${otp}\n\nThis code expires in 5 minutes.\n\n- National University Fairview Guidance and Counseling Center`,
     html: `
- <!DOCTYPE html PUBLIC "-
+ <!DOCTYPE html>
  <html xmlns="http://www.w3.org/1999/xhtml">
  <head>
  <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
@@ -188,9 +216,9 @@ export default async function handler(req, res) {
  <tr>
  <td style="padding: 32px 28px 24px 28px;">
  <h2 style="margin: 0 0 12px 0; color: #0f172a; font-size: 18px; font-weight: 700;">Account Verification Code</h2>
- <p style="margin: 0 0 16px 0; color: #334155; font-size: 14px; line-height: 1.6;">Hello <strong>${recipientName}</strong>,</p>
+ <p style="margin: 0 0 16px 0; color: #334155; font-size: 14px; line-height: 1.6;">Hello <strong>${safeName}</strong>,</p>
  <p style="margin: 0 0 24px 0; color: #475569; font-size: 13px; line-height: 1.6;">
- Thank you for registering with GuideHub. Please enter the following 6-digit One-Time Password (OTP) on the verification screen to activate your institutional portal:
+ Thank you for using GuideHub. Please enter the following 6-digit One-Time Password (OTP) on the verification screen:
  </p>
 
  <!-- 6-Digit OTP Card -->
@@ -198,7 +226,7 @@ export default async function handler(req, res) {
  <tr>
  <td style="padding: 20px; text-align: center;">
  <span style="display: block; font-size: 10px; font-weight: 700; color: #64748b; text-transform: uppercase; letter-spacing: 1.5px; margin-bottom: 6px;">Your 6-Digit One-Time Password</span>
- <span style="font-family: 'Courier New', Courier, monospace, sans-serif; font-size: 36px; font-weight: 900; color: #00205B; letter-spacing: 10px; display: inline-block;">${otp}</span>
+ <span style="font-family: 'Courier New', Courier, monospace, sans-serif; font-size: 36px; font-weight: 900; color: #00205B; letter-spacing: 10px; display: inline-block;">${safeOtp}</span>
  </td>
  </tr>
  </table>

@@ -396,7 +396,10 @@
                 type="text"
                 id="off-num"
                 required
-                placeholder="2024-99812"
+                inputmode="numeric"
+                pattern="[0-9-]*"
+                oninput="this.value = this.value.replace(/[^0-9-]/g, '')"
+                placeholder="2024-1039005"
                 class="w-full px-2.5 py-1.5 border border-slate-300 rounded focus:border-slate-900 focus:outline-none"
               />
             </div>
@@ -437,7 +440,7 @@
       </div>
     </div>
 
-    <div id="printable-call-slip" class="hidden">
+    <div id="printable-call-slip" class="hidden print-only">
       <div class="max-w-xl mx-auto border-2 border-slate-900 p-8 font-serif text-slate-900">
         <div class="text-center border-b-2 border-slate-900 pb-3 mb-4">
           <h2 class="text-base font-bold uppercase tracking-wider">Guidance & Counseling Center</h2>

@@ -1,5 +1,6 @@
 import { requireRole, initNavbar, showToast, getRoleBadge } from './auth.js';
 import { getAllUsers, updateUserRole, subscribeAuditLogs, logAuditEvent } from './db.js';
+import { escapeHtml } from './utils/validation.js';
 
 document.addEventListener('DOMContentLoaded', async () => {
   const currentUser = requireRole(['admin']);
@@ -50,16 +51,16 @@ document.addEventListener('DOMContentLoaded', async () => {
         return `
  <tr class="hover:bg-slate-50/60 transition">
  <td class="py-2.5 px-4">
- <div class="font-bold text-slate-900">${u.fullName}</div>
- <div class="text-[11px] text-slate-500 font-mono">${u.email}</div>
+ <div class="font-bold text-slate-900">${escapeHtml(u.fullName)}</div>
+ <div class="text-[11px] text-slate-500 font-mono">${escapeHtml(u.email)}</div>
  </td>
- <td class="py-2.5 px-4 font-mono text-slate-700 font-medium">${u.studentOrEmpId || 'N/A'}</td>
- <td class="py-2.5 px-4 text-slate-600">${u.program || 'General'}</td>
+ <td class="py-2.5 px-4 font-mono text-slate-700 font-medium">${escapeHtml(u.studentOrEmpId || 'N/A')}</td>
+ <td class="py-2.5 px-4 text-slate-600">${escapeHtml(u.program || u.department || 'General')}</td>
  <td class="py-2.5 px-4">
  ${getRoleBadge(u.role)}
  </td>
  <td class="py-2.5 px-4 text-right">
- <select data-uid="${u.uid}" data-uname="${u.fullName}" class="role-select text-xs border border-slate-200 rounded px-2 py-1 bg-white text-slate-700 font-medium focus:outline-none focus:border-slate-900">
+ <select data-uid="${escapeHtml(u.uid)}" data-uname="${escapeHtml(u.fullName)}" class="role-select text-xs border border-slate-200 rounded px-2 py-1 bg-white text-slate-700 font-medium focus:outline-none focus:border-slate-900">
  <option value="student" ${currentRole === 'student' ? 'selected' : ''}>Student</option>
  <option value="faculty" ${currentRole === 'faculty' ? 'selected' : ''}>Faculty</option>
  <option value="counselor" ${currentRole === 'counselor' ? 'selected' : ''}>Counselor</option>
@@ -126,28 +127,30 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     auditLogsTbody.innerHTML = filtered
       .map(log => {
-        const timeStr = log.timestamp
-          ? new Date(log.timestamp).toLocaleString('en-US', {
-              month: 'short',
-              day: 'numeric',
-              hour: '2-digit',
-              minute: '2-digit',
-              second: '2-digit'
-            })
-          : 'N/A';
+        const rawTs = log.timestamp?.toDate ? log.timestamp.toDate() : log.timestamp ? new Date(log.timestamp) : null;
+        const timeStr =
+          rawTs && !isNaN(rawTs.getTime())
+            ? rawTs.toLocaleString('en-US', {
+                month: 'short',
+                day: 'numeric',
+                hour: '2-digit',
+                minute: '2-digit',
+                second: '2-digit'
+              })
+            : 'N/A';
 
         return `
  <tr class="hover:bg-slate-50/60 transition">
- <td class="py-2.5 px-4 font-mono text-[11px] text-slate-500 whitespace-nowrap">${timeStr}</td>
- <td class="py-2.5 px-4 font-bold text-slate-900">${log.actorName}</td>
+ <td class="py-2.5 px-4 font-mono text-[11px] text-slate-500 whitespace-nowrap">${escapeHtml(timeStr)}</td>
+ <td class="py-2.5 px-4 font-bold text-slate-900">${escapeHtml(log.actorName)}</td>
  <td class="py-2.5 px-4">
  ${getRoleBadge(log.actorRole)}
  </td>
  <td class="py-2.5 px-4 font-mono text-[11px] font-bold text-slate-700">
- ${log.action}
+ ${escapeHtml(log.action)}
  </td>
  <td class="py-2.5 px-4 text-slate-600">
- ${log.details}
+ ${escapeHtml(log.details)}
  </td>
  </tr>
  `;

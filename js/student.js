@@ -10,6 +10,7 @@ import {
   updateWalkInStatus,
   logAuditEvent
 } from './db.js';
+import { escapeHtml } from './utils/validation.js';
 
 document.addEventListener('DOMContentLoaded', () => {
   const currentUser = requireRole(['student']);
@@ -29,8 +30,13 @@ document.addEventListener('DOMContentLoaded', () => {
       qCounselors,
       snapshot => {
         counselorSelect.innerHTML = '<option value="any"> Any Available Counselor (Fastest Matching)</option>';
+        const seenEmails = new Set();
         snapshot.forEach(docSnap => {
           const counselor = docSnap.data();
+          if (counselor.canonicalDocId && counselor.canonicalDocId !== docSnap.id) return;
+          const emailKey = (counselor.email || docSnap.id).toLowerCase();
+          if (seenEmails.has(emailKey)) return;
+          seenEmails.add(emailKey);
           const option = document.createElement('option');
           option.value = docSnap.id;
           option.textContent = `${counselor.fullName} (${counselor.department || counselor.subjectArea || 'Guidance Center'})`;
@@ -114,7 +120,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
       const concernSelect = document.getElementById('wiz-concern-category');
       if (concernSelect) {
-        concernSelect.value = 'Personal / Emotional';
+        concernSelect.value = 'Relationship & Personal';
       }
       const concernDetails = document.getElementById('wiz-concern-details');
       if (concernDetails) {
@@ -168,21 +174,21 @@ document.addEventListener('DOMContentLoaded', () => {
  <div class="p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 hover:bg-slate-50/60 transition">
  <div class="space-y-1">
  <div class="flex items-center gap-2">
- <span class="font-bold text-xs text-slate-900">${apt.concernCategory}</span>
+ <span class="font-bold text-xs text-slate-900">${escapeHtml(apt.concernCategory)}</span>
  <span class="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-medium border ${badgeStyles[statusLower] || badgeStyles.pending}">
- ${apt.status}
+ ${escapeHtml(apt.status)}
  </span>
  ${apt.isWalkIn ? '<span class="px-1.5 py-0.5 rounded text-[9px] font-semibold bg-[#00205B] text-[#F5B800]">Walk-In</span>' : ''}
- ${apt.followUpDate ? `<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-purple-50 text-purple-700 border border-purple-200">Follow-up: ${apt.followUpDate}</span>` : ''}
+ ${apt.followUpDate ? `<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-purple-50 text-purple-700 border border-purple-200">Follow-up: ${escapeHtml(apt.followUpDate)}</span>` : ''}
  </div>
  
  <div class="text-[11px] text-slate-500 flex flex-wrap items-center gap-x-3 gap-y-0.5">
- <span>Date: <strong class="text-slate-700">${apt.date}</strong></span>
- <span>Time: <strong class="text-slate-700">${apt.timeSlot}</strong></span>
- <span>Counselor: <strong class="text-slate-700">${apt.counselorName || 'Assigned Counselor'}</strong></span>
+ <span>Date: <strong class="text-slate-700">${escapeHtml(apt.date)}</strong></span>
+ <span>Time: <strong class="text-slate-700">${escapeHtml(apt.timeSlot)}</strong></span>
+ <span>Counselor: <strong class="text-slate-700">${escapeHtml(apt.counselorName || 'Assigned Counselor')}</strong></span>
  </div>
 
- ${apt.specificConcern ? `<p class="text-[11px] text-slate-600 italic mt-1">"${apt.specificConcern}"</p>` : ''}
+ ${apt.specificConcern ? `<p class="text-[11px] text-slate-600 italic mt-1">"${escapeHtml(apt.specificConcern)}"</p>` : ''}
  </div>
 
  <!-- Actions -->
@@ -190,7 +196,7 @@ document.addEventListener('DOMContentLoaded', () => {
  ${
    isActionable
      ? `
- <button data-cancel-id="${apt.id}" class="btn-cancel-apt px-2.5 py-1 rounded text-xs font-medium text-rose-700 hover:bg-rose-50 border border-rose-200 transition">
+ <button data-cancel-id="${escapeHtml(apt.id)}" class="btn-cancel-apt px-2.5 py-1 rounded text-xs font-medium text-rose-700 hover:bg-rose-50 border border-rose-200 transition">
  Cancel
  </button>
  `
@@ -251,7 +257,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
   walkinForm?.addEventListener('submit', async e => {
     e.preventDefault();
-    const concernCategory = document.getElementById('walkin-concern-type')?.value || 'General Walk-In';
+    const concernCategory =
+      document.getElementById('walkin-concern')?.value ||
+      document.getElementById('walkin-concern-type')?.value ||
+      'General Guidance Inquiry';
 
     try {
       const ticket = await generateWalkInTicket({
@@ -268,8 +277,8 @@ document.addEventListener('DOMContentLoaded', () => {
         currentUser.uid,
         currentUser.fullName,
         currentUser.role,
-        'WALKIN_JOINED',
-        `Generated ticket ${ticket.ticketNumber}`
+        'WALKIN_TICKET_GENERATED',
+        `Generated ticket ${ticket.ticketNumber} (${concernCategory})`
       );
 
       walkinModal?.classList.add('hidden');
@@ -346,6 +355,28 @@ document.addEventListener('DOMContentLoaded', () => {
 
   btnCloseWizard?.addEventListener('click', () => wizardModal?.classList.add('hidden'));
 
+  const sContactInit = document.getElementById('wiz-student-contact');
+  if (sContactInit) {
+    sContactInit.addEventListener('input', e => {
+      e.target.value = e.target.value.replace(/[^0-9+-]/g, '');
+    });
+    sContactInit.addEventListener('keydown', e => {
+      if (
+        ['Backspace', 'Delete', 'Tab', 'Escape', 'Enter', 'ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(e.key) ||
+        e.ctrlKey ||
+        e.metaKey
+      )
+        return;
+      if (!/[0-9+-]/.test(e.key)) e.preventDefault();
+    });
+  }
+
+  const dateInputInit = document.getElementById('wiz-schedule-date');
+  dateInputInit?.addEventListener('change', () => {
+    selectedSlot = null;
+    validateDateAndLoadSlots();
+  });
+
   function openWizard() {
     currentStep = 1;
     selectedSlot = null;
@@ -362,18 +393,6 @@ document.addEventListener('DOMContentLoaded', () => {
     if (sProg) sProg.value = currentUser.program || 'BS Information Technology';
     if (sContact) {
       sContact.value = currentUser.contactNumber || '0917-123-4567';
-      sContact.addEventListener('input', e => {
-        e.target.value = e.target.value.replace(/[^0-9+-]/g, '');
-      });
-      sContact.addEventListener('keydown', e => {
-        if (
-          ['Backspace', 'Delete', 'Tab', 'Escape', 'Enter', 'ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(e.key) ||
-          e.ctrlKey ||
-          e.metaKey
-        )
-          return;
-        if (!/[0-9+-]/.test(e.key)) e.preventDefault();
-      });
     }
     if (sGender) sGender.value = currentUser.gender || 'Female';
 
@@ -387,8 +406,6 @@ document.addEventListener('DOMContentLoaded', () => {
       if (d.getDay() === 0) d.setDate(d.getDate() + 1);
       if (d.getDay() === 6) d.setDate(d.getDate() + 2);
       dateInput.value = d.toISOString().split('T')[0];
-
-      dateInput.addEventListener('change', validateDateAndLoadSlots);
     }
 
     renderStep();

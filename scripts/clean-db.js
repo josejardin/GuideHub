@@ -1,5 +1,6 @@
 import { initializeApp } from 'firebase/app';
-import { getFirestore, collection, getDocs, deleteDoc, doc, collectionGroup } from 'firebase/firestore';
+import { getAuth, signInWithEmailAndPassword } from 'firebase/auth';
+import { getFirestore, collection, getDocs, deleteDoc, doc } from 'firebase/firestore';
 import dotenv from 'dotenv';
 import path from 'path';
 import { fileURLToPath } from 'url';
@@ -21,6 +22,7 @@ const firebaseConfig = {
 };
 
 const app = initializeApp(firebaseConfig);
+const auth = getAuth(app);
 const db = getFirestore(app);
 
 const collectionsToPurge = [
@@ -29,6 +31,7 @@ const collectionsToPurge = [
   'cases',
   'walkinQueue',
   'walkin_queue',
+  'counselorSchedules',
   'otpVerifications',
   'auditLogs',
   'students',
@@ -120,6 +123,13 @@ async function runCleanup() {
   console.log(' Wiping all test bookings, referrals, logs,');
   console.log(' and redundant / messy [users] documents...');
   console.log('====================================================');
+
+  try {
+    await signInWithEmailAndPassword(auth, 'admin.alex@nu-fairview.edu.ph', 'Password123!');
+    console.log(' Authenticated as admin for full database cleanup.');
+  } catch (e) {
+    console.warn(' Admin sign-in notice during cleanup:', e.message);
+  }
 
   // 1. Purge all operational collections
   for (const colName of collectionsToPurge) {

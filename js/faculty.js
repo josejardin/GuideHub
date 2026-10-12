@@ -1,5 +1,6 @@
 import { requireRole, initNavbar, showToast } from './auth.js';
 import { createReferral, subscribeFacultyReferrals, logAuditEvent } from './db.js';
+import { escapeHtml, formatDateIso } from './utils/validation.js';
 
 document.addEventListener('DOMContentLoaded', () => {
   const currentUser = requireRole(['faculty']);
@@ -48,24 +49,24 @@ document.addEventListener('DOMContentLoaded', () => {
           Closed: 'bg-emerald-50 text-emerald-700 border-emerald-200/80'
         };
 
-        const dateStr = (r.createdAt || '').split('T')[0] || 'Recent';
+        const dateStr = formatDateIso(r.createdAt) || 'Recent';
 
         return `
  <tr class="hover:bg-slate-50/60 transition">
- <td class="py-3 px-4 text-slate-500 font-mono text-[11px] whitespace-nowrap">${dateStr}</td>
+ <td class="py-3 px-4 text-slate-500 font-mono text-[11px] whitespace-nowrap">${escapeHtml(dateStr)}</td>
  <td class="py-3 px-4">
- <div class="font-bold text-slate-900">${r.studentName}</div>
- <div class="text-[11px] text-slate-500">${r.studentNumber} • ${r.program}</div>
+ <div class="font-bold text-slate-900">${escapeHtml(r.studentName)}</div>
+ <div class="text-[11px] text-slate-500">${escapeHtml(r.studentNumber)} • ${escapeHtml(r.program)}</div>
  </td>
- <td class="py-3 px-4 text-slate-700 font-medium">${r.subjectCourse || 'General'}</td>
- <td class="py-3 px-4 text-slate-800 font-medium">${r.reasonCategory}</td>
+ <td class="py-3 px-4 text-slate-700 font-medium">${escapeHtml(r.subjectCourse || 'General')}</td>
+ <td class="py-3 px-4 text-slate-800 font-medium">${escapeHtml(r.reasonCategory)}</td>
  <td class="py-3 px-4">
  <span class="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-medium border ${stageStyles[r.status] || stageStyles.Referred}">
- ${r.status}
+ ${escapeHtml(r.status)}
  </span>
  </td>
  <td class="py-3 px-4 text-right">
- <button data-view-id="${r.id}" class="btn-view-ref px-2.5 py-1 rounded text-xs font-medium text-slate-700 hover:bg-slate-100 border border-slate-200 transition">
+ <button data-view-id="${escapeHtml(r.id)}" class="btn-view-ref px-2.5 py-1 rounded text-xs font-medium text-slate-700 hover:bg-slate-100 border border-slate-200 transition">
  View
  </button>
  </td>
@@ -167,20 +168,20 @@ document.addEventListener('DOMContentLoaded', () => {
  <div class="bg-slate-50 p-3.5 rounded-lg border border-slate-200 space-y-1.5 text-xs">
  <div class="flex justify-between">
  <span class="text-slate-400">Student:</span>
- <span class="font-bold text-slate-900">${referral.studentName} (${referral.studentNumber})</span>
+ <span class="font-bold text-slate-900">${escapeHtml(referral.studentName)} (${escapeHtml(referral.studentNumber)})</span>
  </div>
  <div class="flex justify-between">
  <span class="text-slate-400">Program / Course:</span>
- <span class="font-medium text-slate-700">${referral.program} • ${referral.subjectCourse}</span>
+ <span class="font-medium text-slate-700">${escapeHtml(referral.program)} • ${escapeHtml(referral.subjectCourse)}</span>
  </div>
  <div class="flex justify-between">
  <span class="text-slate-400">Category:</span>
- <span class="font-medium text-slate-900">${referral.reasonCategory}</span>
+ <span class="font-medium text-slate-900">${escapeHtml(referral.reasonCategory)}</span>
  </div>
  <div class="pt-1">
  <span class="text-slate-400 block mb-0.5">Observations:</span>
  <p class="bg-white p-2 rounded border border-slate-200 text-slate-700 italic">
- "${referral.specificObservations}"
+ "${escapeHtml(referral.specificObservations)}"
  </p>
  </div>
  </div>
