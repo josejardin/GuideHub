@@ -57,8 +57,11 @@ app.use((req, res, next) => {
   next();
 });
 
+// Cache heavy static assets (images/icons) to accelerate public tunnel loading
+app.use('/assets', express.static(path.join(ROOT_DIR, 'assets'), { maxAge: '1d', immutable: false }));
+
 // Serve static assets, client portals, and views from project root (denying dotfiles)
-app.use(express.static(ROOT_DIR, { dotfiles: 'deny' }));
+app.use(express.static(ROOT_DIR, { dotfiles: 'deny', maxAge: '5m' }));
 
 const transporter = nodemailer.createTransport({
   host: 'smtp.gmail.com',
@@ -533,6 +536,6 @@ app.get('*', (req, res) => {
   res.sendFile(path.join(ROOT_DIR, 'index.html'));
 });
 
-app.listen(PORT, () => {
-  console.log(` GuideHub running at http://localhost:${PORT}`);
+app.listen(PORT, '0.0.0.0', () => {
+  console.log(` GuideHub running at http://127.0.0.1:${PORT} (http://localhost:${PORT})`);
 });

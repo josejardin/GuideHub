@@ -7,6 +7,7 @@
   "scripts": {
     "start": "node server/server.js",
     "dev": "node server/server.js",
+    "live": "node scripts/start-live.js",
     "clean-db": "node scripts/clean-db.js",
     "seed": "node scripts/seed-accounts.js"
   },
@@ -27,5 +28,8 @@
     "otp"
   ],
   "author": "National University Fairview Guidance Office",
-  "license": "ISC"
+  "license": "ISC",
+  "devDependencies": {
+    "cloudflared": "^0.7.3"
+  }
 }

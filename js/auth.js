@@ -371,31 +371,14 @@ export async function verifyOTPAndCreateUser(email, enteredCode, profileData, pa
   await setDoc(
     doc(db, 'users', category),
     {
-      [userDocId]: completeProfile
+      [userDocId]: completeProfile,
+      roleCategory: category
     },
     { merge: true }
   );
 
   // 2. Direct Subcollection under Role: users/{category}/users/{userDocId}
   await setDoc(doc(db, 'users', category, 'users', userDocId), completeProfile);
-
-  // 3. Primary document under standardized semantic ID in root (users/{userDocId})
-  await setDoc(doc(db, 'users', userDocId), completeProfile);
-
-  // 4. Role collection at root ({category}/{userDocId})
-  await setDoc(doc(db, category, userDocId), completeProfile);
-
-  // 5. Maintain alias under Firebase Auth UID for direct resolution
-  if (user.uid && user.uid !== userDocId) {
-    await setDoc(
-      doc(db, 'users', user.uid),
-      {
-        ...completeProfile,
-        canonicalDocId: userDocId
-      },
-      { merge: true }
-    );
-  }
 
   // Dispatch Administrative Security & Registration Audit Alert
   dispatchAdminAlert('REGISTRATION_SUCCESS', {
@@ -493,69 +476,25 @@ export async function loginUser(email, password, remember = true) {
     let profileData = null;
     if (db) {
       try {
-        // 1. Direct document lookup by Auth UID in root
-        const userDocRef = doc(db, 'users', user.uid);
-        const snap = await getDoc(userDocRef);
-        if (snap.exists()) {
-          const data = snap.data();
-          if (data.canonicalDocId) {
-            const canonicalSnap = await getDoc(doc(db, 'users', data.canonicalDocId));
-            if (canonicalSnap.exists()) {
-              profileData = { uid: canonicalSnap.id, ...canonicalSnap.data() };
+        const categories = isStudentDomain(cleanEmail)
+          ? ['students', 'counselors', 'faculty', 'head', 'admin']
+          : ['counselors', 'faculty', 'head', 'admin', 'students'];
+
+        // 1. Query role subcollections: users/{category}/users by email
+        for (const cat of categories) {
+          try {
+            const qCat = query(collection(db, 'users', cat, 'users'), where('email', '==', cleanEmail));
+            const catSnap = await getDocs(qCat);
+            if (!catSnap.empty) {
+              const docSnap = catSnap.docs[0];
+              profileData = { uid: docSnap.id, ...docSnap.data() };
+              break;
             }
-          }
-          if (!profileData) {
-            profileData = { uid: snap.id, ...data };
-          }
+          } catch (catErr) {}
         }
 
-        // 2. Query root users collection by institutional email
+        // 2. Check role document maps: users/{category} contains docId fields
         if (!profileData) {
-          const qEmail = query(collection(db, 'users'), where('email', '==', cleanEmail));
-          const querySnap = await getDocs(qEmail);
-          if (!querySnap.empty) {
-            const primaryDoc =
-              querySnap.docs.find(d => !d.data().canonicalDocId || d.data().canonicalDocId === d.id) ||
-              querySnap.docs[0];
-            profileData = { uid: primaryDoc.id, ...primaryDoc.data() };
-          }
-        }
-
-        // 3. Query role subcollections: users/{category}/users
-        if (!profileData) {
-          const categories = ['students', 'counselors', 'faculty', 'head', 'admin'];
-          for (const cat of categories) {
-            try {
-              const qCat = query(collection(db, 'users', cat, 'users'), where('email', '==', cleanEmail));
-              const catSnap = await getDocs(qCat);
-              if (!catSnap.empty) {
-                const docSnap = catSnap.docs[0];
-                profileData = { uid: docSnap.id, ...docSnap.data() };
-                break;
-              }
-            } catch (catErr) {}
-          }
-        }
-
-        // 4. Query root role collections: {category}/{docId}
-        if (!profileData) {
-          const categories = ['students', 'counselors', 'faculty', 'head', 'admin'];
-          for (const cat of categories) {
-            try {
-              const qCat = query(collection(db, cat), where('email', '==', cleanEmail));
-              const catSnap = await getDocs(qCat);
-              if (!catSnap.empty) {
-                const docSnap = catSnap.docs[0];
-                profileData = { uid: docSnap.id, ...docSnap.data() };
-                break;
-              }
-            } catch (catErr) {}
-          }
-        }
-
-        // 5. Check role document maps: users/{category} contains docId fields
-        if (!profileData) {
-          const categories = ['students', 'counselors', 'faculty', 'head', 'admin'];
           for (const cat of categories) {
             try {
               const catDoc = await getDoc(doc(db, 'users', cat));
@@ -573,13 +512,18 @@ export async function loginUser(email, password, remember = true) {
           }
         }
 
-        // 6. Query root users collection by authUid
+        // 3. Query role subcollections by authUid
         if (!profileData) {
-          const qAuth = query(collection(db, 'users'), where('authUid', '==', user.uid));
-          const authSnap = await getDocs(qAuth);
-          if (!authSnap.empty) {
-            const docSnap = authSnap.docs[0];
-            profileData = { uid: docSnap.id, ...docSnap.data() };
+          for (const cat of categories) {
+            try {
+              const qAuth = query(collection(db, 'users', cat, 'users'), where('authUid', '==', user.uid));
+              const authSnap = await getDocs(qAuth);
+              if (!authSnap.empty) {
+                const docSnap = authSnap.docs[0];
+                profileData = { uid: docSnap.id, ...docSnap.data() };
+                break;
+              }
+            } catch (authErr) {}
           }
         }
       } catch (fsErr) {
@@ -608,17 +552,8 @@ export async function loginUser(email, password, remember = true) {
       };
       if (db) {
         try {
-          await setDoc(doc(db, 'users', category), { [generatedDocId]: profileData }, { merge: true });
+          await setDoc(doc(db, 'users', category), { [generatedDocId]: profileData, roleCategory: category }, { merge: true });
           await setDoc(doc(db, 'users', category, 'users', generatedDocId), profileData, { merge: true });
-          await setDoc(doc(db, 'users', generatedDocId), profileData, { merge: true });
-          await setDoc(doc(db, category, generatedDocId), profileData, { merge: true });
-          if (user.uid !== generatedDocId) {
-            await setDoc(
-              doc(db, 'users', user.uid),
-              { ...profileData, canonicalDocId: generatedDocId },
-              { merge: true }
-            );
-          }
         } catch (e) {}
       }
     }

@@ -541,26 +541,6 @@ async function seedDatabase() {
       // Path: users/{category}/users/{docId}
       await setDoc(doc(db, 'users', category, 'users', docId), profilePayload, { merge: true });
       console.log(` [SUBCOLLECTION] users/${category}/users/${docId}`);
-
-      // 3. Root users collection (users/{docId}) for fast resolution & portal compatibility
-      await setDoc(doc(db, 'users', docId), profilePayload, { merge: true });
-      console.log(` [ROOT USERS] users/${docId}`);
-
-      // 4. Role collection at root ({category}/{docId})
-      await setDoc(doc(db, category, docId), profilePayload, { merge: true });
-      console.log(` [ROLE COLLECTION] ${category}/${docId}`);
-
-      // 5. Auth UID alias if different from semantic docId
-      if (uid && uid !== docId) {
-        await setDoc(
-          doc(db, 'users', uid),
-          {
-            ...profilePayload,
-            canonicalDocId: docId
-          },
-          { merge: true }
-        );
-      }
     } catch (err) {
       console.error(` Error provisioning ${account.email}:`, err.message);
     }
