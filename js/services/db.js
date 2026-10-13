@@ -360,22 +360,62 @@ export async function updateAppointmentStatus(appointmentId, status, extraFields
   }
 }
 
-export async function checkSlotAvailable(date, timeSlot, counselorId = 'any') {
-  const state = getLocalState();
-  let activeApts = Object.values(state.appointments).filter(
-    apt => apt.date === date && apt.timeSlot === timeSlot && apt.status !== 'Cancelled' && apt.status !== 'No-Show'
-  );
+export async function getCounselors() {
+  const counselors = [];
+  try {
+    if (db) {
+      const snap = await getDoc(doc(db, 'users', 'counselors'));
+      if (snap.exists()) {
+        const data = snap.data();
+        for (const [key, val] of Object.entries(data)) {
+          if (val && typeof val === 'object' && val.fullName) {
+            counselors.push({ id: key, uid: key, ...val });
+          }
+        }
+      }
+    }
+  } catch (e) {
+    console.warn('getCounselors warning:', e.message);
+  }
 
+  if (counselors.length === 0) {
+    const state = getLocalState();
+    const fallbackList = Object.entries(state.users || {})
+      .filter(([_, u]) => (u.role || '').toLowerCase() === 'counselor')
+      .map(([id, u]) => ({ id, uid: id, ...u }));
+    if (fallbackList.length > 0) return fallbackList;
+
+    return [
+      {
+        id: 'usr_counselor_mark_d',
+        uid: 'usr_counselor_mark_d',
+        fullName: 'Mark Dimalanta, RGC',
+        email: 'mark.d@nu-fairview.edu.ph',
+        gender: 'Male',
+        department: 'Guidance and Counseling Center'
+      },
+      {
+        id: 'usr_counselor_claire_m',
+        uid: 'usr_counselor_claire_m',
+        fullName: 'Claire Mendoza, RGC',
+        email: 'claire.m@nu-fairview.edu.ph',
+        gender: 'Female',
+        department: 'Guidance and Counseling Center'
+      }
+    ];
+  }
+
+  return counselors;
+}
+
+export async function checkSlotAvailable(date, timeSlot, counselorId = 'any', genderPreference = 'Any') {
+  const state = getLocalState();
   const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
   const dayOfWeek = date ? dayNames[new Date(`${date}T00:00:00`).getDay()] : '';
 
-  let isBlocked = false;
-  if (counselorId && counselorId !== 'any') {
-    isBlocked = !!(
-      (state.counselorSchedules[`${counselorId}_${date}_${timeSlot}`] || {}).isBlocked ||
-      (dayOfWeek && (state.counselorSchedules[`${counselorId}_${dayOfWeek}_${timeSlot}`] || {}).isBlocked)
-    );
-  }
+  let activeApts = Object.values(state.appointments || {}).filter(
+    apt => apt.date === date && apt.timeSlot === timeSlot && apt.status !== 'Cancelled' && apt.status !== 'No-Show'
+  );
 
   try {
     if (db) {
@@ -386,30 +426,81 @@ export async function checkSlotAvailable(date, timeSlot, counselorId = 'any') {
           .map(d => ({ id: d.id, ...d.data() }))
           .filter(apt => apt.timeSlot === timeSlot && apt.status !== 'Cancelled' && apt.status !== 'No-Show');
       }
-
-      if (counselorId && counselorId !== 'any') {
-        if (dayOfWeek) {
-          const dayBlockSnap = await getDoc(doc(db, 'counselorSchedules', `${counselorId}_${dayOfWeek}_${timeSlot}`));
-          if (dayBlockSnap.exists() && dayBlockSnap.data().isBlocked) {
-            isBlocked = true;
-          }
-        }
-        const dateBlockSnap = await getDoc(doc(db, 'counselorSchedules', `${counselorId}_${date}_${timeSlot}`));
-        if (dateBlockSnap.exists() && dateBlockSnap.data().isBlocked) {
-          isBlocked = true;
-        }
-      }
     }
   } catch (err) {
-    console.warn('Firestore checkSlotAvailable fallback:', err.message);
+    console.warn('Firestore active appointments fetch warning:', err.message);
   }
 
+  const allCounselors = await getCounselors();
+
+  async function isCounselorBlockedOrBooked(c) {
+    const cId = c.id || c.uid;
+    const cEmail = (c.email || '').toLowerCase();
+    const cName = (c.fullName || '').toLowerCase();
+
+    // 1. Appointment Collision Check
+    const hasCollision = activeApts.some(apt => {
+      const aptCId = apt.counselorId;
+      const aptCName = (apt.counselorName || '').toLowerCase();
+      return (
+        aptCId === cId ||
+        aptCId === cEmail ||
+        (aptCName && cName && (aptCName.includes(cName) || cName.includes(aptCName)))
+      );
+    });
+    if (hasCollision) return true;
+
+    // 2. Local State Block Check
+    const localDayBlocked = !!(
+      (state.counselorSchedules[`${cId}_${dayOfWeek}_${timeSlot}`] || {}).isBlocked ||
+      (state.counselorSchedules[`${cId}_${date}_${timeSlot}`] || {}).isBlocked
+    );
+    if (localDayBlocked) return true;
+
+    // 3. Firestore Block Check
+    if (db) {
+      try {
+        if (dayOfWeek) {
+          const daySnap = await getDoc(doc(db, 'counselorSchedules', `${cId}_${dayOfWeek}_${timeSlot}`));
+          if (daySnap.exists() && daySnap.data().isBlocked) return true;
+        }
+        const dateSnap = await getDoc(doc(db, 'counselorSchedules', `${cId}_${date}_${timeSlot}`));
+        if (dateSnap.exists() && dateSnap.data().isBlocked) return true;
+      } catch (e) {}
+    }
+
+    return false;
+  }
+
+  // A. Specific Counselor Selected
   if (counselorId && counselorId !== 'any') {
-    const hasCollision = activeApts.some(apt => apt.counselorId === counselorId);
-    return !hasCollision && !isBlocked;
+    const targetCounselor =
+      allCounselors.find(c => c.id === counselorId || c.uid === counselorId || c.email === counselorId) || {
+        id: counselorId,
+        uid: counselorId
+      };
+    const blockedOrBooked = await isCounselorBlockedOrBooked(targetCounselor);
+    return !blockedOrBooked;
   }
 
-  return activeApts.length < 4;
+  // B. "Any Available Counselor" Selected
+  let eligibleCounselors = allCounselors;
+  if (genderPreference && genderPreference !== 'Any') {
+    const prefLower = genderPreference.toLowerCase();
+    const genderFiltered = allCounselors.filter(c => (c.gender || '').toLowerCase() === prefLower);
+    if (genderFiltered.length > 0) {
+      eligibleCounselors = genderFiltered;
+    }
+  }
+
+  for (const c of eligibleCounselors) {
+    const blockedOrBooked = await isCounselorBlockedOrBooked(c);
+    if (!blockedOrBooked) {
+      return true; // At least one eligible counselor is open
+    }
+  }
+
+  return false;
 }
 
 export async function generateWalkInTicket(studentData) {

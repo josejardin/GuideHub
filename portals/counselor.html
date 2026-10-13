@@ -145,6 +145,8 @@
               </div>
             </div>
 
+            <div id="agenda-blocked-banner" class="hidden mb-3 p-3 rounded-lg bg-amber-50 border border-amber-200 text-xs text-amber-900"></div>
+
             <div
               id="agenda-list"
               class="divide-y divide-slate-100 border border-slate-200 rounded-lg overflow-hidden"
@@ -399,7 +401,7 @@
                 inputmode="numeric"
                 pattern="[0-9-]*"
                 oninput="this.value = this.value.replace(/[^0-9-]/g, '')"
-                placeholder="2024-1039005"
+                placeholder="e.g, 2XXX-XXXXXX"
                 class="w-full px-2.5 py-1.5 border border-slate-300 rounded focus:border-slate-900 focus:outline-none"
               />
             </div>
@@ -409,7 +411,7 @@
                 type="text"
                 id="off-program"
                 required
-                placeholder="BS Criminology"
+                placeholder="e.g, BS Psychology"
                 class="w-full px-2.5 py-1.5 border border-slate-300 rounded focus:border-slate-900 focus:outline-none"
               />
             </div>

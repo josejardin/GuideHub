@@ -119,24 +119,103 @@ document.addEventListener('DOMContentLoaded', () => {
     renderAgenda();
   });
 
-  function renderAgenda() {
+  const DAY_NAMES = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+  const SLOTS = [
+    '08:00 - 09:00',
+    '09:00 - 10:00',
+    '10:00 - 11:00',
+    '11:00 - 12:00',
+    '13:00 - 14:00',
+    '14:00 - 15:00',
+    '15:00 - 16:00',
+    '16:00 - 17:00'
+  ];
+
+  async function renderAgenda() {
     if (!agendaList) return;
 
     const currentCounselorId = currentUser.uid;
+    const currentEmail = (currentUser.email || '').toLowerCase();
+    const currentName = (currentUser.fullName || '').toLowerCase();
+
+    // Fetch this counselor's blocked slots
+    const blockedRecords = await getCounselorBlockedSlots(currentUser.uid);
+    const blockedSet = new Set(
+      blockedRecords.map(b => `${b.dayOfWeek}_${b.timeSlot}`)
+    );
+
     const accessibleAppointments = allAppointments.filter(apt => {
-      return (
-        !apt.counselorId ||
-        apt.counselorId === 'any' ||
-        apt.counselorId === currentCounselorId ||
-        apt.counselorGenderPreference === 'Any' ||
-        apt.counselorName === 'Any Available Counselor'
-      );
+      const aptCId = apt.counselorId;
+      const aptCName = (apt.counselorName || '').toLowerCase();
+
+      // 1. Explicitly assigned to ME (Mark)
+      const isAssignedToMe =
+        aptCId === currentCounselorId ||
+        aptCId === currentEmail ||
+        (aptCName && currentName && (aptCName.includes(currentName) || currentName.includes(aptCName)));
+
+      if (isAssignedToMe) {
+        return true;
+      }
+
+      // 2. Explicitly assigned to ANOTHER specific counselor (e.g. Claire)
+      const isAssignedToOther = aptCId && aptCId !== 'any' && !isAssignedToMe;
+      if (isAssignedToOther) {
+        return false; // Other counselor's scheduled consultation! Never show to Mark!
+      }
+
+      // 3. Unassigned / Pending appointment ('any'):
+      // Exclude if student's gender preference does not match my gender
+      if (apt.counselorGenderPreference && apt.counselorGenderPreference !== 'Any' && currentUser.gender) {
+        if (apt.counselorGenderPreference.toLowerCase() !== currentUser.gender.toLowerCase()) {
+          return false;
+        }
+      }
+
+      // Exclude if I have BLOCKED this day/date & time slot
+      const aptDay = apt.date ? DAY_NAMES[new Date(`${apt.date}T00:00:00`).getDay()] : '';
+      const isMyBlockedSlot =
+        blockedSet.has(`${aptDay}_${apt.timeSlot}`) || blockedSet.has(`${apt.date}_${apt.timeSlot}`);
+
+      if (isMyBlockedSlot) {
+        // I have blocked this schedule, so this pending unassigned request is not for me
+        return false;
+      }
+
+      return true;
     });
 
     const pendingCount = accessibleAppointments.filter(a => (a.status || '').toLowerCase() === 'pending').length;
     if (badgeAllPendingCount) badgeAllPendingCount.textContent = pendingCount;
 
     const selectedDate = agendaDatePicker?.value || todayIso;
+
+    // Render Banner for Blocked Slots on the Selected Date
+    const agendaBlockedBanner = document.getElementById('agenda-blocked-banner');
+    if (agendaBlockedBanner) {
+      const selectedDayOfWeek = selectedDate ? DAY_NAMES[new Date(`${selectedDate}T00:00:00`).getDay()] : '';
+      const blockedSlotsOnDate = SLOTS.filter(
+        slot => blockedSet.has(`${selectedDayOfWeek}_${slot}`) || blockedSet.has(`${selectedDate}_${slot}`)
+      );
+
+      if (blockedSlotsOnDate.length > 0 && activeViewFilter === 'selected_date') {
+        agendaBlockedBanner.innerHTML = `
+          <div class="flex items-center gap-2.5">
+            <i data-lucide="shield-alert" class="w-4 h-4 text-amber-600 shrink-0"></i>
+            <div>
+              <span class="font-bold text-amber-900">Your Availability on ${escapeHtml(selectedDayOfWeek)}:</span>
+              <span class="text-amber-800"> You have blocked </span>
+              <strong class="text-amber-950 font-mono">${escapeHtml(blockedSlotsOnDate.join(', '))}</strong>.
+              <span class="text-amber-700 block text-[11px] mt-0.5">Students cannot book appointments with you during these hours.</span>
+            </div>
+          </div>
+        `;
+        agendaBlockedBanner.classList.remove('hidden');
+        if (window.lucide) window.lucide.createIcons();
+      } else {
+        agendaBlockedBanner.classList.add('hidden');
+      }
+    }
     const filtered = accessibleAppointments.filter(item => {
       const itemStatus = (item.status || '').toLowerCase();
       if (activeViewFilter === 'all_pending') {
@@ -186,8 +265,12 @@ document.addEventListener('DOMContentLoaded', () => {
         const isPending = statusLower === 'pending';
         const isConfirmed = statusLower === 'confirmed';
 
+        const aptDay = apt.date ? DAY_NAMES[new Date(`${apt.date}T00:00:00`).getDay()] : '';
+        const isConflict =
+          blockedSet.has(`${aptDay}_${apt.timeSlot}`) || blockedSet.has(`${apt.date}_${apt.timeSlot}`);
+
         return `
- <div class="p-4 bg-white flex flex-col md:flex-row items-start md:items-center justify-between gap-3 hover:bg-slate-50/60 transition ${isPending ? 'border-l-4 border-amber-400 bg-amber-50/20' : ''}">
+ <div class="p-4 bg-white flex flex-col md:flex-row items-start md:items-center justify-between gap-3 hover:bg-slate-50/60 transition ${isPending ? 'border-l-4 border-amber-400 bg-amber-50/20' : ''} ${isConflict ? 'border-r-4 border-rose-500' : ''}">
  <div class="flex items-start gap-3">
  <div class="w-16 py-1.5 rounded bg-[#00205B] text-white flex flex-col items-center justify-center flex-shrink-0 text-center font-mono">
  <span class="text-xs font-bold leading-tight">${escapeHtml(apt.timeSlot ? apt.timeSlot.split(' - ')[0] : 'TBD')}</span>
@@ -195,13 +278,14 @@ document.addEventListener('DOMContentLoaded', () => {
  </div>
  
  <div class="space-y-0.5">
- <div class="flex items-center gap-2">
+ <div class="flex flex-wrap items-center gap-2">
  <span class="font-bold text-xs text-slate-900">${escapeHtml(apt.studentName)}</span>
  <span class="text-[11px] text-slate-500 font-mono">(${escapeHtml(apt.studentNumber)} • ${escapeHtml(apt.program)})</span>
  <span class="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-medium border ${badgeStyles[statusLower] || badgeStyles.pending}">
  ${escapeHtml(apt.status)}
  </span>
  ${apt.date !== todayIso ? `<span class="px-1.5 py-0.2 rounded text-[10px] font-semibold bg-slate-100 text-slate-600 border border-slate-200">${escapeHtml(apt.date)}</span>` : ''}
+ ${isConflict ? `<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-rose-100 text-rose-800 border border-rose-300">BLOCKED SLOT CONFLICT</span>` : ''}
  </div>
  
  <div class="text-[11px] text-slate-500 flex flex-wrap items-center gap-x-3">
@@ -1129,16 +1213,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
   const availabilityGrid = document.getElementById('availability-slots-grid');
   const DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'];
-  const SLOTS = [
-    '08:00 - 09:00',
-    '09:00 - 10:00',
-    '10:00 - 11:00',
-    '11:00 - 12:00',
-    '13:00 - 14:00',
-    '14:00 - 15:00',
-    '15:00 - 16:00',
-    '16:00 - 17:00'
-  ];
 
   async function renderAvailabilityGrid() {
     if (!availabilityGrid) return;
@@ -1173,8 +1247,8 @@ document.addEventListener('DOMContentLoaded', () => {
         const newBlockedState = !currentlyBlocked;
 
         await toggleCounselorBlockedSlot(currentUser.uid, day, slot, newBlockedState);
-        showToast(`${day} (${slot}) ${newBlockedState ? 'BLOCKED' : 'AVAILABLE'}.`, 'info');
-        renderAvailabilityGrid();
+        await renderAvailabilityGrid();
+        renderAgenda();
       });
     });
   }

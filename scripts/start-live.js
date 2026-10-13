@@ -1,4 +1,4 @@
-import { spawn } from 'child_process';
+import { spawn, execSync } from 'child_process';
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
@@ -10,6 +10,28 @@ const ROOT_DIR = path.join(__dirname, '..');
 console.log('================================================================');
 console.log(' Starting GuideHub Local Server + High-Speed Cloudflare Tunnel');
 console.log('================================================================\n');
+
+// Automatically free port 3000 if a previous local server instance is still bound
+try {
+  if (process.platform === 'win32') {
+    const out = execSync('netstat -ano | findstr :3000', { encoding: 'utf8' });
+    const pids = new Set();
+    for (const line of out.split(/\r?\n/)) {
+      if (line.includes('LISTENING')) {
+        const parts = line.trim().split(/\s+/);
+        const pid = parts[parts.length - 1];
+        if (pid && /^\d+$/.test(pid) && Number(pid) !== process.pid) {
+          pids.add(pid);
+        }
+      }
+    }
+    for (const pid of pids) {
+      try {
+        execSync(`taskkill /F /PID ${pid}`, { stdio: 'ignore' });
+      } catch (e) {}
+    }
+  }
+} catch (e) {}
 
 // Start Express server directly in the same process
 await import('../server/server.js');
