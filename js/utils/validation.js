@@ -3,7 +3,7 @@ export const STUDENT_DOMAIN = 'students.nu-fairview.edu.ph';
 export const STAFF_DOMAIN = 'nu-fairview.edu.ph';
 
 export const STUDENT_ID_REGEX = /^20[1-2][0-9]-(SHS-)?\d{4,7}$/i;
-export const EMPLOYEE_ID_REGEX = /^(EMP|FAC|STAFF|GC|GCO)-\d{3,4}(-\d{3,4})?$/i;
+export const EMPLOYEE_ID_REGEX = /^(?:\d{2,3}-\d{2,7}|(?:EMP|FAC|STAFF|GC|GCO)-\d{2,4}(?:-\d{2,7})?)$/i;
 export const EMAIL_PREFIX_REGEX = /^[a-zA-Z0-9]+([._]?[a-zA-Z0-9]+)*$/;
 
 export function isStudentDomain(email = '') {
@@ -68,7 +68,7 @@ export function validateIdentityFormat({ fullName, emailPrefix, idNumber, role }
     if (!EMPLOYEE_ID_REGEX.test(idNumber)) {
       return {
         valid: false,
-        message: 'Invalid Faculty/Employee ID format. Expected format: FAC-XXXX or EMP-YYYY-XXXX (e.g., FAC-0123).'
+        message: 'Invalid Faculty/Employee ID format. Expected format: XX-XXXX or XXX-XXXX (e.g., 24-0102 or 102-0451).'
       };
     }
   }

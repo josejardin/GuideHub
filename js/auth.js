@@ -65,7 +65,7 @@ export function validateInstitutionalIdentity(data = {}) {
   // 3. Validate Student / Employee ID Pattern
   const isStudent = role === 'student' || role === 'college_student' || role === 'shs_student';
   const studentIdRegex = /^20[1-2][0-9]-(SHS-)?\d{4,7}$/i;
-  const empIdRegex = /^(EMP|FAC|STAFF|GC|GCO)-\d{3,4}(-\d{3,4})?$/i;
+  const empIdRegex = /^(?:\d{2,3}-\d{2,7}|(?:EMP|FAC|STAFF|GC|GCO)-\d{2,4}(?:-\d{2,7})?)$/i;
 
   if (isStudent && idNumber && !studentIdRegex.test(idNumber)) {
     return {
@@ -84,7 +84,7 @@ export function validateInstitutionalIdentity(data = {}) {
     if (!empIdRegex.test(idNumber)) {
       return {
         valid: false,
-        message: 'Invalid Faculty/Employee ID format. Expected format: FAC-XXXX or EMP-YYYY-XXXX (e.g., FAC-0123).'
+        message: 'Invalid Faculty/Employee ID format. Expected format: XX-XXXX or XXX-XXXX (e.g., 24-0102 or 102-0451).'
       };
     }
   }

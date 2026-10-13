@@ -133,7 +133,7 @@ app.post('/api/send-otp', async (req, res) => {
 
   // 3. Validate ID Format per Role
   const studentIdRegex = /^20[1-2][0-9]-(SHS-)?\d{4,7}$/i;
-  const empIdRegex = /^(EMP|FAC|STAFF|GC|GCO)-\d{3,4}(-\d{3,4})?$/i;
+  const empIdRegex = /^(?:\d{2,3}-\d{2,7}|(?:EMP|FAC|STAFF|GC|GCO)-\d{2,4}(?:-\d{2,7})?)$/i;
 
   if (isRegistration && isStudent && !studentIdRegex.test(idNumber)) {
     return res.status(400).json({
@@ -149,7 +149,7 @@ app.post('/api/send-otp', async (req, res) => {
 
   if (isRegistration && !isStudent && !empIdRegex.test(idNumber)) {
     return res.status(400).json({
-      error: 'Invalid Faculty/Employee ID format. Expected format: FAC-XXXX or EMP-YYYY-XXXX.'
+      error: 'Invalid Faculty/Employee ID format. Expected format: XX-XXXX or XXX-XXXX (e.g., 24-0102 or 102-0451).'
     });
   }
 
