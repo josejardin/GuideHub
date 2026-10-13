@@ -158,19 +158,6 @@
               </div>
             </div>
 
-            <div class="flex items-center justify-between pt-1">
-              <label class="flex items-center text-slate-600 cursor-pointer">
-                <input
-                  type="checkbox"
-                  id="remember-me"
-                  checked
-                  class="rounded border-slate-300 text-[#00205B] focus:ring-0 mr-2"
-                />
-                <span class="text-xs">Remember this device</span>
-              </label>
-              <span class="text-[11px] text-slate-400">Institutional SSO</span>
-            </div>
-
             <button
               type="submit"
               id="login-submit-btn"
@@ -260,12 +247,11 @@
           const emailDomain = emailDomainSelect?.value || '@students.nu-fairview.edu.ph';
           const fullEmail = `${emailPrefix}${emailDomain}`.toLowerCase();
           const password = passwordInput.value;
-          const remember = document.getElementById('remember-me').checked;
 
           try {
             submitBtn.disabled = true;
             submitBtn.innerHTML = `<span>Signing in...</span>`;
-            const result = await loginUser(fullEmail, password, remember);
+            const result = await loginUser(fullEmail, password, true);
             const profile = result.profile || result;
 
             showToast(`Welcome back, ${profile.fullName}!`, 'success');
