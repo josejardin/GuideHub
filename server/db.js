@@ -141,20 +141,7 @@ export async function findAccountByEmail(rawEmail) {
   const cleanEmail = (rawEmail || '').trim().toLowerCase();
   if (!cleanEmail) return null;
 
-  // 1. Check role subcollections (users/{roleCategory}/users)
-  try {
-    for (const cat of ROLE_CATEGORIES) {
-      const qCat = query(collection(clientDb, 'users', cat, 'users'), where('email', '==', cleanEmail));
-      const snapCat = await getDocs(qCat);
-      if (!snapCat.empty) {
-        return { id: snapCat.docs[0].id, path: snapCat.docs[0].ref.path, ...snapCat.docs[0].data() };
-      }
-    }
-  } catch (err) {
-    console.warn('[WARNING] Subcollection users email query notice:', err.message);
-  }
-
-  // 2. Check role document maps: users/{category} contains docId fields
+  // 1. Check role document maps: users/{category} contains docId fields
   try {
     for (const cat of ROLE_CATEGORIES) {
       const catDoc = await getDoc(doc(clientDb, 'users', cat));
@@ -171,17 +158,17 @@ export async function findAccountByEmail(rawEmail) {
     console.warn('[WARNING] Role doc map email notice:', err.message);
   }
 
-  // 3. Safely check Admin Auth if available
+  // 2. If not in Firestore, clean up any orphaned Firebase Auth record so re-registration succeeds cleanly
   if (isFirebaseAdminInitialized) {
     try {
       const adminUser = await getAdminAuth()
         .getUserByEmail(cleanEmail)
-        .catch(err => {
-          if (err.code === 'auth/user-not-found') return null;
-          return null;
-        });
+        .catch(() => null);
       if (adminUser) {
-        return { id: adminUser.uid, email: adminUser.email, authOnly: true };
+        await getAdminAuth()
+          .deleteUser(adminUser.uid)
+          .catch(() => {});
+        console.log(`[AUTH SYNC] Removed orphaned Firebase Auth record for ${cleanEmail} (not present in Firestore).`);
       }
     } catch (adminErr) {
       // Ignored
@@ -195,20 +182,7 @@ export async function findAccountById(idNumber) {
   const cleanId = (idNumber || '').trim();
   if (!cleanId) return null;
 
-  // 1. Check role subcollections (users/{roleCategory}/users)
-  try {
-    for (const cat of ROLE_CATEGORIES) {
-      const qCat = query(collection(clientDb, 'users', cat, 'users'), where('studentOrEmpId', '==', cleanId));
-      const snapCat = await getDocs(qCat);
-      if (!snapCat.empty) {
-        return { id: snapCat.docs[0].id, path: snapCat.docs[0].ref.path, ...snapCat.docs[0].data() };
-      }
-    }
-  } catch (err) {
-    console.warn('[WARNING] Subcollection users ID query notice:', err.message);
-  }
-
-  // 2. Check role document maps: users/{category} contains docId fields
+  // Check role document maps: users/{category} contains docId fields
   try {
     for (const cat of ROLE_CATEGORIES) {
       const catDoc = await getDoc(doc(clientDb, 'users', cat));

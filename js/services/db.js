@@ -7,6 +7,7 @@ import {
   addDoc,
   updateDoc,
   deleteDoc,
+  deleteField,
   query,
   where,
   orderBy,
@@ -53,38 +54,22 @@ export async function getUserProfile(uid) {
     if (db) {
       const categories = ['students', 'counselors', 'faculty', 'head', 'admin'];
 
-      // 1. Direct lookup across category subcollections: users/{cat}/users/{uid}
-      for (const cat of categories) {
-        try {
-          const catDocRef = doc(db, 'users', cat, 'users', uid);
-          const catSnap = await getDoc(catDocRef);
-          if (catSnap.exists()) {
-            return { uid: catSnap.id, ...catSnap.data() };
-          }
-        } catch (e) {}
-      }
-
-      // 2. Check role document maps: users/{cat} contains [uid]
       for (const cat of categories) {
         try {
           const catDocRef = doc(db, 'users', cat);
           const catSnap = await getDoc(catDocRef);
           if (catSnap.exists()) {
             const catData = catSnap.data();
+            // 1. Direct match by semantic user key (e.g. usr_student_gio_l)
             if (catData[uid] && typeof catData[uid] === 'object') {
               return { uid, ...catData[uid] };
             }
-          }
-        } catch (e) {}
-      }
-
-      // 3. Query category subcollections by authUid
-      for (const cat of categories) {
-        try {
-          const qAuth = query(collection(db, 'users', cat, 'users'), where('authUid', '==', uid));
-          const authSnap = await getDocs(qAuth);
-          if (!authSnap.empty) {
-            return { uid: authSnap.docs[0].id, ...authSnap.docs[0].data() };
+            // 2. Match by authUid if uid passed is a Firebase Auth UID
+            for (const [key, val] of Object.entries(catData)) {
+              if (val && typeof val === 'object' && val.authUid === uid) {
+                return { uid: key, ...val };
+              }
+            }
           }
         } catch (e) {}
       }
@@ -112,11 +97,8 @@ export async function saveUserProfile(uid, data) {
 
   try {
     if (db) {
-      // 1. Role document map field: users/{category} -> [uid]: profile
+      // Strictly store inside users/{category} -> [uid]: profile (NO nested users subcollection)
       await setDoc(doc(db, 'users', category), { [uid]: profileData, roleCategory: category }, { merge: true });
-
-      // 2. Role subcollection: users/{category}/users/{uid}
-      await setDoc(doc(db, 'users', category, 'users', uid), profileData, { merge: true });
     }
   } catch (err) {
     console.warn('Firestore saveUserProfile fallback:', err.message);
@@ -158,17 +140,7 @@ export async function getAllUsers() {
         usersMap.set(id, { ...data, uid: id });
       };
 
-      // 1. Read from all category subcollections first (canonical usr_* docs)
-      await Promise.all(
-        categories.map(async cat => {
-          try {
-            const snap = await getDocs(collection(db, 'users', cat, 'users'));
-            snap.forEach(d => addCleanUser(d.id, d.data()));
-          } catch (e) {}
-        })
-      );
-
-      // 2. Read from role doc maps
+      // Read strictly from the 5 role documents (users/students, users/counselors, etc.)
       await Promise.all(
         categories.map(async cat => {
           try {
@@ -203,25 +175,28 @@ export async function updateUserRole(uid, newRole) {
       const categories = ['students', 'counselors', 'faculty', 'head', 'admin'];
       let userData = null;
 
-      // 1. Update across category subcollections
       for (const cat of categories) {
         try {
-          const catSubRef = doc(db, 'users', cat, 'users', uid);
-          const snap = await getDoc(catSubRef);
+          const catRef = doc(db, 'users', cat);
+          const snap = await getDoc(catRef);
           if (snap.exists()) {
-            userData = { ...snap.data(), role: newRole, roleType: newRole };
-            if (cat === targetCategory) {
-              await updateDoc(catSubRef, { role: newRole, roleType: newRole });
-            } else {
-              await deleteDoc(catSubRef).catch(() => {});
+            const data = snap.data();
+            if (data[uid] && typeof data[uid] === 'object') {
+              userData = { ...data[uid], role: newRole, roleType: newRole };
+              if (cat !== targetCategory) {
+                await updateDoc(catRef, { [uid]: deleteField() }).catch(() => {});
+              }
             }
           }
         } catch (e) {}
       }
 
       if (userData) {
-        await setDoc(doc(db, 'users', targetCategory, 'users', uid), userData, { merge: true }).catch(() => {});
-        await setDoc(doc(db, 'users', targetCategory), { [uid]: userData, roleCategory: targetCategory }, { merge: true }).catch(() => {});
+        await setDoc(
+          doc(db, 'users', targetCategory),
+          { [uid]: userData, roleCategory: targetCategory },
+          { merge: true }
+        ).catch(() => {});
       }
     }
   } catch (err) {

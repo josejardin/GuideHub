@@ -36,6 +36,17 @@ app.use((req, res, next) => {
   res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
 
   const reqPath = (req.path || '').toLowerCase();
+  if (
+    reqPath === '/' ||
+    reqPath.endsWith('.html') ||
+    reqPath.startsWith('/portals/') ||
+    reqPath.startsWith('/auth/')
+  ) {
+    res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+    res.setHeader('Pragma', 'no-cache');
+    res.setHeader('Expires', '0');
+  }
+
   const blockedPrefixes = ['/server', '/scripts', '/.git', '/.env', '/node_modules'];
   const blockedFiles = [
     '/package.json',

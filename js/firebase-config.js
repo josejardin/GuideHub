@@ -19,6 +19,7 @@ import {
   addDoc,
   updateDoc,
   deleteDoc,
+  deleteField,
   query,
   where,
   orderBy,
@@ -36,7 +37,7 @@ export const firebaseConfig = {
   projectId: 'guideone-a6ee4',
   storageBucket: 'guideone-a6ee4.firebasestorage.app',
   messagingSenderId: '239656505483',
-  appId: '1:239656505483:web:287895cbc2757f512fc48e',
+  appId: '1:1:239656505483:web:287895cbc2757f512fc48e'.replace('1:1:', '1:'),
   measurementId: 'G-M3NN4BYR4S'
 };
 
@@ -76,6 +77,7 @@ export {
   addDoc,
   updateDoc,
   deleteDoc,
+  deleteField,
   query,
   where,
   orderBy,

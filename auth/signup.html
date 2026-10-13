@@ -649,11 +649,8 @@
 
     <script type="module">
       import {
-        collection,
-        query,
-        where,
-        getDocs,
-        collectionGroup
+        doc,
+        getDoc
       } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js';
       import { db } from '../js/firebase-config.js';
       import {
@@ -674,7 +671,7 @@
 
         const user = getCurrentUser();
         if (user) {
-          window.location.href = getRolePortalPath(user.role);
+          window.location.replace(getRolePortalPath(user.role));
           return;
         }
 
@@ -938,7 +935,7 @@
             return;
           }
 
-          // Real-time pre-check for duplicate ID in Firestore role subcollections
+          // Real-time pre-check for duplicate ID in Firestore role documents
           if (db && idNumber) {
             try {
               let duplicateFound = false;
@@ -946,11 +943,16 @@
 
               for (const cat of categories) {
                 try {
-                  const qCat = query(collection(db, 'users', cat, 'users'), where('studentOrEmpId', '==', idNumber));
-                  const catSnap = await getDocs(qCat);
-                  if (!catSnap.empty) {
-                    duplicateFound = true;
-                    break;
+                  const catDoc = await getDoc(doc(db, 'users', cat));
+                  if (catDoc.exists()) {
+                    const data = catDoc.data();
+                    for (const [key, val] of Object.entries(data)) {
+                      if (val && typeof val === 'object' && val.studentOrEmpId === idNumber) {
+                        duplicateFound = true;
+                        break;
+                      }
+                    }
+                    if (duplicateFound) break;
                   }
                 } catch (e) {}
               }
@@ -1286,8 +1288,8 @@
             showToast(`Account verified! Welcome to GuideHub, ${profile.fullName}.`, 'success');
 
             setTimeout(() => {
-              window.location.href = getRolePortalPath(profile.role);
-            }, 500);
+              window.location.replace(getRolePortalPath(profile.role));
+            }, 400);
           } catch (err) {
             showToast(err.message || 'Invalid verification code.', 'error');
             btnConfirmOtp.disabled = false;

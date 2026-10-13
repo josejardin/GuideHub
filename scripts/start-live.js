@@ -11,10 +11,8 @@ console.log('================================================================');
 console.log(' Starting GuideHub Local Server + High-Speed Cloudflare Tunnel');
 console.log('================================================================\n');
 
-const serverProc = spawn('node', ['server/server.js'], {
-  cwd: ROOT_DIR,
-  stdio: 'inherit'
-});
+// Start Express server directly in the same process
+await import('../server/server.js');
 
 setTimeout(() => {
   const cloudflaredCli = path.join(ROOT_DIR, 'node_modules', 'cloudflared', 'lib', 'cloudflared.js');
@@ -33,6 +31,11 @@ setTimeout(() => {
     tunnelProc.on('exit', code => {
       console.log(`\n[Tunnel closed with code ${code}]`);
     });
+
+    process.on('SIGINT', () => {
+      tunnelProc.kill('SIGINT');
+      process.exit(0);
+    });
   } else {
     console.log('\n Generating shareable public HTTPS link (localhost.run fallback)...\n');
     const tunnelProc = spawn(
@@ -47,10 +50,10 @@ setTimeout(() => {
     tunnelProc.on('exit', code => {
       console.log(`\n[Tunnel closed with code ${code}]`);
     });
-  }
-}, 1500);
 
-process.on('SIGINT', () => {
-  serverProc.kill('SIGINT');
-  process.exit(0);
-});
+    process.on('SIGINT', () => {
+      tunnelProc.kill('SIGINT');
+      process.exit(0);
+    });
+  }
+}, 1000);

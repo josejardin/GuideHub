@@ -525,7 +525,7 @@ async function seedDatabase() {
         createdAt: nowIso
       };
 
-      // 1. Role Document Field representation: users/{category} contains docId as map
+      // Store strictly inside users/{category} -> [docId]: profilePayload (NO nested users subcollection)
       await setDoc(
         doc(db, 'users', category),
         {
@@ -536,11 +536,6 @@ async function seedDatabase() {
         { merge: true }
       );
       console.log(` [ROLE DOC FIELD] users/${category} -> ${docId}`);
-
-      // 2. Direct Subcollection under Role (no "accounts" intermediate name)
-      // Path: users/{category}/users/{docId}
-      await setDoc(doc(db, 'users', category, 'users', docId), profilePayload, { merge: true });
-      console.log(` [SUBCOLLECTION] users/${category}/users/${docId}`);
     } catch (err) {
       console.error(` Error provisioning ${account.email}:`, err.message);
     }

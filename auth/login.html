@@ -217,8 +217,8 @@
         if (window.lucide) window.lucide.createIcons();
 
         const user = getCurrentUser();
-        if (user && user.emailVerified) {
-          window.location.href = getRolePortalPath(user.role);
+        if (user) {
+          window.location.replace(getRolePortalPath(user.role));
           return;
         }
 
@@ -270,8 +270,8 @@
 
             showToast(`Welcome back, ${profile.fullName}!`, 'success');
             setTimeout(() => {
-              window.location.href = getRolePortalPath(profile.role);
-            }, 400);
+              window.location.replace(getRolePortalPath(profile.role));
+            }, 350);
           } catch (err) {
             showToast(err.message || 'Authentication error', 'error');
             submitBtn.disabled = false;

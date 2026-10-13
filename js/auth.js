@@ -335,16 +335,38 @@ export async function verifyOTPAndCreateUser(email, enteredCode, profileData, pa
     throw new Error(`Incorrect verification code. ${3 - nextAttempts} attempt(s) remaining.`);
   }
 
+  let user = null;
+  try {
+    const userCredential = await createUserWithEmailAndPassword(auth, cleanEmail, password);
+    user = userCredential.user;
+  } catch (authErr) {
+    if (authErr.code === 'auth/email-already-in-use') {
+      // Account was previously deleted from Firestore but remained in Firebase Auth: sync password and sign in
+      try {
+        await fetch('/api/reset-password', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            email: cleanEmail,
+            otp: cleanCode,
+            newPassword: password
+          })
+        });
+      } catch (e) {}
+      const signInCred = await signInWithEmailAndPassword(auth, cleanEmail, password);
+      user = signInCred.user;
+    } else {
+      throw authErr;
+    }
+  }
+
   try {
     await deleteDoc(otpDocRef);
   } catch (delErr) {
     console.warn('Could not delete OTP record:', delErr.message);
   }
 
-  const userCredential = await createUserWithEmailAndPassword(auth, cleanEmail, password);
-  const user = userCredential.user;
-
-  await updateProfile(user, { displayName: profileData.fullName });
+  await updateProfile(user, { displayName: profileData.fullName }).catch(() => {});
 
   const userDocId = generateUserDocId(profileData.role, profileData.fullName, cleanEmail.split('@')[0]);
 
@@ -367,7 +389,7 @@ export async function verifyOTPAndCreateUser(email, enteredCode, profileData, pa
     createdAt: new Date().toISOString()
   };
 
-  // 1. Role Document Field representation (users/{category} -> [userDocId]: profile)
+  // Store strictly inside users/{category} -> [userDocId]: completeProfile (NO nested users subcollection)
   await setDoc(
     doc(db, 'users', category),
     {
@@ -376,9 +398,6 @@ export async function verifyOTPAndCreateUser(email, enteredCode, profileData, pa
     },
     { merge: true }
   );
-
-  // 2. Direct Subcollection under Role: users/{category}/users/{userDocId}
-  await setDoc(doc(db, 'users', category, 'users', userDocId), completeProfile);
 
   // Dispatch Administrative Security & Registration Audit Alert
   dispatchAdminAlert('REGISTRATION_SUCCESS', {
@@ -480,51 +499,25 @@ export async function loginUser(email, password, remember = true) {
           ? ['students', 'counselors', 'faculty', 'head', 'admin']
           : ['counselors', 'faculty', 'head', 'admin', 'students'];
 
-        // 1. Query role subcollections: users/{category}/users by email
+        // Check role document maps: users/{category} contains docId fields
         for (const cat of categories) {
           try {
-            const qCat = query(collection(db, 'users', cat, 'users'), where('email', '==', cleanEmail));
-            const catSnap = await getDocs(qCat);
-            if (!catSnap.empty) {
-              const docSnap = catSnap.docs[0];
-              profileData = { uid: docSnap.id, ...docSnap.data() };
-              break;
-            }
-          } catch (catErr) {}
-        }
-
-        // 2. Check role document maps: users/{category} contains docId fields
-        if (!profileData) {
-          for (const cat of categories) {
-            try {
-              const catDoc = await getDoc(doc(db, 'users', cat));
-              if (catDoc.exists()) {
-                const data = catDoc.data();
-                for (const [key, val] of Object.entries(data)) {
-                  if (val && typeof val === 'object' && val.email && val.email.toLowerCase() === cleanEmail) {
-                    profileData = { uid: key, ...val };
-                    break;
-                  }
+            const catDoc = await getDoc(doc(db, 'users', cat));
+            if (catDoc.exists()) {
+              const data = catDoc.data();
+              for (const [key, val] of Object.entries(data)) {
+                if (
+                  val &&
+                  typeof val === 'object' &&
+                  ((val.email && val.email.toLowerCase() === cleanEmail) || val.authUid === user.uid)
+                ) {
+                  profileData = { uid: key, ...val };
+                  break;
                 }
-                if (profileData) break;
               }
-            } catch (catDocErr) {}
-          }
-        }
-
-        // 3. Query role subcollections by authUid
-        if (!profileData) {
-          for (const cat of categories) {
-            try {
-              const qAuth = query(collection(db, 'users', cat, 'users'), where('authUid', '==', user.uid));
-              const authSnap = await getDocs(qAuth);
-              if (!authSnap.empty) {
-                const docSnap = authSnap.docs[0];
-                profileData = { uid: docSnap.id, ...docSnap.data() };
-                break;
-              }
-            } catch (authErr) {}
-          }
+              if (profileData) break;
+            }
+          } catch (catDocErr) {}
         }
       } catch (fsErr) {
         console.warn('Firestore profile fetch error:', fsErr.message);
@@ -548,12 +541,12 @@ export async function loginUser(email, password, remember = true) {
         studentOrEmpId: 'N/A',
         program: 'General',
         isVerified: true,
+        emailVerified: true,
         createdAt: new Date().toISOString()
       };
       if (db) {
         try {
           await setDoc(doc(db, 'users', category), { [generatedDocId]: profileData, roleCategory: category }, { merge: true });
-          await setDoc(doc(db, 'users', category, 'users', generatedDocId), profileData, { merge: true });
         } catch (e) {}
       }
     }
@@ -583,39 +576,122 @@ export async function loginUser(email, password, remember = true) {
 }
 
 export async function logoutUser() {
+  setCurrentUser(null);
   try {
     await signOut(auth);
   } catch (e) {
     console.error('Sign out error', e);
   }
-  setCurrentUser(null);
-  window.location.href = getLoginPath();
+  if (typeof window !== 'undefined') {
+    window.history.replaceState({ guidehubLoggedOut: true }, '', getLoginPath());
+    window.location.replace(getLoginPath());
+  }
 }
 
 export function requireRole(allowedRoles = []) {
   const cachedUser = getCurrentUser();
 
   if (!cachedUser) {
-    window.location.href = getLoginPath();
+    if (typeof document !== 'undefined') {
+      document.documentElement.style.visibility = 'hidden';
+    }
+    window.location.replace(getLoginPath());
     return null;
   }
 
   if (allowedRoles.length > 0 && !allowedRoles.includes(cachedUser.role)) {
     showToast('Access restricted. Redirecting to your assigned workspace.', 'warning');
     setTimeout(() => {
-      window.location.href = getRolePortalPath(cachedUser.role);
-    }, 1000);
+      window.location.replace(getRolePortalPath(cachedUser.role));
+    }, 600);
     return null;
+  }
+
+  // Lock browser history so pressing Back while inside a portal does not return to Login/Signup,
+  // and pressing Back after Logout never restores cached portal views
+  if (typeof window !== 'undefined' && !window.__guidehubPortalHistoryLocked) {
+    window.__guidehubPortalHistoryLocked = true;
+    window.history.pushState({ guidehubPortalGuard: true }, '', window.location.href);
+
+    window.addEventListener('popstate', () => {
+      const activeUser = getCurrentUser();
+      if (!activeUser) {
+        document.documentElement.style.visibility = 'hidden';
+        window.location.replace(getLoginPath());
+      } else {
+        window.history.pushState({ guidehubPortalGuard: true }, '', window.location.href);
+      }
+    });
+
+    window.addEventListener('pageshow', event => {
+      const activeUser = getCurrentUser();
+      if (!activeUser || event.persisted) {
+        if (!activeUser) {
+          document.documentElement.style.visibility = 'hidden';
+          window.location.replace(getLoginPath());
+        }
+      }
+    });
+
+    window.addEventListener('storage', () => {
+      if (!getCurrentUser()) {
+        document.documentElement.style.visibility = 'hidden';
+        window.location.replace(getLoginPath());
+      }
+    });
   }
 
   onAuthStateChanged(auth, async firebaseUser => {
     if (!firebaseUser) {
       setCurrentUser(null);
-      window.location.href = getLoginPath();
+      if (typeof document !== 'undefined') {
+        document.documentElement.style.visibility = 'hidden';
+      }
+      window.location.replace(getLoginPath());
     }
   });
 
   return cachedUser;
+}
+
+// Automatically guard auth/public pages against Back-button navigation across auth states
+if (typeof window !== 'undefined') {
+  const enforceAuthPageHistoryGuard = () => {
+    const path = (window.location.pathname || '').toLowerCase();
+    const isAuthPage =
+      path.includes('/auth/login') ||
+      path.includes('/auth/signup') ||
+      path.includes('/auth/forgot-password') ||
+      path.endsWith('login.html') ||
+      path.endsWith('signup.html') ||
+      path.endsWith('forgot-password.html');
+
+    if (isAuthPage) {
+      const activeUser = getCurrentUser();
+      if (activeUser) {
+        window.location.replace(getRolePortalPath(activeUser.role));
+        return;
+      }
+
+      if (!window.__guidehubAuthHistoryLocked) {
+        window.__guidehubAuthHistoryLocked = true;
+        window.history.pushState({ guidehubAuthGuard: true }, '', window.location.href);
+
+        window.addEventListener('popstate', () => {
+          const usr = getCurrentUser();
+          if (usr) {
+            window.location.replace(getRolePortalPath(usr.role));
+          } else {
+            // Stay on the auth page so Back button after logout cannot go back to the portal
+            window.history.pushState({ guidehubAuthGuard: true }, '', window.location.href);
+          }
+        });
+      }
+    }
+  };
+
+  enforceAuthPageHistoryGuard();
+  window.addEventListener('pageshow', enforceAuthPageHistoryGuard);
 }
 
 export function getRoleBadge(role) {
