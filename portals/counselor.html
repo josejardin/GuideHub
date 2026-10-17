@@ -142,6 +142,22 @@
                     class="text-xs border border-slate-200 rounded-md px-2.5 py-1 bg-white font-medium focus:border-[#00205B] focus:outline-none shadow-2xs"
                   />
                 </div>
+
+                <div class="flex items-center gap-1.5">
+                  <label class="text-xs text-slate-400 font-medium">Status:</label>
+                  <select
+                    id="agenda-status-filter"
+                    class="text-xs border border-slate-200 rounded-md px-2.5 py-1 bg-white font-medium focus:border-[#00205B] focus:outline-none shadow-2xs"
+                  >
+                    <option value="ACTIVE" selected>Active (Pending & Confirmed)</option>
+                    <option value="ALL">All Statuses</option>
+                    <option value="Pending">Pending Only</option>
+                    <option value="Confirmed">Confirmed Only</option>
+                    <option value="Completed">Completed Only</option>
+                    <option value="Cancelled">Cancelled Only</option>
+                    <option value="No-Show">No-Show Only</option>
+                  </select>
+                </div>
               </div>
             </div>
 
@@ -208,12 +224,26 @@
           </div>
 
           <div id="tab-content-referrals" class="space-y-4 hidden">
-            <div class="flex items-center justify-between pb-3 border-b border-slate-100">
+            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-100">
               <div>
                 <h2 class="text-sm font-bold text-slate-900">Faculty Referrals & Call Slip Issuance</h2>
                 <p class="text-[11px] text-slate-500">
                   Evaluate referrals, schedule consultation dates, and issue official slips
                 </p>
+              </div>
+              <div class="flex items-center gap-2">
+                <span class="text-xs text-slate-400 font-medium">Status:</span>
+                <select
+                  id="referral-status-filter"
+                  class="text-xs border border-slate-200 rounded-md px-2.5 py-1 bg-white font-medium focus:border-[#00205B] focus:outline-none shadow-2xs"
+                >
+                  <option value="ACTIVE" selected>Active Referrals (Open)</option>
+                  <option value="ALL">All Referrals</option>
+                  <option value="Referred">Referred</option>
+                  <option value="Call Slip Issued">Call Slip Issued</option>
+                  <option value="Intake Conducted">Intake Conducted</option>
+                  <option value="Closed">Closed</option>
+                </select>
               </div>
             </div>
 
@@ -247,14 +277,30 @@
                   Strictly protected under RA 9258 (Inaccessible to Faculty & Students)
                 </p>
               </div>
-              <div class="relative w-full sm:w-60">
-                <i data-lucide="search" class="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-2"></i>
-                <input
-                  type="text"
-                  id="case-search-input"
-                  placeholder="Search case folder..."
-                  class="w-full pl-8 pr-2.5 py-1 text-xs border border-slate-200 rounded-md focus:outline-none focus:border-slate-900"
-                />
+              <div class="flex flex-wrap items-center gap-2">
+                <div class="flex items-center gap-1.5">
+                  <label class="text-xs text-slate-400 font-medium">Status:</label>
+                  <select
+                    id="case-status-filter"
+                    class="text-xs border border-slate-200 rounded-md px-2.5 py-1 bg-white font-medium focus:border-[#00205B] focus:outline-none shadow-2xs"
+                  >
+                    <option value="ACTIVE" selected>Active Cases (Open)</option>
+                    <option value="ALL">All Cases</option>
+                    <option value="High Risk">High Risk Only</option>
+                    <option value="Active">Active Only</option>
+                    <option value="Monitoring">Monitoring Only</option>
+                    <option value="Closed">Closed Only</option>
+                  </select>
+                </div>
+                <div class="relative w-full sm:w-48">
+                  <i data-lucide="search" class="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-2"></i>
+                  <input
+                    type="text"
+                    id="case-search-input"
+                    placeholder="Search folder..."
+                    class="w-full pl-8 pr-2.5 py-1 text-xs border border-slate-200 rounded-md focus:outline-none focus:border-slate-900"
+                  />
+                </div>
               </div>
             </div>
 

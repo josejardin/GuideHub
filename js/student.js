@@ -135,17 +135,28 @@ document.addEventListener('DOMContentLoaded', () => {
 
   function renderAppointments() {
     if (!appointmentsListEl) return;
-    const filter = statusFilterEl?.value || 'ALL';
-    const filtered = cachedAppointments.filter(
-      a => filter === 'ALL' || (a.status || '').toLowerCase() === filter.toLowerCase()
-    );
+    const filter = statusFilterEl?.value || 'ACTIVE';
+    const filtered = cachedAppointments.filter(a => {
+      const s = (a.status || 'pending').toLowerCase();
+      if (filter === 'ACTIVE') {
+        return s === 'pending' || s === 'confirmed';
+      } else if (filter === 'ALL') {
+        return true;
+      } else {
+        return s === filter.toLowerCase();
+      }
+    });
 
     if (filtered.length === 0) {
+      const msg =
+        filter === 'ACTIVE'
+          ? 'No active appointments. (Completed or cancelled appointments can be viewed via status filter)'
+          : `No appointments found matching "${filter}".`;
       appointmentsListEl.innerHTML = `
- <div class="p-8 text-center text-slate-400 text-xs">
- No appointments found matching this filter.
- </div>
- `;
+        <div class="p-8 text-center text-slate-400 text-xs">
+          ${msg}
+        </div>
+      `;
       return;
     }
 

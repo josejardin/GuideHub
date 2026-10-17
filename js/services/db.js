@@ -988,7 +988,9 @@ export async function getCounselorBlockedSlots(counselorId) {
         snap.docs.forEach(d => {
           state.counselorSchedules[d.id] = d.data();
         });
-        saveLocalState(state);
+        try {
+          localStorage.setItem(LOCAL_STORE_KEY, JSON.stringify(state));
+        } catch (e) {}
         return snap.docs.map(d => d.data()).filter(s => s.isBlocked);
       }
     }
@@ -1036,13 +1038,9 @@ export function subscribeAllCounselorSchedules(callback) {
         q,
         snap => {
           firestoreMap = {};
-          const state = getLocalState();
           snap.docs.forEach(d => {
-            const data = d.data();
-            firestoreMap[d.id] = data;
-            state.counselorSchedules[d.id] = data;
+            firestoreMap[d.id] = d.data();
           });
-          saveLocalState(state);
           deliver();
         },
         err => {

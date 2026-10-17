@@ -81,6 +81,11 @@ document.addEventListener('DOMContentLoaded', () => {
   if (agendaDatePicker && !agendaDatePicker.value) {
     agendaDatePicker.value = todayIso;
   }
+  const agendaStatusFilter = document.getElementById('agenda-status-filter');
+  agendaStatusFilter?.addEventListener('change', () => {
+    renderAgenda();
+  });
+
   agendaDatePicker?.addEventListener('change', () => {
     activeViewFilter = 'selected_date';
     updateFilterUI();
@@ -235,17 +240,31 @@ document.addEventListener('DOMContentLoaded', () => {
         agendaBlockedBanner.classList.add('hidden');
       }
     }
+    const statusFilterVal = agendaStatusFilter?.value || 'ACTIVE';
+
     const filtered = accessibleAppointments.filter(item => {
-      const itemStatus = (item.status || '').toLowerCase();
+      const itemStatus = (item.status || 'pending').toLowerCase();
+
+      // Check view mode (all pending requests vs selected date)
       if (activeViewFilter === 'all_pending') {
-        return itemStatus === 'pending';
+        if (itemStatus !== 'pending') return false;
+      } else {
+        if (item.date !== selectedDate) return false;
       }
-      return item.date === selectedDate;
+
+      // Check status filter:
+      if (statusFilterVal === 'ACTIVE') {
+        return itemStatus === 'pending' || itemStatus === 'confirmed';
+      } else if (statusFilterVal === 'ALL') {
+        return true;
+      } else {
+        return itemStatus === statusFilterVal.toLowerCase();
+      }
     });
 
     if (badgeAgendaCount) {
       badgeAgendaCount.textContent = accessibleAppointments.filter(
-        a => a.date === todayIso || (a.status || '').toLowerCase() === 'pending'
+        a => (a.date === todayIso && ((a.status || '').toLowerCase() === 'pending' || (a.status || '').toLowerCase() === 'confirmed')) || (a.status || '').toLowerCase() === 'pending'
       ).length;
     }
 
@@ -258,15 +277,19 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     if (filtered.length === 0) {
-      const emptyMsg =
-        activeViewFilter === 'all_pending'
-          ? 'No pending appointment requests currently.'
-          : `No scheduled counseling sessions for ${selectedDate}.`;
+      let emptyMsg = `No scheduled counseling sessions for ${selectedDate}.`;
+      if (activeViewFilter === 'all_pending') {
+        emptyMsg = 'No pending appointment requests currently.';
+      } else if (statusFilterVal === 'ACTIVE') {
+        emptyMsg = `No active consultations (Pending/Confirmed) for ${selectedDate}. Check status filter to view completed or cancelled appointments.`;
+      } else if (statusFilterVal !== 'ALL') {
+        emptyMsg = `No ${statusFilterVal} consultations found for ${selectedDate}.`;
+      }
       agendaList.innerHTML = `
- <div class="p-8 text-center text-slate-400 text-xs bg-white">
- ${emptyMsg}
- </div>
- `;
+        <div class="p-8 text-center text-slate-400 text-xs bg-white">
+          ${emptyMsg}
+        </div>
+      `;
       return;
     }
 
@@ -606,6 +629,9 @@ document.addEventListener('DOMContentLoaded', () => {
   let allReferrals = [];
   const referralsTbody = document.getElementById('counselor-referrals-tbody');
   const badgeReferralCount = document.getElementById('badge-referral-count');
+  const referralStatusFilter = document.getElementById('referral-status-filter');
+
+  referralStatusFilter?.addEventListener('change', renderReferralInbox);
 
   subscribeAllReferrals(referrals => {
     allReferrals = referrals;
@@ -614,22 +640,38 @@ document.addEventListener('DOMContentLoaded', () => {
 
   function renderReferralInbox() {
     if (!referralsTbody) return;
+    const openReferralsCount = allReferrals.filter(r => r.status !== 'Closed').length;
     if (badgeReferralCount) {
-      badgeReferralCount.textContent = allReferrals.filter(r => r.status !== 'Closed').length;
+      badgeReferralCount.textContent = openReferralsCount;
     }
 
-    if (allReferrals.length === 0) {
+    const filterVal = referralStatusFilter?.value || 'ACTIVE';
+    const filteredReferrals = allReferrals.filter(r => {
+      if (filterVal === 'ACTIVE') {
+        return r.status !== 'Closed';
+      } else if (filterVal === 'ALL') {
+        return true;
+      } else {
+        return (r.status || '').toLowerCase() === filterVal.toLowerCase();
+      }
+    });
+
+    if (filteredReferrals.length === 0) {
+      const msg =
+        filterVal === 'ACTIVE'
+          ? 'No active faculty referrals in inbox. (Closed referrals can be viewed via status filter)'
+          : `No referrals found with status "${filterVal}".`;
       referralsTbody.innerHTML = `
- <tr>
- <td colspan="6" class="p-8 text-center text-slate-400 text-xs">
- No faculty referrals in inbox.
- </td>
- </tr>
- `;
+        <tr>
+          <td colspan="6" class="p-8 text-center text-slate-400 text-xs">
+            ${msg}
+          </td>
+        </tr>
+      `;
       return;
     }
 
-    referralsTbody.innerHTML = allReferrals
+    referralsTbody.innerHTML = filteredReferrals
       .map(r => {
         const stageStyles = {
           Referred: 'bg-amber-50 text-amber-700 border-amber-200/80',
@@ -639,70 +681,82 @@ document.addEventListener('DOMContentLoaded', () => {
         };
 
         return `
- <tr class="hover:bg-slate-50/60 transition">
- <td class="py-2.5 px-4 text-slate-500 font-mono text-[11px] whitespace-nowrap">${escapeHtml(formatDateIso(r.createdAt) || 'Recent')}</td>
- <td class="py-2.5 px-4">
- <div class="font-bold text-slate-900">${escapeHtml(r.studentName)}</div>
- <div class="text-[11px] text-slate-500">${escapeHtml(r.studentNumber)} • ${escapeHtml(r.program)}</div>
- </td>
- <td class="py-2.5 px-4">
- <div class="font-semibold text-slate-800">${escapeHtml(r.facultyName)}</div>
- <div class="text-[11px] text-slate-500">${escapeHtml(r.subjectCourse || 'General')}</div>
- </td>
- <td class="py-2.5 px-4">
- <span class="font-medium text-slate-800">${escapeHtml(r.reasonCategory)}</span>
- </td>
- <td class="py-2.5 px-4">
- <span class="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-medium border ${stageStyles[r.status] || stageStyles.Referred}">
- ${escapeHtml(r.status)}
- </span>
- </td>
- <td class="py-2.5 px-4 text-right space-x-1 whitespace-nowrap">
- <button data-cs-id="${escapeHtml(r.id)}" class="btn-issue-callslip px-2 py-1 rounded bg-slate-900 hover:bg-slate-800 text-white text-xs font-medium transition">
- Call Slip
- </button>
- 
- ${
-   r.status === 'Call Slip Issued'
-     ? `
- <button data-intake-id="${escapeHtml(r.id)}" data-snum="${escapeHtml(r.studentNumber)}" data-sname="${escapeHtml(r.studentName)}" data-sprog="${escapeHtml(r.program)}" class="btn-intake-conducted px-2 py-1 rounded bg-purple-700 hover:bg-purple-800 text-white text-xs font-medium transition">
- Intake
- </button>
- `
-     : ''
- }
+        <tr class="hover:bg-slate-50/60 transition">
+          <td class="py-2.5 px-4 text-slate-500 font-mono text-[11px] whitespace-nowrap">${escapeHtml(formatDateIso(r.createdAt) || 'Recent')}</td>
+          <td class="py-2.5 px-4">
+            <div class="font-bold text-slate-900">${escapeHtml(r.studentName)}</div>
+            <div class="text-[11px] text-slate-500">${escapeHtml(r.studentNumber)} • ${escapeHtml(r.program)}</div>
+          </td>
+          <td class="py-2.5 px-4">
+            <div class="font-semibold text-slate-800">${escapeHtml(r.facultyName)}</div>
+            <div class="text-[11px] text-slate-500">${escapeHtml(r.subjectCourse || 'General')}</div>
+          </td>
+          <td class="py-2.5 px-4">
+            <span class="font-medium text-slate-800">${escapeHtml(r.reasonCategory)}</span>
+          </td>
+          <td class="py-2.5 px-4">
+            <span class="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-medium border ${stageStyles[r.status] || stageStyles.Referred}">
+              ${escapeHtml(r.status)}
+            </span>
+          </td>
+          <td class="py-2.5 px-4 text-right space-x-1 whitespace-nowrap">
+            <button data-cs-id="${escapeHtml(r.id)}" class="btn-issue-callslip px-2 py-1 rounded bg-slate-900 hover:bg-slate-800 text-white text-xs font-medium transition">
+              Call Slip
+            </button>
+            
+            ${
+              r.status === 'Call Slip Issued'
+                ? `
+            <button data-intake-id="${escapeHtml(r.id)}" data-snum="${escapeHtml(r.studentNumber)}" data-sname="${escapeHtml(r.studentName)}" data-sprog="${escapeHtml(r.program)}" class="btn-intake-conducted px-2 py-1 rounded bg-purple-700 hover:bg-purple-800 text-white text-xs font-medium transition">
+              Intake
+            </button>
+            `
+                : ''
+            }
 
- ${
-   r.status !== 'Closed'
-     ? `
- <button data-close-ref-id="${escapeHtml(r.id)}" class="btn-close-referral px-2 py-1 rounded border border-slate-200 hover:bg-slate-100 text-slate-700 text-xs font-medium transition">
- Close
- </button>
- `
-     : ''
- }
- </td>
- </tr>
- `;
+            ${
+              r.status !== 'Closed'
+                ? `
+            <button data-close-ref-id="${escapeHtml(r.id)}" class="btn-close-referral px-2 py-1 rounded border border-slate-200 hover:bg-slate-100 text-slate-700 text-xs font-medium transition">
+              Close
+            </button>
+            `
+                : ''
+            }
+          </td>
+        </tr>
+      `;
       })
       .join('');
+  }
 
-    document.querySelectorAll('.btn-issue-callslip').forEach(btn => {
-      btn.addEventListener('click', () => {
-        const id = btn.getAttribute('data-cs-id');
-        const ref = allReferrals.find(r => r.id === id);
-        if (ref) openCallSlipModal(ref);
-      });
-    });
+  referralsTbody?.addEventListener('click', async e => {
+    const csBtn = e.target.closest('.btn-issue-callslip');
+    if (csBtn) {
+      e.preventDefault();
+      const id = csBtn.getAttribute('data-cs-id');
+      const ref = allReferrals.find(r => r.id === id);
+      if (ref) openCallSlipModal(ref);
+      return;
+    }
 
-    document.querySelectorAll('.btn-intake-conducted').forEach(btn => {
-      btn.addEventListener('click', async () => {
-        const id = btn.getAttribute('data-intake-id');
-        const snum = btn.getAttribute('data-snum');
-        const sname = btn.getAttribute('data-sname');
-        const sprog = btn.getAttribute('data-sprog');
+    const intakeBtn = e.target.closest('.btn-intake-conducted');
+    if (intakeBtn) {
+      e.preventDefault();
+      if (intakeBtn.disabled) return;
+      intakeBtn.disabled = true;
 
+      const id = intakeBtn.getAttribute('data-intake-id');
+      const snum = intakeBtn.getAttribute('data-snum');
+      const sname = intakeBtn.getAttribute('data-sname');
+      const sprog = intakeBtn.getAttribute('data-sprog');
+
+      try {
         await updateReferralStatus(id, 'Intake Conducted');
+        const targetRef = allReferrals.find(r => r.id === id);
+        if (targetRef) targetRef.status = 'Intake Conducted';
+        renderReferralInbox();
+
         await logAuditEvent(
           currentUser.uid,
           currentUser.fullName,
@@ -715,19 +769,42 @@ document.addEventListener('DOMContentLoaded', () => {
         const caseRecord = await getOrCreateCase(snum, sname, sprog, currentUser.uid);
         switchTab('cases');
         selectCaseFolder(caseRecord.id);
-      });
-    });
+      } catch (err) {
+        intakeBtn.disabled = false;
+        showToast(err.message || 'Failed to update referral.', 'error');
+      }
+      return;
+    }
 
-    document.querySelectorAll('.btn-close-referral').forEach(btn => {
-      btn.addEventListener('click', async () => {
-        const id = btn.getAttribute('data-close-ref-id');
-        if (confirm('Mark referral as Closed?')) {
+    const closeBtn = e.target.closest('.btn-close-referral');
+    if (closeBtn) {
+      e.preventDefault();
+      if (closeBtn.disabled) return;
+      const id = closeBtn.getAttribute('data-close-ref-id');
+      if (confirm('Mark referral as Closed? It will be archived from the active inbox.')) {
+        closeBtn.disabled = true;
+        const targetRef = allReferrals.find(r => r.id === id);
+        if (targetRef) targetRef.status = 'Closed';
+        renderReferralInbox();
+
+        try {
           await updateReferralStatus(id, 'Closed');
-          showToast('Referral closed.', 'info');
+          await logAuditEvent(
+            currentUser.uid,
+            currentUser.fullName,
+            currentUser.role,
+            'REFERRAL_CLOSED',
+            `Closed referral ${id}`
+          );
+          showToast('Referral closed and archived.', 'info');
+        } catch (err) {
+          showToast(err.message || 'Failed to close referral.', 'error');
+          renderReferralInbox();
         }
-      });
-    });
-  }
+      }
+      return;
+    }
+  });
 
   const callslipModal = document.getElementById('callslip-modal');
   const btnCloseCallslip = document.getElementById('btn-close-callslip');
@@ -798,6 +875,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const caseFolderList = document.getElementById('case-folder-list');
   const caseDetailPanel = document.getElementById('case-detail-panel');
   const caseSearchInput = document.getElementById('case-search-input');
+  const caseStatusFilter = document.getElementById('case-status-filter');
 
   subscribeAllCases(cases => {
     allCases = cases;
@@ -809,19 +887,52 @@ document.addEventListener('DOMContentLoaded', () => {
   });
 
   caseSearchInput?.addEventListener('input', renderCaseFolders);
+  caseStatusFilter?.addEventListener('change', renderCaseFolders);
+
+  caseFolderList?.addEventListener('click', e => {
+    const item = e.target.closest('.case-item');
+    if (item) {
+      selectCaseFolder(item.getAttribute('data-case-id'));
+    }
+  });
 
   function renderCaseFolders() {
     if (!caseFolderList) return;
     const query = (caseSearchInput?.value || '').toLowerCase();
-    const filtered = allCases.filter(
-      c =>
+    const statusFilter = caseStatusFilter?.value || 'ACTIVE';
+
+    const filtered = allCases.filter(c => {
+      const matchesSearch =
         (c.studentName || '').toLowerCase().includes(query) ||
         (c.studentNumber || '').toLowerCase().includes(query) ||
-        (c.program || '').toLowerCase().includes(query)
-    );
+        (c.program || '').toLowerCase().includes(query);
+      if (!matchesSearch) return false;
+
+      const isHighRisk =
+        c.status === 'High Risk' ||
+        (c.riskFlags &&
+          (c.riskFlags.selfHarm ||
+            c.riskFlags.abuseHarmFromOthers ||
+            c.riskFlags.threatToOthers ||
+            c.riskFlags.abuse ||
+            c.riskFlags.threat));
+      const displayStatus = isHighRisk ? 'High Risk' : c.status || 'Active';
+
+      if (statusFilter === 'ACTIVE') {
+        return displayStatus !== 'Closed';
+      } else if (statusFilter === 'ALL') {
+        return true;
+      } else {
+        return displayStatus.toLowerCase() === statusFilter.toLowerCase();
+      }
+    });
 
     if (filtered.length === 0) {
-      caseFolderList.innerHTML = `<div class="p-4 text-center text-xs text-slate-400">No matching cases.</div>`;
+      const emptyMsg =
+        statusFilter === 'ACTIVE'
+          ? 'No active student cases. (Closed cases can be viewed via status filter)'
+          : `No cases found matching "${statusFilter}".`;
+      caseFolderList.innerHTML = `<div class="p-4 text-center text-xs text-slate-400">${emptyMsg}</div>`;
       return;
     }
 
@@ -847,24 +958,18 @@ document.addEventListener('DOMContentLoaded', () => {
         const badgeClass = badgeStyles[displayStatus] || badgeStyles.Active;
 
         return `
- <div data-case-id="${escapeHtml(c.id)}" class="case-item p-3 cursor-pointer transition border-l-2 ${isSelected ? 'bg-slate-100 border-[#00205B]' : 'hover:bg-slate-50 border-transparent'}">
- <div class="flex items-center justify-between">
- <span class="font-bold text-xs text-slate-900">${escapeHtml(c.studentName)}</span>
- <span class="px-1.5 py-0.2 rounded text-[9px] border ${badgeClass}">
- ${escapeHtml(displayStatus.toUpperCase())}
- </span>
- </div>
- <div class="text-[11px] text-slate-500 font-mono mt-0.5">${escapeHtml(c.studentNumber)} • ${escapeHtml(c.program)}</div>
- </div>
- `;
+          <div data-case-id="${escapeHtml(c.id)}" class="case-item p-3 cursor-pointer transition border-l-2 ${isSelected ? 'bg-slate-100 border-[#00205B]' : 'hover:bg-slate-50 border-transparent'}">
+            <div class="flex items-center justify-between">
+              <span class="font-bold text-xs text-slate-900">${escapeHtml(c.studentName)}</span>
+              <span class="px-1.5 py-0.2 rounded text-[9px] border ${badgeClass}">
+                ${escapeHtml(displayStatus.toUpperCase())}
+              </span>
+            </div>
+            <div class="text-[11px] text-slate-500 font-mono mt-0.5">${escapeHtml(c.studentNumber)} • ${escapeHtml(c.program)}</div>
+          </div>
+        `;
       })
       .join('');
-
-    document.querySelectorAll('.case-item').forEach(item => {
-      item.addEventListener('click', () => {
-        selectCaseFolder(item.getAttribute('data-case-id'));
-      });
-    });
   }
 
   function selectCaseFolder(caseId) {
@@ -1066,6 +1171,7 @@ document.addEventListener('DOMContentLoaded', () => {
           `Updated status for case ${caseRecord.studentNumber} to ${newStatus}`
         );
         showToast(`Case status updated to ${newStatus}`, 'success');
+        renderCaseFolders();
       } catch (err) {
         console.error('Error updating case status:', err);
         showToast(`Failed to update case status: ${err.message}`, 'error');
@@ -1127,6 +1233,7 @@ document.addEventListener('DOMContentLoaded', () => {
           isAnyFlagActive ? 'Crisis flag logged: Status set to High Risk' : 'Crisis flags updated.',
           isAnyFlagActive ? 'warning' : 'info'
         );
+        renderCaseFolders();
       } catch (err) {
         console.error('Error saving crisis flags:', err);
         showToast('Failed to update crisis flags.', 'error');

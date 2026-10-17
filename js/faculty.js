@@ -26,17 +26,29 @@ document.addEventListener('DOMContentLoaded', () => {
 
   function renderReferrals() {
     if (!referralsTableBody) return;
-    const filter = referralStatusFilter?.value || 'ALL';
-    const filtered = cachedReferrals.filter(r => filter === 'ALL' || r.status === filter);
+    const filter = referralStatusFilter?.value || 'ACTIVE';
+    const filtered = cachedReferrals.filter(r => {
+      if (filter === 'ACTIVE') {
+        return r.status !== 'Closed';
+      } else if (filter === 'ALL') {
+        return true;
+      } else {
+        return r.status === filter;
+      }
+    });
 
     if (filtered.length === 0) {
+      const msg =
+        filter === 'ACTIVE'
+          ? 'No active student referrals found. (Closed referrals can be viewed via status filter)'
+          : `No student referrals found matching "${filter}".`;
       referralsTableBody.innerHTML = `
- <tr>
- <td colspan="6" class="p-8 text-center text-slate-400 text-xs">
- No student referrals found matching this filter.
- </td>
- </tr>
- `;
+        <tr>
+          <td colspan="6" class="p-8 text-center text-slate-400 text-xs">
+            ${msg}
+          </td>
+        </tr>
+      `;
       return;
     }
 
