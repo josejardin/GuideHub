@@ -349,6 +349,19 @@ document.addEventListener('DOMContentLoaded', () => {
  </div>
 
  ${apt.specificConcern ? `<p class="text-[11px] text-slate-600 italic mt-0.5">"${escapeHtml(apt.specificConcern)}"</p>` : ''}
+              ${
+                statusLower === 'cancelled' && apt.cancellationReason
+                  ? `
+                <div class="mt-1.5 p-2 rounded-lg bg-rose-50 border border-rose-200 text-rose-800 text-[11px] leading-relaxed flex items-start gap-1.5">
+                  <i data-lucide="alert-circle" class="w-3.5 h-3.5 text-rose-600 shrink-0 mt-0.5"></i>
+                  <div>
+                    <strong>Reason for Cancellation:</strong> "${escapeHtml(apt.cancellationReason)}"
+                    ${apt.cancelledAt ? `<span class="text-[10px] text-rose-500 block mt-0.5">Cancelled: ${escapeHtml(formatDateIso(apt.cancelledAt))}</span>` : ''}
+                  </div>
+                </div>
+                `
+                  : ''
+              }
  </div>
  </div>
 

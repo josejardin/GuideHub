@@ -14,7 +14,7 @@ import {
   subscribeAllAppointments,
   logAuditEvent
 } from './db.js';
-import { escapeHtml } from './utils/validation.js';
+import { escapeHtml, formatDateIso } from './utils/validation.js';
 
 document.addEventListener('DOMContentLoaded', () => {
   const currentUser = requireRole(['student']);
@@ -178,63 +178,225 @@ document.addEventListener('DOMContentLoaded', () => {
           'no-show': 'bg-slate-100 text-slate-500 border-slate-200/80'
         };
 
-        const isActionable = statusLower === 'pending' || statusLower === 'confirmed';
+        const isPending = statusLower === 'pending';
+        const isConfirmed = statusLower === 'confirmed';
+        const isCancelled = statusLower === 'cancelled';
+
+        const scheduledTime = getAppointmentScheduledDate(apt);
+        const now = new Date();
+        const hoursRemaining = scheduledTime ? (scheduledTime.getTime() - now.getTime()) / (1000 * 60 * 60) : 0;
+
+        // Pending can be cancelled anytime (with reason).
+        // Confirmed can only be cancelled if more than 24 hours (1 day) remain before the session.
+        const canCancelConfirmed = isConfirmed && hoursRemaining >= 24;
+        const isLockedConfirmed = isConfirmed && hoursRemaining < 24;
 
         return `
- <div class="p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 hover:bg-slate-50/60 transition">
- <div class="space-y-1">
- <div class="flex items-center gap-2">
- <span class="font-bold text-xs text-slate-900">${escapeHtml(apt.concernCategory)}</span>
- <span class="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-medium border ${badgeStyles[statusLower] || badgeStyles.pending}">
- ${escapeHtml(apt.status)}
- </span>
- ${apt.isWalkIn ? '<span class="px-1.5 py-0.5 rounded text-[9px] font-semibold bg-[#00205B] text-[#F5B800]">Walk-In</span>' : ''}
- ${apt.followUpDate ? `<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-purple-50 text-purple-700 border border-purple-200">Follow-up: ${escapeHtml(apt.followUpDate)}</span>` : ''}
- </div>
- 
- <div class="text-[11px] text-slate-500 flex flex-wrap items-center gap-x-3 gap-y-0.5">
- <span>Date: <strong class="text-slate-700">${escapeHtml(apt.date)}</strong></span>
- <span>Time: <strong class="text-slate-700">${escapeHtml(apt.timeSlot)}</strong></span>
- <span>Counselor: <strong class="text-slate-700">${escapeHtml(apt.counselorName || 'Assigned Counselor')}</strong></span>
- </div>
+          <div class="p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 hover:bg-slate-50/60 transition">
+            <div class="space-y-1">
+              <div class="flex items-center gap-2">
+                <span class="font-bold text-xs text-slate-900">${escapeHtml(apt.concernCategory)}</span>
+                <span class="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-medium border ${badgeStyles[statusLower] || badgeStyles.pending}">
+                  ${escapeHtml(apt.status)}
+                </span>
+                ${apt.isWalkIn ? '<span class="px-1.5 py-0.5 rounded text-[9px] font-semibold bg-[#00205B] text-[#F5B800]">Walk-In</span>' : ''}
+                ${apt.followUpDate ? `<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-purple-50 text-purple-700 border border-purple-200">Follow-up: ${escapeHtml(apt.followUpDate)}</span>` : ''}
+              </div>
+              
+              <div class="text-[11px] text-slate-500 flex flex-wrap items-center gap-x-3 gap-y-0.5">
+                <span>Date: <strong class="text-slate-700">${escapeHtml(apt.date)}</strong></span>
+                <span>Time: <strong class="text-slate-700">${escapeHtml(apt.timeSlot)}</strong></span>
+                <span>Counselor: <strong class="text-slate-700">${escapeHtml(apt.counselorName || 'Assigned Counselor')}</strong></span>
+              </div>
 
- ${apt.specificConcern ? `<p class="text-[11px] text-slate-600 italic mt-1">"${escapeHtml(apt.specificConcern)}"</p>` : ''}
- </div>
+              ${apt.specificConcern ? `<p class="text-[11px] text-slate-600 italic mt-1">"${escapeHtml(apt.specificConcern)}"</p>` : ''}
 
- <!-- Actions -->
- <div class="flex items-center gap-2 self-end sm:self-center">
- ${
-   isActionable
-     ? `
- <button data-cancel-id="${escapeHtml(apt.id)}" class="btn-cancel-apt px-2.5 py-1 rounded text-xs font-medium text-rose-700 hover:bg-rose-50 border border-rose-200 transition">
- Cancel
- </button>
- `
-     : ''
- }
- </div>
- </div>
- `;
+              ${
+                isCancelled && apt.cancellationReason
+                  ? `
+                <div class="text-[11px] text-rose-700 bg-rose-50/80 border border-rose-200 rounded-lg p-2 mt-1.5 flex items-start gap-1.5">
+                  <i data-lucide="info" class="w-3.5 h-3.5 text-rose-600 shrink-0 mt-0.5"></i>
+                  <div>
+                    <strong class="text-rose-900">Cancellation Reason:</strong>
+                    <span class="text-rose-800">"${escapeHtml(apt.cancellationReason)}"</span>
+                    ${apt.cancelledAt ? `<span class="block text-[10px] text-rose-500 mt-0.5">Recorded: ${escapeHtml(formatDateIso(apt.cancelledAt))}</span>` : ''}
+                  </div>
+                </div>
+                `
+                  : ''
+              }
+            </div>
+
+            <!-- Actions -->
+            <div class="flex items-center gap-2 self-end sm:self-center">
+              ${
+                isPending
+                  ? `
+                <button data-cancel-id="${escapeHtml(apt.id)}" class="btn-cancel-apt px-3 py-1.5 rounded-lg text-xs font-semibold text-rose-700 hover:bg-rose-50 border border-rose-200 transition shadow-sm" title="Cancel this pending request">
+                  Cancel Request
+                </button>
+                `
+                  : ''
+              }
+              ${
+                canCancelConfirmed
+                  ? `
+                <div class="flex flex-col items-end gap-1">
+                  <button data-cancel-id="${escapeHtml(apt.id)}" class="btn-cancel-apt px-3 py-1.5 rounded-lg text-xs font-semibold text-rose-700 hover:bg-rose-50 border border-rose-200 transition shadow-sm" title="Cancel this confirmed appointment (Requires reason)">
+                    Cancel Appointment
+                  </button>
+                  <span class="text-[10px] text-slate-400">Can cancel until 24h prior</span>
+                </div>
+                `
+                  : ''
+              }
+              ${
+                isLockedConfirmed
+                  ? `
+                <div class="flex flex-col items-end gap-1">
+                  <div class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-amber-50 border border-amber-200 text-amber-800 text-[11px] font-medium" title="Cancellations are locked within 24 hours of the session.">
+                    <i data-lucide="lock" class="w-3.5 h-3.5 text-amber-600 shrink-0"></i>
+                    <span>Locked (Within 24h)</span>
+                  </div>
+                  <span class="text-[10px] text-slate-400">For urgent concerns, contact Guidance</span>
+                </div>
+                `
+                  : ''
+              }
+            </div>
+          </div>
+        `;
       })
       .join('');
 
+    if (window.lucide) window.lucide.createIcons();
+
     document.querySelectorAll('.btn-cancel-apt').forEach(btn => {
-      btn.addEventListener('click', async () => {
+      btn.addEventListener('click', () => {
         const id = btn.getAttribute('data-cancel-id');
-        if (confirm('Are you sure you want to cancel this appointment?')) {
-          await updateAppointmentStatus(id, 'Cancelled');
-          await logAuditEvent(
-            currentUser.uid,
-            currentUser.fullName,
-            currentUser.role,
-            'APPOINTMENT_CANCELLED',
-            `Cancelled appointment ${id}`
-          );
-          showToast('Appointment cancelled.', 'info');
-        }
+        const apt = cachedAppointments.find(a => a.id === id);
+        if (apt) openCancelModalFor(apt);
       });
     });
   }
+
+  function getAppointmentScheduledDate(apt) {
+    if (!apt || !apt.date) return null;
+    let timeStr = '08:00';
+    if (apt.timeSlot && apt.timeSlot.includes('-')) {
+      timeStr = apt.timeSlot.split('-')[0].trim();
+    } else if (apt.timeSlot) {
+      timeStr = apt.timeSlot.trim();
+    }
+    if (!timeStr.includes(':')) {
+      timeStr = '08:00';
+    } else {
+      const parts = timeStr.split(':');
+      const h = parts[0].padStart(2, '0');
+      const m = (parts[1] || '00').substring(0, 2);
+      timeStr = `${h}:${m}`;
+    }
+    return new Date(`${apt.date}T${timeStr}:00`);
+  }
+
+  // --- Cancel Appointment Modal Logic ---
+  const modalCancelApt = document.getElementById('modal-cancel-appointment');
+  const formCancelApt = document.getElementById('cancel-appointment-form');
+  const btnCloseCancelModal = document.getElementById('btn-close-cancel-modal');
+  const btnAbortCancel = document.getElementById('btn-abort-cancel');
+  const cancelAptCategory = document.getElementById('cancel-apt-category');
+  const cancelAptDateTime = document.getElementById('cancel-apt-datetime');
+  const cancelAptCounselor = document.getElementById('cancel-apt-counselor');
+  const cancelReasonPreset = document.getElementById('cancel-reason-preset');
+  const cancelReasonDetails = document.getElementById('cancel-reason-details');
+  const btnConfirmCancelApt = document.getElementById('btn-confirm-cancel-apt');
+
+  let activeCancellingAppointment = null;
+
+  function closeCancelModal() {
+    if (!modalCancelApt) return;
+    modalCancelApt.classList.add('hidden');
+    activeCancellingAppointment = null;
+    if (cancelReasonPreset) cancelReasonPreset.value = '';
+    if (cancelReasonDetails) cancelReasonDetails.value = '';
+  }
+
+  function openCancelModalFor(apt) {
+    if (!modalCancelApt || !apt) return;
+    activeCancellingAppointment = apt;
+
+    if (cancelAptCategory) cancelAptCategory.textContent = apt.concernCategory || 'Counseling Session';
+    if (cancelAptDateTime) cancelAptDateTime.textContent = `${apt.date || 'Scheduled Date'} (${apt.timeSlot || 'Scheduled Time'})`;
+    if (cancelAptCounselor) cancelAptCounselor.textContent = apt.counselorName || 'Assigned Counselor';
+    if (cancelReasonPreset) cancelReasonPreset.value = '';
+    if (cancelReasonDetails) cancelReasonDetails.value = '';
+
+    modalCancelApt.classList.remove('hidden');
+    if (cancelReasonPreset) cancelReasonPreset.focus();
+    if (window.lucide) window.lucide.createIcons();
+  }
+
+  btnCloseCancelModal?.addEventListener('click', closeCancelModal);
+  btnAbortCancel?.addEventListener('click', closeCancelModal);
+  modalCancelApt?.addEventListener('click', e => {
+    if (e.target === modalCancelApt) closeCancelModal();
+  });
+
+  formCancelApt?.addEventListener('submit', async e => {
+    e.preventDefault();
+    if (!activeCancellingAppointment) return;
+
+    const preset = cancelReasonPreset?.value;
+    const details = (cancelReasonDetails?.value || '').trim();
+
+    if (!preset) {
+      showToast('Please select a reason for cancellation.', 'error');
+      cancelReasonPreset?.focus();
+      return;
+    }
+
+    if (!details) {
+      showToast('Please provide a brief explanation for your assigned counselor.', 'error');
+      cancelReasonDetails?.focus();
+      return;
+    }
+
+    const fullReason = `${preset} — ${details}`;
+
+    if (btnConfirmCancelApt) {
+      btnConfirmCancelApt.disabled = true;
+      btnConfirmCancelApt.innerHTML = '<span>Cancelling...</span>';
+    }
+
+    try {
+      await updateAppointmentStatus(activeCancellingAppointment.id, 'Cancelled', {
+        cancellationReason: fullReason,
+        cancelledBy: currentUser.fullName || 'Student',
+        cancelledByRole: 'student',
+        cancelledAt: new Date().toISOString()
+      });
+
+      await logAuditEvent(
+        currentUser.uid,
+        currentUser.fullName,
+        currentUser.role,
+        'APPOINTMENT_CANCELLED',
+        `Student cancelled appointment ${activeCancellingAppointment.id}. Reason: ${fullReason}`
+      );
+
+      showToast('Appointment cancelled successfully.', 'info');
+      closeCancelModal();
+    } catch (err) {
+      console.error('Cancellation error:', err);
+      showToast('Failed to cancel appointment. Please try again.', 'error');
+    } finally {
+      if (btnConfirmCancelApt) {
+        btnConfirmCancelApt.disabled = false;
+        btnConfirmCancelApt.innerHTML = '<i data-lucide="x-circle" class="w-3.5 h-3.5"></i><span>Confirm Cancellation</span>';
+        if (window.lucide) window.lucide.createIcons();
+      }
+    }
+  });
 
   const walkinModal = document.getElementById('walkin-modal');
   const openWalkinBtn = document.getElementById('btn-open-walkin-modal');
