@@ -331,10 +331,12 @@ document.addEventListener('DOMContentLoaded', () => {
  ${isConflict ? `<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-rose-100 text-rose-800 border border-rose-300">BLOCKED SLOT CONFLICT</span>` : ''}
  </div>
  
- <div class="text-[11px] text-slate-500 flex flex-wrap items-center gap-x-3">
+ <div class="text-[11px] text-slate-500 flex flex-wrap items-center gap-x-3 gap-y-0.5">
  <span class="font-medium text-[#00205B]">${escapeHtml(apt.concernCategory)}</span>
  <span>Counselor: <strong class="text-slate-700">${escapeHtml(apt.counselorName || 'Any Available')}</strong></span>
  <span>Pref: <strong>${escapeHtml(apt.counselorGenderPreference || 'Any')}</strong></span>
+ ${apt.contactNumber ? `<a href="tel:${escapeHtml(apt.contactNumber)}" class="inline-flex items-center gap-1 text-slate-700 font-medium hover:text-[#00205B] transition"><i data-lucide="phone" class="w-3 h-3 text-emerald-600"></i><span>${escapeHtml(apt.contactNumber)}</span></a>` : ''}
+ ${apt.studentEmail ? `<a href="mailto:${escapeHtml(apt.studentEmail)}" class="inline-flex items-center gap-1 text-slate-700 font-medium hover:text-[#00205B] transition"><i data-lucide="mail" class="w-3 h-3 text-blue-600"></i><span>${escapeHtml(apt.studentEmail)}</span></a>` : ''}
  </div>
 
  ${apt.specificConcern ? `<p class="text-[11px] text-slate-600 italic mt-0.5">"${escapeHtml(apt.specificConcern)}"</p>` : ''}
@@ -1072,6 +1074,14 @@ document.addEventListener('DOMContentLoaded', () => {
       Closed: 'bg-slate-100 text-slate-500 border-slate-200 font-medium'
     };
 
+    let studentPhone = caseRecord.contactNumber || '';
+    let studentEmail = caseRecord.email || '';
+    const matchedApt = allAppointments.find(a => a.studentNumber === caseRecord.studentNumber);
+    if (matchedApt) {
+      if (!studentPhone) studentPhone = matchedApt.contactNumber || '';
+      if (!studentEmail) studentEmail = matchedApt.studentEmail || '';
+    }
+
     caseDetailPanel.innerHTML = `
       <!-- Case Header -->
       <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-200">
@@ -1083,7 +1093,11 @@ document.addEventListener('DOMContentLoaded', () => {
               ${escapeHtml(currentStatus)}
             </span>
           </div>
-          <p class="text-xs text-slate-500 mt-0.5">${escapeHtml(caseRecord.program)} • ${escapeHtml(caseRecord.category || 'Clinical Record')}</p>
+          <div class="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-slate-500 mt-1">
+            <span>${escapeHtml(caseRecord.program)} • ${escapeHtml(caseRecord.category || 'Clinical Record')}</span>
+            ${studentPhone ? `<a href="tel:${escapeHtml(studentPhone)}" class="inline-flex items-center gap-1 font-semibold text-slate-700 hover:text-[#00205B] transition"><i data-lucide="phone" class="w-3.5 h-3.5 text-emerald-600"></i><span>${escapeHtml(studentPhone)}</span></a>` : ''}
+            ${studentEmail ? `<a href="mailto:${escapeHtml(studentEmail)}" class="inline-flex items-center gap-1 font-semibold text-slate-700 hover:text-[#00205B] transition"><i data-lucide="mail" class="w-3.5 h-3.5 text-blue-600"></i><span>${escapeHtml(studentEmail)}</span></a>` : ''}
+          </div>
         </div>
 
         <div class="flex items-center gap-2">
