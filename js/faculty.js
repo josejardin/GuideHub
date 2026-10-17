@@ -267,4 +267,74 @@ document.addEventListener('DOMContentLoaded', () => {
 
     viewReferralModal?.classList.remove('hidden');
   }
+
+  // Call Slip Authenticator for Faculty
+  const verifyModal = document.getElementById('verify-callslip-modal');
+  const btnOpenVerify = document.getElementById('btn-open-verify-callslip');
+  const btnCloseVerify = document.getElementById('btn-close-verify-callslip');
+  const verifyForm = document.getElementById('verify-callslip-form');
+  const verifyInput = document.getElementById('verify-input-query');
+  const verifyResultBox = document.getElementById('verify-result-box');
+
+  btnOpenVerify?.addEventListener('click', () => {
+    verifyModal?.classList.remove('hidden');
+    if (verifyInput) verifyInput.value = '';
+    if (verifyResultBox) {
+      verifyResultBox.innerHTML = '';
+      verifyResultBox.classList.add('hidden');
+    }
+    if (window.lucide) window.lucide.createIcons();
+  });
+
+  btnCloseVerify?.addEventListener('click', () => {
+    verifyModal?.classList.add('hidden');
+  });
+
+  verifyForm?.addEventListener('submit', e => {
+    e.preventDefault();
+    const query = (verifyInput?.value || '').trim().toLowerCase();
+    if (!query) return;
+
+    const matchedRef = cachedReferrals.find(
+      r =>
+        (r.studentNumber && r.studentNumber.toLowerCase().includes(query)) ||
+        (r.studentName && r.studentName.toLowerCase().includes(query)) ||
+        (r.id && r.id.toLowerCase().includes(query))
+    );
+
+    if (matchedRef && (matchedRef.callSlipAppointmentDate || matchedRef.status === 'Call Slip Issued' || matchedRef.status === 'Intake Conducted')) {
+      verifyResultBox.innerHTML = `
+        <div class="p-4 rounded-xl bg-emerald-50/90 border border-emerald-200 text-emerald-950 space-y-2">
+          <div class="flex items-center gap-2 text-emerald-800 font-bold">
+            <i data-lucide="check-circle" class="w-4 h-4 text-emerald-600"></i>
+            <span>Verified Official Call Slip</span>
+          </div>
+          <div class="text-xs space-y-1 text-emerald-900">
+            <p><strong>Student:</strong> ${escapeHtml(matchedRef.studentName)} (${escapeHtml(matchedRef.studentNumber)})</p>
+            <p><strong>Program / Course:</strong> ${escapeHtml(matchedRef.program || 'N/A')}</p>
+            <p><strong>Scheduled Date:</strong> ${escapeHtml(matchedRef.callSlipAppointmentDate || 'Recorded on File')}</p>
+            <p><strong>Scheduled Time:</strong> ${escapeHtml(matchedRef.callSlipAppointmentTime || 'Guidance Consultation Hours')}</p>
+            <p><strong>Issuing Counselor:</strong> ${escapeHtml(matchedRef.assignedCounselor || 'Registered Guidance Counselor')}</p>
+          </div>
+          <div class="pt-1 text-[10px] text-emerald-700 border-t border-emerald-200">
+            Valid excuse verification. In compliance with RA 9258, confidential counseling notes are not disclosed.
+          </div>
+        </div>
+      `;
+    } else {
+      verifyResultBox.innerHTML = `
+        <div class="p-3.5 rounded-xl bg-amber-50/90 border border-amber-200 text-amber-900 text-xs space-y-1">
+          <div class="flex items-center gap-2 font-bold">
+            <i data-lucide="alert-triangle" class="w-4 h-4 text-amber-600"></i>
+            <span>No Active Call Slip Record Found</span>
+          </div>
+          <p class="text-[11px] text-amber-800">
+            No active guidance call slip was located for "<strong>${escapeHtml(query)}</strong>". Please verify the student ID number or contact the Guidance and Counseling Center.
+          </p>
+        </div>
+      `;
+    }
+    verifyResultBox.classList.remove('hidden');
+    if (window.lucide) window.lucide.createIcons();
+  });
 });

@@ -141,6 +141,75 @@ document.addEventListener('DOMContentLoaded', () => {
 
   statusFilterEl?.addEventListener('change', renderAppointments);
 
+  function generateGoogleCalendarUrl(apt) {
+    if (!apt || !apt.date) return '#';
+    try {
+      const cleanDate = apt.date.replace(/-/g, '');
+      let startHour = '09', startMin = '00', endHour = '10', endMin = '00';
+      if (apt.timeSlot && apt.timeSlot.includes('-')) {
+        const [startPart, endPart] = apt.timeSlot.split('-');
+        const sMatch = startPart.trim().match(/^(\d{1,2}):(\d{2})$/);
+        const eMatch = endPart.trim().match(/^(\d{1,2}):(\d{2})$/);
+        if (sMatch) {
+          startHour = sMatch[1].padStart(2, '0');
+          startMin = sMatch[2];
+        }
+        if (eMatch) {
+          endHour = eMatch[1].padStart(2, '0');
+          endMin = eMatch[2];
+        }
+      }
+      const startIso = `${cleanDate}T${startHour}${startMin}00`;
+      const endIso = `${cleanDate}T${endHour}${endMin}00`;
+      const title = encodeURIComponent(`NU Fairview Guidance Consultation with ${apt.counselorName || 'Guidance Counselor'}`);
+      const details = encodeURIComponent(
+        `Focus / Concern: ${apt.concernCategory || 'General Guidance'}\nVenue: Guidance & Counseling Center (2nd Floor, Main Building)\nReference Code: ${apt.id || 'N/A'}\n\nNote: Please arrive 5-10 minutes before your scheduled session.`
+      );
+      const location = encodeURIComponent('National University Fairview Guidance & Counseling Office, 2nd Floor, Main Building');
+      return `https://calendar.google.com/calendar/render?action=TEMPLATE&text=${title}&dates=${startIso}/${endIso}&ctz=Asia/Manila&details=${details}&location=${location}`;
+    } catch (_) {
+      return '#';
+    }
+  }
+
+  function renderProgressTracker(statusLower) {
+    if (statusLower === 'cancelled') {
+      return `
+        <div class="mt-2.5 pt-2 border-t border-slate-100 flex items-center gap-2 text-[11px] text-rose-700">
+          <span class="w-2 h-2 rounded-full bg-rose-500 shrink-0"></span>
+          <span><strong>Consultation Cancelled</strong> • You may book another schedule whenever you feel ready.</span>
+        </div>
+      `;
+    }
+
+    const isStep1Done = true;
+    const isStep2Done = statusLower === 'confirmed' || statusLower === 'completed';
+    const isStep3Done = statusLower === 'completed';
+
+    return `
+      <div class="mt-2.5 pt-2 border-t border-slate-100 flex items-center justify-between text-[10px] text-slate-500 max-w-xs sm:max-w-sm">
+        <div class="flex items-center gap-1 ${isStep1Done ? 'text-[#00205B] font-bold' : ''}">
+          <span class="w-3.5 h-3.5 rounded-full bg-[#00205B] text-[#F5B800] flex items-center justify-center text-[8px]">✓</span>
+          <span>Request Sent</span>
+        </div>
+        <div class="h-0.5 flex-1 mx-1.5 ${isStep2Done ? 'bg-emerald-500' : 'bg-slate-200'}"></div>
+        <div class="flex items-center gap-1 ${isStep2Done ? 'text-emerald-700 font-bold' : (statusLower === 'pending' ? 'text-amber-700 font-bold animate-pulse' : '')}">
+          <span class="w-3.5 h-3.5 rounded-full ${isStep2Done ? 'bg-emerald-600 text-white' : 'bg-amber-100 text-amber-800 border border-amber-300'} flex items-center justify-center text-[8px]">
+            ${isStep2Done ? '✓' : '2'}
+          </span>
+          <span>${isStep2Done ? 'Confirmed' : 'In Review'}</span>
+        </div>
+        <div class="h-0.5 flex-1 mx-1.5 ${isStep3Done ? 'bg-slate-700' : 'bg-slate-200'}"></div>
+        <div class="flex items-center gap-1 ${isStep3Done ? 'text-slate-900 font-bold' : ''}">
+          <span class="w-3.5 h-3.5 rounded-full ${isStep3Done ? 'bg-slate-800 text-white' : 'bg-slate-100 text-slate-400'} flex items-center justify-center text-[8px]">
+            ${isStep3Done ? '✓' : '3'}
+          </span>
+          <span>Session Done</span>
+        </div>
+      </div>
+    `;
+  }
+
   function renderAppointments() {
     if (!appointmentsListEl) return;
     const filter = statusFilterEl?.value || 'ACTIVE';
@@ -156,15 +225,33 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     if (filtered.length === 0) {
-      const msg =
-        filter === 'ACTIVE'
-          ? "You don't have any active appointments right now. Whenever you need someone to talk to, we're always here to listen."
-          : `No conversations found matching "${filter}".`;
       appointmentsListEl.innerHTML = `
-        <div class="p-8 text-center text-slate-400 text-xs">
-          ${msg}
+        <div class="p-8 text-center flex flex-col items-center justify-center max-w-md mx-auto space-y-3">
+          <div class="w-12 h-12 rounded-2xl bg-blue-50 text-[#00205B] flex items-center justify-center shadow-xs border border-blue-200/60">
+            <i data-lucide="heart-handshake" class="w-6 h-6 text-[#00205B]"></i>
+          </div>
+          <div>
+            <h4 class="text-xs font-bold text-slate-800">
+              ${filter === 'ACTIVE' ? "You don't have any active appointments right now" : `No records found matching "${filter}"`}
+            </h4>
+            <p class="text-[11px] text-slate-500 mt-1 leading-relaxed">
+              Whenever you're ready to share what's on your mind, our counselors are always here to listen with zero judgment.
+            </p>
+          </div>
+          <button
+            type="button"
+            id="btn-empty-book-now"
+            class="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-[#00205B] hover:bg-[#001845] text-[#F5B800] text-xs font-bold shadow-sm transition active:scale-95"
+          >
+            <i data-lucide="calendar-plus" class="w-3.5 h-3.5"></i>
+            <span>Schedule a Consultation</span>
+          </button>
         </div>
       `;
+      if (window.lucide) window.lucide.createIcons();
+      document.getElementById('btn-empty-book-now')?.addEventListener('click', () => {
+        document.getElementById('btn-open-wizard-modal')?.click();
+      });
       return;
     }
 
@@ -194,8 +281,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
         return `
           <div class="p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 hover:bg-slate-50/60 transition">
-            <div class="space-y-1">
-              <div class="flex items-center gap-2">
+            <div class="space-y-1 flex-1">
+              <div class="flex items-center gap-2 flex-wrap">
                 <span class="font-bold text-xs text-slate-900">${escapeHtml(apt.concernCategory)}</span>
                 <span class="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-medium border ${badgeStyles[statusLower] || badgeStyles.pending}">
                   ${escapeHtml(apt.status)}
@@ -211,6 +298,9 @@ document.addEventListener('DOMContentLoaded', () => {
               </div>
 
               ${apt.specificConcern ? `<p class="text-[11px] text-slate-600 italic mt-1">"${escapeHtml(apt.specificConcern)}"</p>` : ''}
+
+              <!-- Visual Progress Stepper -->
+              ${renderProgressTracker(statusLower)}
 
               ${
                 isCancelled && apt.cancellationReason
@@ -229,7 +319,23 @@ document.addEventListener('DOMContentLoaded', () => {
             </div>
 
             <!-- Actions -->
-            <div class="flex items-center gap-2 self-end sm:self-center">
+            <div class="flex items-center gap-2 self-end sm:self-center flex-wrap">
+              ${
+                isConfirmed
+                  ? `
+                <a
+                  href="${generateGoogleCalendarUrl(apt)}"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-blue-50 hover:bg-blue-100 text-[#00205B] border border-blue-200 transition shadow-2xs"
+                  title="Add to Google Calendar with automatic reminder"
+                >
+                  <i data-lucide="calendar-plus" class="w-3.5 h-3.5 text-blue-600"></i>
+                  <span>Add to Calendar</span>
+                </a>
+                `
+                  : ''
+              }
               ${
                 isPending
                   ? `
@@ -866,5 +972,48 @@ document.addEventListener('DOMContentLoaded', () => {
     } else if (currentStep === 3) {
       updateCounselorsForChosenSlot();
     }
+  });
+
+  // Guided Onboarding Banner (Dismissible with Local Storage persistence)
+  const onboardingBanner = document.getElementById('student-onboarding-banner');
+  const btnDismissOnboarding = document.getElementById('btn-dismiss-onboarding');
+  if (onboardingBanner) {
+    const isDismissed = localStorage.getItem('guidehub_student_tour_dismissed');
+    if (!isDismissed) {
+      onboardingBanner.classList.remove('hidden');
+    }
+    btnDismissOnboarding?.addEventListener('click', () => {
+      onboardingBanner.classList.add('hidden');
+      localStorage.setItem('guidehub_student_tour_dismissed', 'true');
+    });
+  }
+
+  // 24/7 Crisis & Immediate Care Modal Handlers
+  const crisisModal = document.getElementById('crisis-modal');
+  const btnOpenCrisis = document.getElementById('btn-open-crisis-modal');
+  const btnCloseCrisis = document.getElementById('btn-close-crisis-modal');
+  btnOpenCrisis?.addEventListener('click', () => {
+    crisisModal?.classList.remove('hidden');
+    if (window.lucide) window.lucide.createIcons();
+  });
+  btnCloseCrisis?.addEventListener('click', () => {
+    crisisModal?.classList.add('hidden');
+  });
+
+  // Mobile Bottom Navigation Bar Actions
+  document.getElementById('mob-nav-home')?.addEventListener('click', () => {
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  });
+  document.getElementById('mob-nav-consultations')?.addEventListener('click', () => {
+    appointmentsListEl?.scrollIntoView({ behavior: 'smooth' });
+  });
+  document.getElementById('mob-nav-book')?.addEventListener('click', () => {
+    document.getElementById('btn-open-wizard-modal')?.click();
+  });
+  document.getElementById('mob-nav-walkin')?.addEventListener('click', () => {
+    document.getElementById('btn-open-walkin-modal')?.click();
+  });
+  document.getElementById('mob-nav-profile')?.addEventListener('click', () => {
+    document.getElementById('btn-open-student-profile')?.click();
   });
 });

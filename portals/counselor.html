@@ -184,6 +184,34 @@
               </div>
             </div>
 
+            <!-- Today's Consultation Agenda At-a-Glance Widget -->
+            <div id="counselor-today-agenda-widget" class="mb-4 p-4 rounded-2xl bg-gradient-to-r from-blue-50/80 via-indigo-50/40 to-white border border-slate-200 shadow-2xs flex flex-col md:flex-row md:items-center justify-between gap-4">
+              <div class="flex items-center gap-3.5">
+                <div class="w-11 h-11 rounded-xl bg-[#00205B] text-[#F5B800] flex items-center justify-center shadow-xs shrink-0">
+                  <i data-lucide="calendar-clock" class="w-5 h-5"></i>
+                </div>
+                <div>
+                  <div class="flex items-center gap-2">
+                    <h3 class="text-xs font-bold text-slate-900" id="widget-today-date">Today's Consultation Schedule</h3>
+                    <span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-blue-100 text-[#00205B] border border-blue-200">Daily Agenda</span>
+                  </div>
+                  <p class="text-xs text-slate-600 mt-0.5" id="widget-today-summary">
+                    Loading today's schedule summary...
+                  </p>
+                </div>
+              </div>
+              <div class="flex items-center gap-2 flex-wrap">
+                <button type="button" id="btn-quick-view-today" class="px-3 py-1.5 rounded-xl text-xs font-semibold bg-white hover:bg-slate-50 text-slate-800 border border-slate-200 transition shadow-2xs flex items-center gap-1.5 active:scale-95" title="Filter to view today's scheduled consultations">
+                  <i data-lucide="calendar-check" class="w-3.5 h-3.5 text-blue-600"></i>
+                  <span>Today's Sessions (<span id="widget-count-today">0</span>)</span>
+                </button>
+                <button type="button" id="btn-quick-view-pending" class="px-3 py-1.5 rounded-xl text-xs font-semibold bg-[#00205B] hover:bg-[#0A192F] text-[#F5B800] transition shadow-2xs flex items-center gap-1.5 active:scale-95" title="Review all pending student consultation requests">
+                  <i data-lucide="clock" class="w-3.5 h-3.5 text-[#F5B800]"></i>
+                  <span>Pending Requests (<span id="widget-count-pending">0</span>)</span>
+                </button>
+              </div>
+            </div>
+
             <div id="agenda-blocked-banner" class="hidden mb-4 p-4 rounded-2xl bg-gradient-to-r from-amber-50/95 via-amber-100/50 to-white border-2 border-amber-200/90 shadow-xs text-xs text-amber-950 transition-all"></div>
 
             <div id="agenda-pending-alert" class="hidden mb-4 p-4 rounded-2xl bg-gradient-to-r from-blue-50/95 via-indigo-50/60 to-white border-2 border-blue-200/80 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-3 transition-all">

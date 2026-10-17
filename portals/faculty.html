@@ -42,6 +42,14 @@
             <span>My Profile</span>
           </button>
           <button
+            id="btn-open-verify-callslip"
+            class="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-md bg-blue-50 hover:bg-blue-100 text-[#00205B] text-xs font-semibold border border-blue-200 shadow-sm transition"
+            title="Verify student excuse or guidance call slip"
+          >
+            <i data-lucide="file-check" class="w-3.5 h-3.5 text-blue-600"></i>
+            <span>Verify Call Slip</span>
+          </button>
+          <button
             id="btn-open-referral-modal"
             class="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-md bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold shadow-sm transition"
           >
@@ -267,6 +275,53 @@
         </div>
 
         <div id="view-referral-content" class="space-y-3 text-xs text-slate-700"></div>
+      </div>
+    </div>
+
+    <!-- Call Slip Authenticator Modal for Faculty -->
+    <div id="verify-callslip-modal" class="fixed inset-0 z-50 flex items-center justify-center p-4 modal-backdrop hidden no-print">
+      <div class="bg-white rounded-2xl max-w-md w-full p-6 shadow-xl border border-slate-200 relative space-y-4">
+        <div class="flex items-start justify-between gap-3 pb-3 border-b border-slate-100">
+          <div class="flex items-center gap-3">
+            <div class="w-10 h-10 rounded-xl bg-blue-100 text-[#00205B] flex items-center justify-center shrink-0">
+              <i data-lucide="shield-check" class="w-5 h-5 text-blue-700"></i>
+            </div>
+            <div>
+              <h3 class="text-sm font-bold text-slate-900">Official Call Slip Authenticator</h3>
+              <p class="text-[11px] text-slate-500">Verify student guidance excuses with institutional security</p>
+            </div>
+          </div>
+          <button id="btn-close-verify-callslip" class="text-slate-400 hover:text-slate-600">
+            <i data-lucide="x" class="w-4 h-4"></i>
+          </button>
+        </div>
+
+        <form id="verify-callslip-form" class="space-y-3">
+          <div>
+            <label class="block text-xs font-semibold text-slate-700 mb-1">Enter Student ID Number or Control Code</label>
+            <div class="flex gap-2">
+              <input
+                type="text"
+                id="verify-input-query"
+                placeholder="e.g. 2024-10892 or Maria Santos"
+                required
+                class="flex-1 px-3 py-2 border border-slate-300 rounded-xl focus:border-[#00205B] focus:outline-none text-xs"
+              />
+              <button
+                type="submit"
+                class="px-4 py-2 bg-[#00205B] hover:bg-[#0A192F] text-[#F5B800] rounded-xl text-xs font-semibold shadow-xs transition"
+              >
+                Verify
+              </button>
+            </div>
+          </div>
+        </form>
+
+        <div id="verify-result-box" class="hidden"></div>
+
+        <p class="text-[10px] text-slate-400 italic">
+          * Protected under RA 9258 (Guidance and Counseling Act). Only consultation verification details are confirmed; confidential clinical disclosures remain private.
+        </p>
       </div>
     </div>
 

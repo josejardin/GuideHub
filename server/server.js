@@ -542,6 +542,213 @@ app.post('/api/reset-password', async (req, res) => {
   }
 });
 
+// Helper function to format 12-hour time strings
+function format12hTime(timeStr) {
+  if (!timeStr) return 'Scheduled Time';
+  return timeStr
+    .split('-')
+    .map(part => {
+      const trimmed = part.trim();
+      const match = trimmed.match(/^(\d{1,2}):(\d{2})$/);
+      if (!match) return trimmed;
+      let h = parseInt(match[1], 10);
+      const m = match[2];
+      const ampm = h >= 12 ? 'PM' : 'AM';
+      h = h % 12 || 12;
+      return `${h}:${m} ${ampm}`;
+    })
+    .join(' - ');
+}
+
+// Endpoint: Send Automated Email Notification When Counselor Confirms Booking
+app.post('/api/send-appointment-confirmation', async (req, res) => {
+  try {
+    const {
+      studentEmail,
+      studentName,
+      studentNumber,
+      counselorName,
+      date,
+      timeSlot,
+      concernCategory,
+      appointmentId,
+      location = 'Guidance & Counseling Center (2nd Floor, Main Building)'
+    } = req.body || {};
+
+    if (!studentEmail) {
+      return res.status(400).json({ success: false, error: 'Student email is required.' });
+    }
+
+    const cleanEmail = studentEmail.trim().toLowerCase();
+    const safeStudentName = escapeHtml(studentName || 'Nationalian');
+    const safeCounselorName = escapeHtml(counselorName || 'Guidance Counselor');
+    const safeDate = escapeHtml(date || 'Scheduled Date');
+    const safeTime = escapeHtml(format12hTime(timeSlot));
+    const safeCategory = escapeHtml(concernCategory || 'General Guidance Consultation');
+    const safeAptId = escapeHtml(appointmentId || 'N/A');
+    const safeLocation = escapeHtml(location);
+
+    // Format human-friendly calendar date (e.g., Monday, October 20, 2026)
+    let displayDate = safeDate;
+    try {
+      if (date && date.includes('-')) {
+        const [y, m, d] = date.split('-').map(Number);
+        const dateObj = new Date(y, m - 1, d);
+        if (!isNaN(dateObj.getTime())) {
+          displayDate = dateObj.toLocaleDateString('en-US', {
+            weekday: 'long',
+            year: 'numeric',
+            month: 'long',
+            day: 'numeric'
+          });
+        }
+      }
+    } catch (_) {}
+
+    const logoPath = path.join(ROOT_DIR, 'assets', 'nu-logo.png');
+
+    const mailOptions = {
+      from: `"NU Fairview Guidance Center" <${process.env.GMAIL_USER}>`,
+      to: cleanEmail,
+      replyTo: process.env.GMAIL_USER,
+      subject: `[APPOINTMENT CONFIRMED] Consultation Confirmed - ${displayDate}`,
+      text: `Hello ${studentName || 'Nationalian'},\n\nYour guidance consultation request has been confirmed by ${counselorName}.\n\nDate: ${displayDate}\nTime: ${safeTime}\nLocation: ${location}\nConcern: ${concernCategory}\nReference ID: ${appointmentId}\n\nPlease arrive 5-10 minutes early at the Guidance Office.\n\n- National University Fairview Guidance and Counseling Center`,
+      html: `
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+          <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+          <title>Appointment Confirmed</title>
+        </head>
+        <body style="margin: 0; padding: 0; background-color: #f1f5f9; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; -webkit-font-smoothing: antialiased;">
+          <table width="100%" border="0" cellspacing="0" cellpadding="0" style="background-color: #f1f5f9; padding: 32px 16px;">
+            <tr>
+              <td align="center">
+                <table width="100%" border="0" cellspacing="0" cellpadding="0" style="max-width: 560px; background-color: #ffffff; border-radius: 16px; overflow: hidden; border: 1px solid #e2e8f0; box-shadow: 0 4px 14px rgba(0, 32, 91, 0.08);">
+                  <!-- Institutional Navy Header -->
+                  <tr>
+                    <td style="background-color: #00205B; padding: 26px 24px; text-align: center;">
+                      <table border="0" cellspacing="0" cellpadding="0" style="margin: 0 auto;">
+                        <tr>
+                          <td style="vertical-align: middle; padding-right: 12px;">
+                            <img src="cid:nulogo" alt="NU Logo" width="46" height="46" style="display: block; width: 46px; height: 46px; object-fit: contain;" />
+                          </td>
+                          <td style="vertical-align: middle; text-align: left;">
+                            <h1 style="margin: 0; color: #ffffff; font-size: 17px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.5px;">National University Fairview</h1>
+                            <p style="margin: 3px 0 0 0; color: #F5B800; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px;">Guidance and Counseling Center • GuideHub</p>
+                          </td>
+                        </tr>
+                      </table>
+                    </td>
+                  </tr>
+
+                  <!-- Confirmation Badge Banner -->
+                  <tr>
+                    <td style="background-color: #ecfdf5; border-bottom: 1px solid #a7f3d0; padding: 14px 24px; text-align: center;">
+                      <span style="display: inline-block; color: #065f46; font-size: 12px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.5px;">
+                        ✓ Consultation Request Confirmed &amp; Scheduled
+                      </span>
+                    </td>
+                  </tr>
+
+                  <!-- Body Content -->
+                  <tr>
+                    <td style="padding: 28px 24px 20px 24px;">
+                      <p style="margin: 0 0 14px 0; color: #334155; font-size: 15px; line-height: 1.5;">Hello <strong>${safeStudentName}</strong>,</p>
+                      <p style="margin: 0 0 20px 0; color: #475569; font-size: 13px; line-height: 1.6;">
+                        Your counseling appointment request has been reviewed and officially confirmed by your guidance counselor. We are looking forward to providing you with a safe, comforting, and confidential space to talk.
+                      </p>
+
+                      <!-- Session Details Card -->
+                      <table width="100%" cellpadding="0" cellspacing="0" style="background-color: #f8fafc; border-radius: 12px; border: 1px solid #e2e8f0; margin-bottom: 22px; overflow: hidden;">
+                        <tr>
+                          <td colspan="2" style="background-color: #00205B; color: #ffffff; padding: 10px 16px; font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px;">
+                            Appointment Summary
+                          </td>
+                        </tr>
+                        <tr>
+                          <td style="padding: 10px 16px; border-bottom: 1px solid #e2e8f0; color: #64748b; font-size: 12px; font-weight: 600; width: 38%;">Assigned Counselor:</td>
+                          <td style="padding: 10px 16px; border-bottom: 1px solid #e2e8f0; color: #0f172a; font-size: 13px; font-weight: 700;">${safeCounselorName}</td>
+                        </tr>
+                        <tr>
+                          <td style="padding: 10px 16px; border-bottom: 1px solid #e2e8f0; color: #64748b; font-size: 12px; font-weight: 600;">Date:</td>
+                          <td style="padding: 10px 16px; border-bottom: 1px solid #e2e8f0; color: #0f172a; font-size: 13px; font-weight: 700;">${displayDate}</td>
+                        </tr>
+                        <tr>
+                          <td style="padding: 10px 16px; border-bottom: 1px solid #e2e8f0; color: #64748b; font-size: 12px; font-weight: 600;">Time Slot:</td>
+                          <td style="padding: 10px 16px; border-bottom: 1px solid #e2e8f0; color: #00205B; font-size: 13px; font-weight: 800;">${safeTime}</td>
+                        </tr>
+                        <tr>
+                          <td style="padding: 10px 16px; border-bottom: 1px solid #e2e8f0; color: #64748b; font-size: 12px; font-weight: 600;">Location / Venue:</td>
+                          <td style="padding: 10px 16px; border-bottom: 1px solid #e2e8f0; color: #334155; font-size: 12px;">${safeLocation}</td>
+                        </tr>
+                        <tr>
+                          <td style="padding: 10px 16px; border-bottom: 1px solid #e2e8f0; color: #64748b; font-size: 12px; font-weight: 600;">Category:</td>
+                          <td style="padding: 10px 16px; border-bottom: 1px solid #e2e8f0; color: #334155; font-size: 12px;">${safeCategory}</td>
+                        </tr>
+                        <tr>
+                          <td style="padding: 10px 16px; color: #64748b; font-size: 12px; font-weight: 600;">Reference Code:</td>
+                          <td style="padding: 10px 16px; color: #64748b; font-size: 11px; font-family: monospace;">${safeAptId}</td>
+                        </tr>
+                      </table>
+
+                      <!-- Helpful Guidance Reminders -->
+                      <div style="background-color: #eff6ff; border-left: 4px solid #3b82f6; padding: 12px 16px; border-radius: 0 8px 8px 0; margin-bottom: 20px;">
+                        <strong style="color: #1e40af; font-size: 12px; display: block; margin-bottom: 4px;">Important Reminders:</strong>
+                        <ul style="margin: 0; padding-left: 18px; color: #1e3a8a; font-size: 11px; line-height: 1.5;">
+                          <li>Please arrive at the Guidance Office 5 to 10 minutes before your scheduled appointment.</li>
+                          <li>If you need to excuse yourself from a class, your counselor can issue an official digital <strong>Institutional Call Slip</strong> during or right after the session.</li>
+                          <li>If you need to reschedule or cancel due to an academic conflict, please update your appointment in GuideHub at least 24 hours in advance so another student may be accommodated.</li>
+                        </ul>
+                      </div>
+
+                      <p style="margin: 0; color: #64748b; font-size: 11px; line-height: 1.5; font-style: italic;">
+                        "Whatever you're going through, you don't have to carry it all alone. We're here to listen with an open heart."
+                      </p>
+                    </td>
+                  </tr>
+
+                  <!-- Institutional Footer -->
+                  <tr>
+                    <td style="background-color: #f8fafc; padding: 18px 24px; text-align: center; border-top: 1px solid #f1f5f9;">
+                      <p style="margin: 0 0 6px 0; color: #64748b; font-size: 11px; line-height: 1.4;">
+                        National University Fairview • Guidance &amp; Counseling Center<br />
+                        In compliance with RA 9258 (Guidance and Counseling Act) &amp; RA 10173 (Data Privacy Act)
+                      </p>
+                      <p style="margin: 0; color: #94a3b8; font-size: 10px;">
+                        This is an automated confirmation from the NU Fairview GuideHub Care Portal.
+                      </p>
+                    </td>
+                  </tr>
+                </table>
+              </td>
+            </tr>
+          </table>
+        </body>
+        </html>
+      `,
+      attachments: [{ filename: 'nu-logo.png', path: logoPath, cid: 'nulogo' }]
+    };
+
+    transporter.sendMail(mailOptions, (mailErr, info) => {
+      if (mailErr) {
+        console.warn(`[CONFIRMATION EMAIL NOTICE] Email dispatch to ${cleanEmail} logged note:`, mailErr.message);
+      } else {
+        console.log(`[CONFIRMATION EMAIL SENT] Appointment confirmation successfully delivered to ${cleanEmail} (${info.messageId})`);
+      }
+    });
+
+    return res.status(200).json({
+      success: true,
+      message: `Confirmation email dispatched to ${cleanEmail}`
+    });
+  } catch (err) {
+    console.error('Error in send-appointment-confirmation:', err);
+    return res.status(500).json({ success: false, error: err.message || 'Server error sending email.' });
+  }
+});
+
 // Explicit route for root landing page
 app.get('/', (req, res) => {
   res.sendFile(path.join(ROOT_DIR, 'index.html'));

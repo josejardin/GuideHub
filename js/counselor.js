@@ -352,6 +352,56 @@ document.addEventListener('DOMContentLoaded', () => {
       ).length;
     }
 
+    // Update Today's Agenda At-a-Glance Widget
+    const widgetTodayDate = document.getElementById('widget-today-date');
+    const widgetTodaySummary = document.getElementById('widget-today-summary');
+    const widgetCountToday = document.getElementById('widget-count-today');
+    const widgetCountPending = document.getElementById('widget-count-pending');
+
+    const todayApts = accessibleAppointments.filter(
+      a => a.date === todayIso && (a.status || '').toLowerCase() !== 'cancelled'
+    );
+    const todayConfirmedApts = todayApts.filter(a => (a.status || '').toLowerCase() === 'confirmed');
+    const allPendingApts = accessibleAppointments.filter(a => (a.status || '').toLowerCase() === 'pending');
+
+    if (widgetTodayDate) {
+      try {
+        const todayObj = new Date();
+        const formattedToday = todayObj.toLocaleDateString('en-US', {
+          weekday: 'long',
+          month: 'short',
+          day: 'numeric'
+        });
+        widgetTodayDate.textContent = `Today's Schedule: ${formattedToday}`;
+      } catch (_) {
+        widgetTodayDate.textContent = `Today's Schedule`;
+      }
+    }
+    if (widgetTodaySummary) {
+      widgetTodaySummary.innerHTML = `<strong>${todayApts.length} session(s)</strong> scheduled today (${todayConfirmedApts.length} confirmed) • <strong class="text-[#00205B]">${allPendingApts.length}</strong> pending request(s) awaiting confirmation.`;
+    }
+    if (widgetCountToday) widgetCountToday.textContent = todayApts.length;
+    if (widgetCountPending) widgetCountPending.textContent = allPendingApts.length;
+
+    const btnQuickViewToday = document.getElementById('btn-quick-view-today');
+    const btnQuickViewPending = document.getElementById('btn-quick-view-pending');
+    if (btnQuickViewToday && !btnQuickViewToday._bound) {
+      btnQuickViewToday._bound = true;
+      btnQuickViewToday.addEventListener('click', () => {
+        if (agendaDatePicker) agendaDatePicker.value = todayIso;
+        if (agendaStatusFilter) agendaStatusFilter.value = 'ACTIVE';
+        activeViewFilter = 'selected_date';
+        renderAgenda();
+      });
+    }
+    if (btnQuickViewPending && !btnQuickViewPending._bound) {
+      btnQuickViewPending._bound = true;
+      btnQuickViewPending.addEventListener('click', () => {
+        activeViewFilter = 'all_pending';
+        renderAgenda();
+      });
+    }
+
     filtered.sort((a, b) => {
       if (activeViewFilter === 'all_cancelled') {
         return new Date(b.cancelledAt || b.date) - new Date(a.cancelledAt || a.date);
@@ -418,6 +468,17 @@ document.addEventListener('DOMContentLoaded', () => {
           ? formattedSlot.split('-').map(s => s.trim())
           : [formattedSlot, ''];
 
+        const concernText = `${apt.concernCategory || ''} ${apt.specificConcern || ''}`.toLowerCase();
+        const isUrgent =
+          concernText.includes('crisis') ||
+          concernText.includes('depress') ||
+          concernText.includes('suicid') ||
+          concernText.includes('grief') ||
+          concernText.includes('probation') ||
+          concernText.includes('failing') ||
+          concernText.includes('emergency') ||
+          concernText.includes('urgent');
+
         return `
           <div class="p-4 bg-white flex flex-col md:flex-row items-start md:items-center justify-between gap-3 hover:bg-slate-50/60 transition ${isPending ? 'border-l-4 border-amber-400 bg-amber-50/20' : ''} ${isCancelled ? 'border-l-4 border-rose-500 bg-rose-50/20' : ''} ${isConflict ? 'border-r-4 border-rose-500' : ''}">
             <div class="flex items-center gap-3">
@@ -435,6 +496,7 @@ document.addEventListener('DOMContentLoaded', () => {
                   </span>
                   ${(activeViewFilter !== 'selected_date' || apt.date !== todayIso) ? `<span class="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-slate-100 text-slate-700 border border-slate-200 font-mono">${escapeHtml(apt.date)}</span>` : ''}
                   ${isConflict ? `<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-rose-100 text-rose-800 border border-rose-300">BLOCKED SLOT CONFLICT</span>` : ''}
+                  ${isUrgent ? `<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold bg-amber-50 text-amber-900 border border-amber-300 shadow-2xs animate-pulse"><i data-lucide="alert-circle" class="w-3 h-3 text-amber-600"></i>Priority Triage</span>` : ''}
                 </div>
                 
                 <div class="text-[11px] text-slate-500 flex flex-wrap items-center gap-x-3 gap-y-0.5">
@@ -445,7 +507,7 @@ document.addEventListener('DOMContentLoaded', () => {
             </div>
 
             <!-- Actions -->
-            <div class="flex items-center gap-1.5 self-end md:self-center">
+            <div class="flex items-center gap-1.5 self-end md:self-center flex-wrap">
               <button data-id="${escapeHtml(apt.id)}" class="btn-view-apt-details px-2.5 py-1.5 rounded-lg border border-slate-200 hover:bg-slate-100 text-slate-700 text-xs font-semibold transition flex items-center gap-1 shadow-2xs" title="View complete details, contact info, notes, and cancellation reason">
                 <i data-lucide="eye" class="w-3.5 h-3.5 text-slate-500"></i>
                 <span>Details</span>
@@ -454,7 +516,8 @@ document.addEventListener('DOMContentLoaded', () => {
               ${
                 isPending
                   ? `
-              <button data-action="Confirmed" data-id="${escapeHtml(apt.id)}" class="btn-apt-status px-3 py-1.5 rounded-lg bg-[#00205B] hover:bg-[#0A192F] text-white text-xs font-semibold shadow-sm transition flex items-center gap-1">
+              <button data-action="Confirmed" data-id="${escapeHtml(apt.id)}" class="btn-apt-status px-3 py-1.5 rounded-lg bg-[#00205B] hover:bg-[#0A192F] text-white text-xs font-semibold shadow-sm transition flex items-center gap-1" title="Accept consultation and dispatch confirmation email to student">
+                <i data-lucide="check" class="w-3.5 h-3.5 text-emerald-400"></i>
                 <span>Accept</span>
               </button>
               <button data-action="Cancelled" data-id="${escapeHtml(apt.id)}" class="btn-apt-status px-2.5 py-1.5 rounded-lg border border-rose-200 hover:bg-rose-50 text-rose-700 text-xs font-medium transition">
@@ -467,8 +530,13 @@ document.addEventListener('DOMContentLoaded', () => {
               ${
                 isConfirmed
                   ? `
-              <button data-action="Completed" data-id="${escapeHtml(apt.id)}" class="btn-apt-status px-3 py-1.5 rounded-lg bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-semibold shadow-sm transition">
-                Mark Completed
+              <button data-action="Completed" data-id="${escapeHtml(apt.id)}" class="btn-apt-status px-3 py-1.5 rounded-lg bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-semibold shadow-sm transition flex items-center gap-1">
+                <i data-lucide="check-check" class="w-3.5 h-3.5"></i>
+                <span>Completed</span>
+              </button>
+              <button data-student-num="${escapeHtml(apt.studentNumber)}" data-student-name="${escapeHtml(apt.studentName)}" data-program="${escapeHtml(apt.program)}" data-date="${escapeHtml(apt.date)}" data-time="${escapeHtml(apt.timeSlot)}" class="btn-quick-callslip px-2.5 py-1.5 rounded-lg bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 text-xs font-semibold transition flex items-center gap-1 shadow-2xs" title="Generate institutional call slip for this student">
+                <i data-lucide="file-badge-2" class="w-3.5 h-3.5"></i>
+                <span>Call Slip</span>
               </button>
               <button data-action="No-Show" data-id="${escapeHtml(apt.id)}" class="btn-apt-status px-2.5 py-1.5 rounded-lg border border-slate-200 hover:bg-slate-100 text-slate-700 text-xs font-medium transition">
                 No-Show
@@ -499,6 +567,20 @@ document.addEventListener('DOMContentLoaded', () => {
       if (apt) {
         openAppointmentDetailsModal(apt);
       }
+      return;
+    }
+
+    const quickCsBtn = e.target.closest('.btn-quick-callslip');
+    if (quickCsBtn) {
+      e.preventDefault();
+      e.stopPropagation();
+      openCallSlipModal({
+        studentName: quickCsBtn.getAttribute('data-student-name'),
+        studentNumber: quickCsBtn.getAttribute('data-student-num'),
+        program: quickCsBtn.getAttribute('data-program'),
+        date: quickCsBtn.getAttribute('data-date'),
+        timeSlot: quickCsBtn.getAttribute('data-time')
+      });
       return;
     }
 
@@ -534,6 +616,34 @@ document.addEventListener('DOMContentLoaded', () => {
 
         await updateAppointmentStatus(id, status, extra);
 
+        // Automated Email Notification when Counselor Confirms Booking
+        if (status === 'Confirmed') {
+          const targetStudentEmail = targetApt?.studentEmail || '';
+          if (targetStudentEmail) {
+            fetch('/api/send-appointment-confirmation', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                studentEmail: targetStudentEmail,
+                studentName: targetApt?.studentName || 'Student',
+                studentNumber: targetApt?.studentNumber || '',
+                counselorName: currentUser.fullName || 'Guidance Counselor',
+                date: targetApt?.date || '',
+                timeSlot: targetApt?.timeSlot || '',
+                concernCategory: targetApt?.concernCategory || '',
+                appointmentId: id
+              })
+            })
+              .then(res => res.json())
+              .then(data => {
+                if (data.success) {
+                  showToast(`Confirmation email dispatched to ${targetStudentEmail}.`, 'success', 'Email Delivered');
+                }
+              })
+              .catch(err => console.warn('Confirmation email dispatch notice:', err));
+          }
+        }
+
         await logAuditEvent(
           currentUser.uid,
           currentUser.fullName,
@@ -542,7 +652,13 @@ document.addEventListener('DOMContentLoaded', () => {
           `Updated appointment ${id} to ${status}`
         );
 
-        showToast(`Appointment status updated to ${status}.`, 'success');
+        showToast(
+          status === 'Confirmed'
+            ? `Appointment confirmed! ${targetApt?.studentEmail ? 'A confirmation email with session details was sent to the student.' : ''}`
+            : `Appointment status updated to ${status}.`,
+          'success',
+          status === 'Confirmed' ? 'Confirmed & Scheduled' : 'Status Updated'
+        );
       } catch (err) {
         console.error('Error updating appointment:', err);
         showToast(err.message || 'Failed to update appointment.', 'error');
@@ -1100,16 +1216,28 @@ document.addEventListener('DOMContentLoaded', () => {
     const studentInput = document.getElementById('cs-student');
     const counselorInput = document.getElementById('cs-counselor');
     const dateInput = document.getElementById('cs-date');
+    const timeInput = document.getElementById('cs-time');
 
-    if (studentInput) studentInput.value = `${referral.studentName} (${referral.studentNumber} - ${referral.program})`;
+    if (studentInput) {
+      studentInput.value = `${referral.studentName || 'Student'} (${referral.studentNumber || ''} - ${referral.program || ''})`;
+    }
     if (counselorInput) counselorInput.value = currentUser.fullName;
 
     if (dateInput) {
-      const tomorrow = new Date(Date.now() + 86400000).toISOString().split('T')[0];
-      dateInput.value = tomorrow;
+      if (referral.date) {
+        dateInput.value = referral.date;
+      } else {
+        const tomorrow = new Date(Date.now() + 86400000).toISOString().split('T')[0];
+        dateInput.value = tomorrow;
+      }
+    }
+
+    if (timeInput && referral.timeSlot) {
+      timeInput.value = referral.timeSlot;
     }
 
     callslipModal?.classList.remove('hidden');
+    if (window.lucide) window.lucide.createIcons();
   }
 
   btnCloseCallslip?.addEventListener('click', () => callslipModal?.classList.add('hidden'));
@@ -1119,12 +1247,14 @@ document.addEventListener('DOMContentLoaded', () => {
     const appDate = document.getElementById('cs-date')?.value;
     const appTime = document.getElementById('cs-time')?.value;
 
-    await updateReferralStatus(activeReferralForCallSlip.id, 'Call Slip Issued', {
-      callSlipIssuedAt: new Date().toISOString().split('T')[0],
-      callSlipAppointmentDate: appDate,
-      callSlipAppointmentTime: appTime,
-      assignedCounselor: currentUser.fullName
-    });
+    if (activeReferralForCallSlip.id && String(activeReferralForCallSlip.id).startsWith('ref_')) {
+      await updateReferralStatus(activeReferralForCallSlip.id, 'Call Slip Issued', {
+        callSlipIssuedAt: new Date().toISOString().split('T')[0],
+        callSlipAppointmentDate: appDate,
+        callSlipAppointmentTime: appTime,
+        assignedCounselor: currentUser.fullName
+      });
+    }
 
     await logAuditEvent(
       currentUser.uid,
