@@ -157,8 +157,8 @@ document.addEventListener('DOMContentLoaded', () => {
     if (filtered.length === 0) {
       const msg =
         filter === 'ACTIVE'
-          ? 'No active appointments. (Completed or cancelled appointments can be viewed via status filter)'
-          : `No appointments found matching "${filter}".`;
+          ? "You don't have any active appointments right now. Whenever you need someone to talk to, we're always here to listen."
+          : `No conversations found matching "${filter}".`;
       appointmentsListEl.innerHTML = `
         <div class="p-8 text-center text-slate-400 text-xs">
           ${msg}
