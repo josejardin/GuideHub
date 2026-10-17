@@ -10,6 +10,7 @@ import {
   updateReferralStatus,
   subscribeAllCases,
   getOrCreateCase,
+  updateCaseStatus,
   addSessionNote,
   subscribeCaseNotes,
   updateCaseRiskFlags,
@@ -439,6 +440,11 @@ document.addEventListener('DOMContentLoaded', () => {
       const sProg = caseBtn.getAttribute('data-program');
 
       const caseRecord = await getOrCreateCase(sNum, sName, sProg, currentUser.uid);
+      if (caseRecord.status === 'Closed') {
+        await updateCaseStatus(caseRecord.id, 'Active');
+        caseRecord.status = 'Active';
+        showToast(`Retrieved past clinical records for ${sName}. Case reopened as Active.`, 'info');
+      }
       switchTab('cases');
       selectCaseFolder(caseRecord.id);
     }
@@ -572,6 +578,11 @@ document.addEventListener('DOMContentLoaded', () => {
         showToast('Walk-in completed. Opening case...', 'success');
 
         const caseRecord = await getOrCreateCase(snum, sname, sprog, currentUser.uid);
+        if (caseRecord.status === 'Closed') {
+          await updateCaseStatus(caseRecord.id, 'Active');
+          caseRecord.status = 'Active';
+          showToast(`Retrieved past clinical records for ${sname}. Case reopened as Active.`, 'info');
+        }
         switchTab('cases');
         selectCaseFolder(caseRecord.id);
       });
@@ -767,6 +778,11 @@ document.addEventListener('DOMContentLoaded', () => {
         showToast('Status updated to Intake Conducted.', 'success');
 
         const caseRecord = await getOrCreateCase(snum, sname, sprog, currentUser.uid);
+        if (caseRecord.status === 'Closed') {
+          await updateCaseStatus(caseRecord.id, 'Active');
+          caseRecord.status = 'Active';
+          showToast(`Retrieved past clinical records for ${sname}. Case reopened as Active.`, 'info');
+        }
         switchTab('cases');
         selectCaseFolder(caseRecord.id);
       } catch (err) {
@@ -989,6 +1005,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const isHighRisk = caseRecord.status === 'High Risk' || selfHarmChecked || abuseChecked || threatChecked;
     const currentStatus = isHighRisk ? 'High Risk' : caseRecord.status || 'Active';
+    const isClosed = currentStatus === 'Closed';
 
     const badgeStyles = {
       'High Risk': 'bg-rose-50 text-rose-700 border-rose-200 font-bold',
@@ -998,29 +1015,50 @@ document.addEventListener('DOMContentLoaded', () => {
     };
 
     caseDetailPanel.innerHTML = `
- <!-- Case Header -->
- <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-200">
- <div>
- <div class="flex items-center gap-2">
- <h3 class="text-base font-bold text-slate-900">${escapeHtml(caseRecord.studentName)}</h3>
- <span class="text-xs text-slate-500 font-mono">(${escapeHtml(caseRecord.studentNumber)})</span>
- <span id="case-header-badge" class="px-2 py-0.5 rounded text-[10px] border ${badgeStyles[currentStatus] || badgeStyles.Active}">
- ${escapeHtml(currentStatus)}
- </span>
- </div>
- <p class="text-xs text-slate-500 mt-0.5">${escapeHtml(caseRecord.program)} • ${escapeHtml(caseRecord.category || 'Clinical Record')}</p>
- </div>
+      <!-- Case Header -->
+      <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-200">
+        <div>
+          <div class="flex items-center gap-2">
+            <h3 class="text-base font-bold text-slate-900">${escapeHtml(caseRecord.studentName)}</h3>
+            <span class="text-xs text-slate-500 font-mono">(${escapeHtml(caseRecord.studentNumber)})</span>
+            <span id="case-header-badge" class="px-2 py-0.5 rounded text-[10px] border ${badgeStyles[currentStatus] || badgeStyles.Active}">
+              ${escapeHtml(currentStatus)}
+            </span>
+          </div>
+          <p class="text-xs text-slate-500 mt-0.5">${escapeHtml(caseRecord.program)} • ${escapeHtml(caseRecord.category || 'Clinical Record')}</p>
+        </div>
 
- <div class="flex items-center gap-2">
- <span class="text-xs text-slate-500 font-semibold">Status:</span>
- <select id="case-status-select" class="text-xs border border-slate-300 rounded-lg px-2.5 py-1.5 bg-white font-bold text-slate-800 focus:border-[#00205B] focus:outline-none shadow-sm">
- <option value="Active" ${currentStatus === 'Active' ? 'selected' : ''}>Active</option>
- <option value="High Risk" ${currentStatus === 'High Risk' ? 'selected' : ''}>High Risk</option>
- <option value="Monitoring" ${currentStatus === 'Monitoring' ? 'selected' : ''}>Monitoring</option>
- <option value="Closed" ${currentStatus === 'Closed' ? 'selected' : ''}>Closed</option>
- </select>
- </div>
- </div>
+        <div class="flex items-center gap-2">
+          <span class="text-xs text-slate-500 font-semibold">Status:</span>
+          <select id="case-status-select" class="text-xs border border-slate-300 rounded-lg px-2.5 py-1.5 bg-white font-bold text-slate-800 focus:border-[#00205B] focus:outline-none shadow-sm">
+            <option value="Active" ${currentStatus === 'Active' ? 'selected' : ''}>Active</option>
+            <option value="High Risk" ${currentStatus === 'High Risk' ? 'selected' : ''}>High Risk</option>
+            <option value="Monitoring" ${currentStatus === 'Monitoring' ? 'selected' : ''}>Monitoring</option>
+            <option value="Closed" ${currentStatus === 'Closed' ? 'selected' : ''}>Closed</option>
+          </select>
+        </div>
+      </div>
+
+      ${
+        isClosed
+          ? `
+      <!-- CLOSED CASE REOPEN BANNER -->
+      <div class="p-3 bg-amber-50 border border-amber-200 rounded-lg flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 text-xs text-amber-900">
+        <div class="flex items-center gap-2">
+          <i data-lucide="archive" class="w-4 h-4 text-amber-600 shrink-0"></i>
+          <div>
+            <span class="font-bold text-amber-950">This Student Case Folder is Marked as Closed.</span>
+            <span class="text-amber-800 block text-[11px]">All past clinical session notes and history are safely preserved below. You can reopen this case if the student returns for a new concern.</span>
+          </div>
+        </div>
+        <button type="button" id="btn-reopen-case" class="px-3 py-1.5 bg-[#00205B] text-white rounded-md font-bold hover:bg-[#0A192F] transition text-xs shrink-0 shadow-sm flex items-center gap-1.5">
+          <i data-lucide="refresh-cw" class="w-3.5 h-3.5"></i>
+          <span>Reopen Case (Set to Active)</span>
+        </button>
+      </div>
+      `
+          : ''
+      }
 
  <!-- CRISIS & MANDATORY REPORTING PROTOCOL FLAGS -->
  <div class="bg-rose-50/50 border border-rose-200/80 rounded-lg p-3 space-y-2">
@@ -1178,6 +1216,21 @@ document.addEventListener('DOMContentLoaded', () => {
       }
     });
 
+    document.getElementById('btn-reopen-case')?.addEventListener('click', async () => {
+      await updateCaseStatus(caseRecord.id, 'Active');
+      caseRecord.status = 'Active';
+      await logAuditEvent(
+        currentUser.uid,
+        currentUser.fullName,
+        currentUser.role,
+        'CASE_REOPENED',
+        `Reopened case for ${caseRecord.studentName} (${caseRecord.studentNumber}) as Active`
+      );
+      showToast(`Case for ${caseRecord.studentName} reopened as Active.`, 'success');
+      renderCaseFolders();
+      renderCaseDetail(caseRecord);
+    });
+
     const updateFlags = async () => {
       const selfHarm = flagSelfHarm?.checked || false;
       const abuse = flagAbuse?.checked || false;
@@ -1253,7 +1306,12 @@ document.addEventListener('DOMContentLoaded', () => {
       const subjectiveObservation = document.getElementById('note-subjective')?.value.trim();
       const counselorRemarks = document.getElementById('note-remarks')?.value.trim();
       const actionPlan = document.getElementById('note-action')?.value.trim();
-      const currentStatusVal = caseStatusSelect?.value || caseRecord.status || 'Active';
+      let currentStatusVal = caseStatusSelect?.value || caseRecord.status || 'Active';
+
+      // If logging a session note on a previously Closed case, automatically reactivate it to Active
+      if (caseRecord.status === 'Closed' && currentStatusVal === 'Closed') {
+        currentStatusVal = 'Active';
+      }
 
       try {
         await addSessionNote(caseRecord.id, {
@@ -1332,6 +1390,12 @@ document.addEventListener('DOMContentLoaded', () => {
             : 'Clinical session note saved successfully.',
           'success'
         );
+
+        if (caseRecord.status !== currentStatusVal) {
+          caseRecord.status = currentStatusVal;
+          renderCaseFolders();
+          renderCaseDetail(caseRecord);
+        }
       } catch (err) {
         showToast(err.message || 'Failed to save note', 'error');
       }

@@ -978,6 +978,25 @@ export async function updateCaseRiskFlags(caseId, riskFlags) {
   }
 }
 
+export async function updateCaseStatus(caseId, status, extra = {}) {
+  try {
+    if (db) {
+      const caseRef = doc(db, 'cases', caseId);
+      await setDoc(caseRef, { status, ...extra, updatedAt: new Date().toISOString() }, { merge: true });
+    }
+  } catch (err) {
+    console.warn('Firestore updateCaseStatus fallback:', err.message);
+  }
+
+  const state = getLocalState();
+  if (state.cases[caseId]) {
+    state.cases[caseId].status = status;
+    Object.assign(state.cases[caseId], extra);
+    state.cases[caseId].updatedAt = new Date().toISOString();
+    saveLocalState(state);
+  }
+}
+
 export async function getCounselorBlockedSlots(counselorId) {
   try {
     if (db && counselorId) {
