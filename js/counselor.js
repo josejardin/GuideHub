@@ -84,13 +84,18 @@ document.addEventListener('DOMContentLoaded', () => {
   });
 
   let allAppointments = [];
-  let activeViewFilter = 'all_pending';
+  let activeViewFilter = 'all_confirmed';
 
   const agendaList = document.getElementById('agenda-list');
   const agendaDatePicker = document.getElementById('agenda-date-picker');
+  const agendaSearchInput = document.getElementById('agenda-search-input');
   const badgeAgendaCount = document.getElementById('badge-agenda-count');
+  const badgeTodayCount = document.getElementById('badge-today-count');
+  const badgeAllConfirmedCount = document.getElementById('badge-all-confirmed-count');
   const badgeAllPendingCount = document.getElementById('badge-all-pending-count');
   const badgeAllCancelledCount = document.getElementById('badge-all-cancelled-count');
+  const btnViewToday = document.getElementById('btn-view-today');
+  const btnViewConfirmed = document.getElementById('btn-view-confirmed');
   const btnViewDate = document.getElementById('btn-view-date');
   const btnViewPending = document.getElementById('btn-view-pending');
   const btnViewCancelled = document.getElementById('btn-view-cancelled');
@@ -106,8 +111,24 @@ document.addEventListener('DOMContentLoaded', () => {
     renderAgenda();
   });
 
+  agendaSearchInput?.addEventListener('input', () => {
+    renderAgenda();
+  });
+
   agendaDatePicker?.addEventListener('change', () => {
     activeViewFilter = 'selected_date';
+    updateFilterUI();
+    renderAgenda();
+  });
+
+  btnViewToday?.addEventListener('click', () => {
+    activeViewFilter = 'today';
+    updateFilterUI();
+    renderAgenda();
+  });
+
+  btnViewConfirmed?.addEventListener('click', () => {
+    activeViewFilter = 'all_confirmed';
     updateFilterUI();
     renderAgenda();
   });
@@ -130,6 +151,12 @@ document.addEventListener('DOMContentLoaded', () => {
     renderAgenda();
   });
 
+  document.getElementById('btn-jump-confirmed')?.addEventListener('click', () => {
+    activeViewFilter = 'all_confirmed';
+    updateFilterUI();
+    renderAgenda();
+  });
+
   document.getElementById('btn-jump-pending')?.addEventListener('click', () => {
     activeViewFilter = 'all_pending';
     updateFilterUI();
@@ -143,12 +170,24 @@ document.addEventListener('DOMContentLoaded', () => {
   });
 
   function updateFilterUI() {
-    [btnViewDate, btnViewPending, btnViewCancelled].forEach(btn => {
+    [btnViewToday, btnViewConfirmed, btnViewDate, btnViewPending, btnViewCancelled].forEach(btn => {
       btn?.classList.remove('bg-white', 'text-[#00205B]', 'font-bold', 'shadow-sm');
       btn?.classList.add('text-slate-600');
     });
 
-    if (activeViewFilter === 'selected_date') {
+    if (activeViewFilter === 'today') {
+      btnViewToday?.classList.add('bg-white', 'text-[#00205B]', 'font-bold', 'shadow-sm');
+      btnViewToday?.classList.remove('text-slate-600');
+      agendaDateWrapper?.classList.add('opacity-50');
+      agendaStatusWrapper?.classList.add('opacity-50', 'pointer-events-none');
+      if (agendaStatusFilter) agendaStatusFilter.disabled = true;
+    } else if (activeViewFilter === 'all_confirmed') {
+      btnViewConfirmed?.classList.add('bg-white', 'text-[#00205B]', 'font-bold', 'shadow-sm');
+      btnViewConfirmed?.classList.remove('text-slate-600');
+      agendaDateWrapper?.classList.add('opacity-50');
+      agendaStatusWrapper?.classList.add('opacity-50', 'pointer-events-none');
+      if (agendaStatusFilter) agendaStatusFilter.disabled = true;
+    } else if (activeViewFilter === 'selected_date') {
       btnViewDate?.classList.add('bg-white', 'text-[#00205B]', 'font-bold', 'shadow-sm');
       btnViewDate?.classList.remove('text-slate-600');
       agendaDateWrapper?.classList.remove('opacity-50');
@@ -252,11 +291,31 @@ document.addEventListener('DOMContentLoaded', () => {
       return true;
     });
 
+    const confirmedCount = accessibleAppointments.filter(a => (a.status || '').toLowerCase() === 'confirmed').length;
     const pendingCount = accessibleAppointments.filter(a => (a.status || '').toLowerCase() === 'pending').length;
-    if (badgeAllPendingCount) badgeAllPendingCount.textContent = pendingCount;
-
     const cancelledCount = accessibleAppointments.filter(a => (a.status || '').toLowerCase() === 'cancelled').length;
+    const todayApts = accessibleAppointments.filter(
+      a => a.date === todayIso && (a.status || '').toLowerCase() !== 'cancelled'
+    );
+    const todayCount = todayApts.length;
+
+    if (badgeTodayCount) badgeTodayCount.textContent = todayCount;
+    if (badgeAllConfirmedCount) badgeAllConfirmedCount.textContent = confirmedCount;
+    if (badgeAllPendingCount) badgeAllPendingCount.textContent = pendingCount;
     if (badgeAllCancelledCount) badgeAllCancelledCount.textContent = cancelledCount;
+
+    // Confirmed Consultations Action Alert Banner
+    const agendaConfirmedAlert = document.getElementById('agenda-confirmed-alert');
+    const confirmedAlertCount = document.getElementById('confirmed-alert-count');
+    if (agendaConfirmedAlert) {
+      if (confirmedCount > 0 && activeViewFilter !== 'all_confirmed') {
+        if (confirmedAlertCount) confirmedAlertCount.textContent = confirmedCount;
+        agendaConfirmedAlert.classList.remove('hidden');
+        if (window.lucide) window.lucide.createIcons();
+      } else {
+        agendaConfirmedAlert.classList.add('hidden');
+      }
+    }
 
     const agendaPendingAlert = document.getElementById('agenda-pending-alert');
     const pendingAlertCount = document.getElementById('pending-alert-count');
@@ -321,16 +380,34 @@ document.addEventListener('DOMContentLoaded', () => {
       }
     }
     const statusFilterVal = agendaStatusFilter?.value || 'ACTIVE';
+    const searchQuery = (agendaSearchInput?.value || '').trim().toLowerCase();
 
     const filtered = accessibleAppointments.filter(item => {
       const itemStatus = (item.status || 'pending').toLowerCase();
 
-      // Check view mode: all pending requests or all cancelled bypass status filter
+      // Instant text search filter
+      if (searchQuery) {
+        const match =
+          (item.studentName || '').toLowerCase().includes(searchQuery) ||
+          (item.studentNumber || '').toLowerCase().includes(searchQuery) ||
+          (item.program || '').toLowerCase().includes(searchQuery) ||
+          (item.concernCategory || '').toLowerCase().includes(searchQuery) ||
+          (item.date || '').toLowerCase().includes(searchQuery);
+        if (!match) return false;
+      }
+
+      // Check view mode:
+      if (activeViewFilter === 'all_confirmed') {
+        return itemStatus === 'confirmed';
+      }
       if (activeViewFilter === 'all_pending') {
         return itemStatus === 'pending';
       }
       if (activeViewFilter === 'all_cancelled') {
         return itemStatus === 'cancelled';
+      }
+      if (activeViewFilter === 'today') {
+        return item.date === todayIso && itemStatus !== 'cancelled';
       }
 
       // Selected date mode:
@@ -356,13 +433,10 @@ document.addEventListener('DOMContentLoaded', () => {
     const widgetTodayDate = document.getElementById('widget-today-date');
     const widgetTodaySummary = document.getElementById('widget-today-summary');
     const widgetCountToday = document.getElementById('widget-count-today');
+    const widgetCountConfirmed = document.getElementById('widget-count-confirmed');
     const widgetCountPending = document.getElementById('widget-count-pending');
 
-    const todayApts = accessibleAppointments.filter(
-      a => a.date === todayIso && (a.status || '').toLowerCase() !== 'cancelled'
-    );
     const todayConfirmedApts = todayApts.filter(a => (a.status || '').toLowerCase() === 'confirmed');
-    const allPendingApts = accessibleAppointments.filter(a => (a.status || '').toLowerCase() === 'pending');
 
     if (widgetTodayDate) {
       try {
@@ -378,19 +452,28 @@ document.addEventListener('DOMContentLoaded', () => {
       }
     }
     if (widgetTodaySummary) {
-      widgetTodaySummary.innerHTML = `<strong>${todayApts.length} session(s)</strong> scheduled today (${todayConfirmedApts.length} confirmed) • <strong class="text-[#00205B]">${allPendingApts.length}</strong> pending request(s) awaiting confirmation.`;
+      widgetTodaySummary.innerHTML = `<strong>${todayApts.length} session(s)</strong> scheduled today (${todayConfirmedApts.length} confirmed) • <strong class="text-emerald-700">${confirmedCount} total confirmed</strong> session(s) ready • <strong class="text-[#00205B]">${pendingCount}</strong> pending request(s).`;
     }
     if (widgetCountToday) widgetCountToday.textContent = todayApts.length;
-    if (widgetCountPending) widgetCountPending.textContent = allPendingApts.length;
+    if (widgetCountConfirmed) widgetCountConfirmed.textContent = confirmedCount;
+    if (widgetCountPending) widgetCountPending.textContent = pendingCount;
 
     const btnQuickViewToday = document.getElementById('btn-quick-view-today');
+    const btnQuickViewConfirmed = document.getElementById('btn-quick-view-confirmed');
     const btnQuickViewPending = document.getElementById('btn-quick-view-pending');
     if (btnQuickViewToday && !btnQuickViewToday._bound) {
       btnQuickViewToday._bound = true;
       btnQuickViewToday.addEventListener('click', () => {
-        if (agendaDatePicker) agendaDatePicker.value = todayIso;
-        if (agendaStatusFilter) agendaStatusFilter.value = 'ACTIVE';
-        activeViewFilter = 'selected_date';
+        activeViewFilter = 'today';
+        updateFilterUI();
+        renderAgenda();
+      });
+    }
+    if (btnQuickViewConfirmed && !btnQuickViewConfirmed._bound) {
+      btnQuickViewConfirmed._bound = true;
+      btnQuickViewConfirmed.addEventListener('click', () => {
+        activeViewFilter = 'all_confirmed';
+        updateFilterUI();
         renderAgenda();
       });
     }
@@ -398,6 +481,7 @@ document.addEventListener('DOMContentLoaded', () => {
       btnQuickViewPending._bound = true;
       btnQuickViewPending.addEventListener('click', () => {
         activeViewFilter = 'all_pending';
+        updateFilterUI();
         renderAgenda();
       });
     }
@@ -406,9 +490,12 @@ document.addEventListener('DOMContentLoaded', () => {
       if (activeViewFilter === 'all_cancelled') {
         return new Date(b.cancelledAt || b.date) - new Date(a.cancelledAt || a.date);
       }
-      if (activeViewFilter === 'all_pending') {
+      if (activeViewFilter === 'all_confirmed' || activeViewFilter === 'all_pending') {
         const dateComp = (a.date || '').localeCompare(b.date || '');
         if (dateComp !== 0) return dateComp;
+        return normalizeTimeSlot(a.timeSlot || '').localeCompare(normalizeTimeSlot(b.timeSlot || ''));
+      }
+      if (activeViewFilter === 'today') {
         return normalizeTimeSlot(a.timeSlot || '').localeCompare(normalizeTimeSlot(b.timeSlot || ''));
       }
       const isAPending = (a.status || '').toLowerCase() === 'pending';
@@ -420,7 +507,13 @@ document.addEventListener('DOMContentLoaded', () => {
 
     if (filtered.length === 0) {
       let emptyMsg = `No scheduled counseling sessions for ${selectedDate}.`;
-      if (activeViewFilter === 'all_pending') {
+      if (searchQuery) {
+        emptyMsg = `No consultation records found matching "${escapeHtml(searchQuery)}".`;
+      } else if (activeViewFilter === 'today') {
+        emptyMsg = `No consultations scheduled for today (${todayIso}). Check "Confirmed" tab for upcoming sessions.`;
+      } else if (activeViewFilter === 'all_confirmed') {
+        emptyMsg = 'No confirmed consultations currently. Accept pending requests to schedule sessions.';
+      } else if (activeViewFilter === 'all_pending') {
         emptyMsg = 'No pending appointment requests currently.';
       } else if (activeViewFilter === 'all_cancelled') {
         emptyMsg = 'No cancelled appointments on record.';
@@ -494,7 +587,11 @@ document.addEventListener('DOMContentLoaded', () => {
                   <span class="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-medium border ${badgeStyles[statusLower] || badgeStyles.pending}">
                     ${escapeHtml(apt.status)}
                   </span>
-                  ${(activeViewFilter !== 'selected_date' || apt.date !== todayIso) ? `<span class="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-slate-100 text-slate-700 border border-slate-200 font-mono">${escapeHtml(apt.date)}</span>` : ''}
+                  <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-semibold bg-slate-100 text-slate-700 border border-slate-200 font-mono">
+                    <i data-lucide="calendar" class="w-3 h-3 text-slate-500"></i>
+                    ${escapeHtml(apt.date || 'TBD')}
+                  </span>
+                  ${isConfirmed && apt.date <= todayIso ? `<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-300 shadow-2xs"><i data-lucide="clock" class="w-3 h-3 text-emerald-600"></i>Ready for Session / Done</span>` : ''}
                   ${isConflict ? `<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-rose-100 text-rose-800 border border-rose-300">BLOCKED SLOT CONFLICT</span>` : ''}
                   ${isUrgent ? `<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold bg-amber-50 text-amber-900 border border-amber-300 shadow-2xs animate-pulse"><i data-lucide="alert-circle" class="w-3 h-3 text-amber-600"></i>Priority Triage</span>` : ''}
                 </div>
@@ -530,9 +627,9 @@ document.addEventListener('DOMContentLoaded', () => {
               ${
                 isConfirmed
                   ? `
-              <button data-action="Completed" data-id="${escapeHtml(apt.id)}" class="btn-apt-status px-3 py-1.5 rounded-lg bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-semibold shadow-sm transition flex items-center gap-1">
+              <button data-action="Completed" data-id="${escapeHtml(apt.id)}" class="btn-apt-status px-3 py-1.5 rounded-lg bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-semibold shadow-sm transition flex items-center gap-1.5" title="Mark this counseling session as completed and log clinical notes">
                 <i data-lucide="check-check" class="w-3.5 h-3.5"></i>
-                <span>Completed</span>
+                <span>Complete Session</span>
               </button>
               <button data-student-num="${escapeHtml(apt.studentNumber)}" data-student-name="${escapeHtml(apt.studentName)}" data-program="${escapeHtml(apt.program)}" data-date="${escapeHtml(apt.date)}" data-time="${escapeHtml(apt.timeSlot)}" class="btn-quick-callslip px-2.5 py-1.5 rounded-lg bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 text-xs font-semibold transition flex items-center gap-1 shadow-2xs" title="Generate institutional call slip for this student">
                 <i data-lucide="file-badge-2" class="w-3.5 h-3.5"></i>
@@ -654,10 +751,12 @@ document.addEventListener('DOMContentLoaded', () => {
 
         showToast(
           status === 'Confirmed'
-            ? 'Appointment confirmed! Official confirmation email is being delivered to the student.'
+            ? 'Appointment confirmed! Official confirmation email sent to student. Session is in "Confirmed / Action" tab.'
+            : status === 'Completed'
+            ? 'Consultation session marked as Completed! Click "Open Case" anytime to log session notes.'
             : `Appointment status updated to ${status}.`,
           'success',
-          status === 'Confirmed' ? 'Confirmed & Scheduled' : 'Status Updated'
+          status === 'Confirmed' ? 'Confirmed & Scheduled' : status === 'Completed' ? 'Session Completed' : 'Status Updated'
         );
       } catch (err) {
         console.error('Error updating appointment:', err);

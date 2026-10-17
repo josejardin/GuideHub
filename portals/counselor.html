@@ -121,13 +121,45 @@
               </div>
 
               <div class="flex flex-wrap items-center gap-2">
-                <div class="inline-flex rounded-lg bg-slate-100 p-0.5 text-xs font-medium border border-slate-200">
+                <div class="inline-flex rounded-lg bg-slate-100 p-0.5 text-xs font-medium border border-slate-200 flex-wrap">
+                  <button
+                    type="button"
+                    id="btn-view-today"
+                    class="px-3 py-1 rounded-md text-slate-600 hover:text-slate-900 transition flex items-center gap-1.5"
+                    title="View all consultation sessions scheduled for today"
+                  >
+                    <i data-lucide="calendar" class="w-3.5 h-3.5 text-blue-600"></i>
+                    <span>Today</span>
+                    <span
+                      id="badge-today-count"
+                      class="px-1.5 py-0.2 rounded-full text-[10px] bg-blue-100 text-blue-800 font-bold"
+                    >
+                      0
+                    </span>
+                  </button>
+                  <button
+                    type="button"
+                    id="btn-view-confirmed"
+                    class="px-3 py-1 rounded-md text-slate-600 hover:text-slate-900 transition flex items-center gap-1.5"
+                    title="View all confirmed sessions across all dates ready for consultation or completion"
+                  >
+                    <i data-lucide="check-circle-2" class="w-3.5 h-3.5 text-emerald-600"></i>
+                    <span>Confirmed / Action</span>
+                    <span
+                      id="badge-all-confirmed-count"
+                      class="px-1.5 py-0.2 rounded-full text-[10px] bg-emerald-100 text-emerald-800 font-bold"
+                    >
+                      0
+                    </span>
+                  </button>
                   <button
                     type="button"
                     id="btn-view-pending"
                     class="px-3 py-1 rounded-md bg-white text-[#00205B] font-bold shadow-sm transition flex items-center gap-1.5"
+                    title="Review student consultation requests awaiting your confirmation"
                   >
-                    <span>All Pending</span>
+                    <i data-lucide="clock" class="w-3.5 h-3.5 text-amber-500"></i>
+                    <span>Pending</span>
                     <span
                       id="badge-all-pending-count"
                       class="px-1.5 py-0.2 rounded-full text-[10px] bg-amber-100 text-amber-800 font-bold"
@@ -138,14 +170,17 @@
                   <button
                     type="button"
                     id="btn-view-date"
-                    class="px-3 py-1 rounded-md text-slate-600 hover:text-slate-900 transition"
+                    class="px-3 py-1 rounded-md text-slate-600 hover:text-slate-900 transition flex items-center gap-1.5"
+                    title="Filter consultations by specific calendar date"
                   >
-                    Selected Date
+                    <i data-lucide="calendar-range" class="w-3.5 h-3.5"></i>
+                    <span>By Date</span>
                   </button>
                   <button
                     type="button"
                     id="btn-view-cancelled"
                     class="px-3 py-1 rounded-md text-slate-600 hover:text-slate-900 transition flex items-center gap-1.5"
+                    title="View cancelled consultation appointments and student reasons"
                   >
                     <span>Cancelled</span>
                     <span
@@ -155,6 +190,17 @@
                       0
                     </span>
                   </button>
+                </div>
+
+                <!-- Instant Search Across Consultations -->
+                <div class="relative flex items-center">
+                  <i data-lucide="search" class="w-3.5 h-3.5 text-slate-400 absolute left-2.5 pointer-events-none"></i>
+                  <input
+                    type="text"
+                    id="agenda-search-input"
+                    placeholder="Search student or ID..."
+                    class="text-xs border border-slate-200 rounded-md pl-8 pr-2.5 py-1 bg-white font-medium focus:border-[#00205B] focus:outline-none shadow-2xs w-44 transition placeholder:text-slate-400"
+                  />
                 </div>
 
                 <div id="agenda-date-wrapper" class="flex items-center gap-1.5">
@@ -205,14 +251,37 @@
                   <i data-lucide="calendar-check" class="w-3.5 h-3.5 text-blue-600"></i>
                   <span>Today's Sessions (<span id="widget-count-today">0</span>)</span>
                 </button>
+                <button type="button" id="btn-quick-view-confirmed" class="px-3 py-1.5 rounded-xl text-xs font-semibold bg-emerald-700 hover:bg-emerald-800 text-white transition shadow-2xs flex items-center gap-1.5 active:scale-95" title="View all confirmed sessions across all dates awaiting consultation or completion">
+                  <i data-lucide="check-check" class="w-3.5 h-3.5 text-emerald-200"></i>
+                  <span>Confirmed (<span id="widget-count-confirmed">0</span>)</span>
+                </button>
                 <button type="button" id="btn-quick-view-pending" class="px-3 py-1.5 rounded-xl text-xs font-semibold bg-[#00205B] hover:bg-[#0A192F] text-[#F5B800] transition shadow-2xs flex items-center gap-1.5 active:scale-95" title="Review all pending student consultation requests">
                   <i data-lucide="clock" class="w-3.5 h-3.5 text-[#F5B800]"></i>
-                  <span>Pending Requests (<span id="widget-count-pending">0</span>)</span>
+                  <span>Pending (<span id="widget-count-pending">0</span>)</span>
                 </button>
               </div>
             </div>
 
             <div id="agenda-blocked-banner" class="hidden mb-4 p-4 rounded-2xl bg-gradient-to-r from-amber-50/95 via-amber-100/50 to-white border-2 border-amber-200/90 shadow-xs text-xs text-amber-950 transition-all"></div>
+
+            <!-- Confirmed Consultations Action Banner -->
+            <div id="agenda-confirmed-alert" class="hidden mb-4 p-4 rounded-2xl bg-gradient-to-r from-emerald-50/95 via-teal-50/60 to-white border-2 border-emerald-200/80 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-3 transition-all">
+              <div class="flex items-start sm:items-center gap-3">
+                <div class="w-10 h-10 rounded-xl bg-emerald-700 text-white flex items-center justify-center shadow-xs shrink-0">
+                  <i data-lucide="calendar-check" class="w-5 h-5 text-white"></i>
+                </div>
+                <div>
+                  <h4 class="text-xs font-bold text-emerald-950 uppercase tracking-wide">Confirmed Consultations Active</h4>
+                  <p class="text-xs text-slate-700 mt-0.5">
+                    You have <strong id="confirmed-alert-count" class="font-bold text-emerald-800 bg-emerald-100 px-2 py-0.5 rounded-md border border-emerald-200">0</strong> confirmed session(s). Conduct the consultation, print a call slip, or complete sessions directly.
+                  </p>
+                </div>
+              </div>
+              <button type="button" id="btn-jump-confirmed" class="inline-flex items-center gap-1.5 px-3.5 py-2 bg-emerald-700 hover:bg-emerald-800 text-white rounded-xl text-xs font-semibold shadow-sm transition shrink-0 self-end sm:self-auto">
+                <span>View Confirmed Sessions</span>
+                <i data-lucide="arrow-right" class="w-3.5 h-3.5 text-white"></i>
+              </button>
+            </div>
 
             <div id="agenda-pending-alert" class="hidden mb-4 p-4 rounded-2xl bg-gradient-to-r from-blue-50/95 via-indigo-50/60 to-white border-2 border-blue-200/80 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-3 transition-all">
               <div class="flex items-start sm:items-center gap-3">
