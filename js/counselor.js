@@ -77,7 +77,7 @@ document.addEventListener('DOMContentLoaded', () => {
   });
 
   let allAppointments = [];
-  let activeViewFilter = 'selected_date';
+  let activeViewFilter = 'all_pending';
 
   const agendaList = document.getElementById('agenda-list');
   const agendaDatePicker = document.getElementById('agenda-date-picker');
@@ -88,6 +88,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const btnViewPending = document.getElementById('btn-view-pending');
   const btnViewCancelled = document.getElementById('btn-view-cancelled');
   const agendaDateWrapper = document.getElementById('agenda-date-wrapper');
+  const agendaStatusWrapper = document.getElementById('agenda-status-wrapper');
 
   const todayIso = new Date().toISOString().split('T')[0];
   if (agendaDatePicker && !agendaDatePicker.value) {
@@ -144,16 +145,24 @@ document.addEventListener('DOMContentLoaded', () => {
       btnViewDate?.classList.add('bg-white', 'text-[#00205B]', 'font-bold', 'shadow-sm');
       btnViewDate?.classList.remove('text-slate-600');
       agendaDateWrapper?.classList.remove('opacity-50');
+      agendaStatusWrapper?.classList.remove('opacity-50', 'pointer-events-none');
+      if (agendaStatusFilter) agendaStatusFilter.disabled = false;
     } else if (activeViewFilter === 'all_pending') {
       btnViewPending?.classList.add('bg-white', 'text-[#00205B]', 'font-bold', 'shadow-sm');
       btnViewPending?.classList.remove('text-slate-600');
       agendaDateWrapper?.classList.add('opacity-50');
+      agendaStatusWrapper?.classList.add('opacity-50', 'pointer-events-none');
+      if (agendaStatusFilter) agendaStatusFilter.disabled = true;
     } else if (activeViewFilter === 'all_cancelled') {
       btnViewCancelled?.classList.add('bg-white', 'text-[#00205B]', 'font-bold', 'shadow-sm');
       btnViewCancelled?.classList.remove('text-slate-600');
       agendaDateWrapper?.classList.add('opacity-50');
+      agendaStatusWrapper?.classList.add('opacity-50', 'pointer-events-none');
+      if (agendaStatusFilter) agendaStatusFilter.disabled = true;
     }
   }
+
+  updateFilterUI();
 
   subscribeAllAppointments(appointments => {
     allAppointments = appointments;
@@ -245,7 +254,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const agendaPendingAlert = document.getElementById('agenda-pending-alert');
     const pendingAlertCount = document.getElementById('pending-alert-count');
     if (agendaPendingAlert) {
-      if (pendingCount > 0 && activeViewFilter === 'selected_date') {
+      if (pendingCount > 0 && activeViewFilter !== 'all_pending') {
         if (pendingAlertCount) pendingAlertCount.textContent = pendingCount;
         agendaPendingAlert.classList.remove('hidden');
         if (window.lucide) window.lucide.createIcons();
@@ -257,7 +266,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const agendaCancelledAlert = document.getElementById('agenda-cancelled-alert');
     const cancelledAlertCount = document.getElementById('cancelled-alert-count');
     if (agendaCancelledAlert) {
-      if (cancelledCount > 0 && activeViewFilter === 'selected_date') {
+      if (cancelledCount > 0 && activeViewFilter !== 'all_cancelled') {
         if (cancelledAlertCount) cancelledAlertCount.textContent = cancelledCount;
         agendaCancelledAlert.classList.remove('hidden');
         if (window.lucide) window.lucide.createIcons();
@@ -308,16 +317,18 @@ document.addEventListener('DOMContentLoaded', () => {
     const filtered = accessibleAppointments.filter(item => {
       const itemStatus = (item.status || 'pending').toLowerCase();
 
-      // Check view mode (all pending requests vs all cancelled vs selected date)
+      // Check view mode: all pending requests or all cancelled bypass status filter
       if (activeViewFilter === 'all_pending') {
-        if (itemStatus !== 'pending') return false;
-      } else if (activeViewFilter === 'all_cancelled') {
-        if (itemStatus !== 'cancelled') return false;
-      } else {
-        if (item.date !== selectedDate) return false;
+        return itemStatus === 'pending';
+      }
+      if (activeViewFilter === 'all_cancelled') {
+        return itemStatus === 'cancelled';
       }
 
-      // Check status filter:
+      // Selected date mode:
+      if (item.date !== selectedDate) return false;
+
+      // Check status filter (only applies when viewing selected date):
       if (statusFilterVal === 'ACTIVE') {
         return itemStatus === 'pending' || itemStatus === 'confirmed';
       } else if (statusFilterVal === 'ALL') {
@@ -336,6 +347,11 @@ document.addEventListener('DOMContentLoaded', () => {
     filtered.sort((a, b) => {
       if (activeViewFilter === 'all_cancelled') {
         return new Date(b.cancelledAt || b.date) - new Date(a.cancelledAt || a.date);
+      }
+      if (activeViewFilter === 'all_pending') {
+        const dateComp = (a.date || '').localeCompare(b.date || '');
+        if (dateComp !== 0) return dateComp;
+        return normalizeTimeSlot(a.timeSlot || '').localeCompare(normalizeTimeSlot(b.timeSlot || ''));
       }
       const isAPending = (a.status || '').toLowerCase() === 'pending';
       const isBPending = (b.status || '').toLowerCase() === 'pending';
@@ -409,14 +425,13 @@ document.addEventListener('DOMContentLoaded', () => {
                   <span class="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-medium border ${badgeStyles[statusLower] || badgeStyles.pending}">
                     ${escapeHtml(apt.status)}
                   </span>
-                  ${apt.date !== todayIso ? `<span class="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-slate-100 text-slate-600 border border-slate-200">${escapeHtml(apt.date)}</span>` : ''}
+                  ${(activeViewFilter !== 'selected_date' || apt.date !== todayIso) ? `<span class="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-slate-100 text-slate-700 border border-slate-200 font-mono">${escapeHtml(apt.date)}</span>` : ''}
                   ${isConflict ? `<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-rose-100 text-rose-800 border border-rose-300">BLOCKED SLOT CONFLICT</span>` : ''}
                 </div>
                 
                 <div class="text-[11px] text-slate-500 flex flex-wrap items-center gap-x-3 gap-y-0.5">
                   <span class="font-semibold text-[#00205B]">${escapeHtml(apt.concernCategory)}</span>
                   <span>Counselor: <strong class="text-slate-700">${escapeHtml(apt.counselorName || 'Any Available')}</strong></span>
-                  ${isCancelled ? `<span class="inline-flex items-center gap-1 text-[11px] font-semibold text-rose-700 bg-rose-50 px-2 py-0.5 rounded border border-rose-200"><i data-lucide="calendar-x" class="w-3 h-3 text-rose-600"></i> Cancelled</span>` : ''}
                 </div>
               </div>
             </div>

@@ -124,15 +124,8 @@
                 <div class="inline-flex rounded-lg bg-slate-100 p-0.5 text-xs font-medium border border-slate-200">
                   <button
                     type="button"
-                    id="btn-view-date"
-                    class="px-3 py-1 rounded-md bg-white text-[#00205B] font-bold shadow-sm transition"
-                  >
-                    Selected Date
-                  </button>
-                  <button
-                    type="button"
                     id="btn-view-pending"
-                    class="px-3 py-1 rounded-md text-slate-600 hover:text-slate-900 transition flex items-center gap-1.5"
+                    class="px-3 py-1 rounded-md bg-white text-[#00205B] font-bold shadow-sm transition flex items-center gap-1.5"
                   >
                     <span>All Pending</span>
                     <span
@@ -141,6 +134,13 @@
                     >
                       0
                     </span>
+                  </button>
+                  <button
+                    type="button"
+                    id="btn-view-date"
+                    class="px-3 py-1 rounded-md text-slate-600 hover:text-slate-900 transition"
+                  >
+                    Selected Date
                   </button>
                   <button
                     type="button"
@@ -166,7 +166,7 @@
                   />
                 </div>
 
-                <div class="flex items-center gap-1.5">
+                <div id="agenda-status-wrapper" class="flex items-center gap-1.5">
                   <label class="text-xs text-slate-400 font-medium">Status:</label>
                   <select
                     id="agenda-status-filter"
