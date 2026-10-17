@@ -18,7 +18,7 @@ import {
   collectionGroup
 } from './firebase-config.js';
 import { generateUserDocId, getRoleCategory, escapeHtml } from './utils/validation.js';
-import { logAuditEvent } from './db.js';
+import { logAuditEvent, saveUserProfile } from './db.js';
 
 const CURRENT_USER_KEY = 'guidehub_active_user';
 
@@ -727,40 +727,464 @@ export function initNavbar(containerId = 'navbar-container', activePortal = '') 
         <div class="flex items-center space-x-3">
           <a href="${getRolePortalPath(user.role)}" class="flex items-center space-x-3 group">
             <img src="${logoSrc}" alt="National University" class="h-10 w-auto object-contain flex-shrink-0 group-hover:scale-105 transition transform drop-shadow-sm" />
- <div>
- <div class="flex items-center gap-1.5">
- <span class="text-sm font-bold tracking-tight text-white">GuideHub</span>
- <span class="text-[10px] bg-[#F5B800] text-[#00205B] font-extrabold px-1.5 py-0.2 rounded">FAIRVIEW</span>
- </div>
- <span class="text-[10px] text-slate-300 font-medium block">Guidance & Counseling Center</span>
- </div>
- </a>
- </div>
+            <div>
+              <div class="flex items-center gap-1.5">
+                <span class="text-sm font-bold tracking-tight text-white">GuideHub</span>
+                <span class="text-[10px] bg-[#F5B800] text-[#00205B] font-extrabold px-1.5 py-0.2 rounded">FAIRVIEW</span>
+              </div>
+              <span class="text-[10px] text-slate-300 font-medium block">Guidance & Counseling Center</span>
+            </div>
+          </a>
+        </div>
 
- <!-- User Identity & Logout -->
- <div class="flex items-center space-x-3">
- <div class="hidden sm:flex items-center space-x-2.5 px-3.5 py-1.5 bg-white/10 backdrop-blur-sm rounded-xl border border-white/10">
- <div class="text-right">
- <div class="text-xs font-bold text-white leading-tight">${escapeHtml(user.fullName)}</div>
- <div class="text-[10px] text-slate-300 font-mono">${escapeHtml(user.studentOrEmpId || user.email)}</div>
- </div>
- <div class="ml-1">${getRoleBadge(user.role)}</div>
- </div>
+        <!-- User Identity, Profile & Logout -->
+        <div class="flex items-center space-x-2 sm:space-x-3">
+          <button id="nav-profile-pill-btn" type="button" class="flex items-center space-x-2.5 px-3 py-1.5 bg-white/10 hover:bg-white/20 backdrop-blur-sm rounded-xl border border-white/10 transition cursor-pointer text-left group" title="Click to view & edit Profile Dashboard">
+            <div class="hidden sm:block text-right">
+              <div id="nav-user-fullname" class="text-xs font-bold text-white leading-tight group-hover:text-amber-300 transition">${escapeHtml(user.fullName)}</div>
+              <div class="text-[10px] text-slate-300 font-mono">${escapeHtml(user.studentOrEmpId || user.email)}</div>
+            </div>
+            <div>${getRoleBadge(user.role)}</div>
+            <div class="w-6 h-6 rounded-lg bg-white/10 flex items-center justify-center text-[#F5B800] group-hover:bg-[#F5B800] group-hover:text-[#00205B] transition">
+              <i data-lucide="user-cog" class="w-3.5 h-3.5"></i>
+            </div>
+          </button>
 
- <button id="nav-logout-btn" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold text-[#00205B] bg-[#F5B800] hover:bg-[#D99B00] shadow-sm transition">
- <i data-lucide="log-out" class="w-3.5 h-3.5"></i>
- <span class="hidden sm:inline">Sign Out</span>
- </button>
- </div>
+          <button id="nav-logout-btn" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold text-[#00205B] bg-[#F5B800] hover:bg-[#D99B00] shadow-sm transition">
+            <i data-lucide="log-out" class="w-3.5 h-3.5"></i>
+            <span class="hidden sm:inline">Sign Out</span>
+          </button>
+        </div>
 
- </div>
- </div>
- </nav>
- `;
+      </div>
+    </div>
+  </nav>
+  `;
 
   document.getElementById('nav-logout-btn')?.addEventListener('click', () => {
     logoutUser();
   });
 
+  document.getElementById('nav-profile-pill-btn')?.addEventListener('click', () => {
+    openProfileModal();
+  });
+
+  // Attach any page buttons with data-action="open-profile" or specific profile IDs
+  setTimeout(() => {
+    document.querySelectorAll('[data-action="open-profile"], #btn-open-student-profile, #btn-open-counselor-profile, #btn-open-faculty-profile, #btn-open-head-profile, #btn-open-admin-profile').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        e.preventDefault();
+        openProfileModal();
+      });
+    });
+  }, 50);
+
+  initProfileModal();
+
   if (window.lucide) window.lucide.createIcons();
+}
+
+export function initProfileModal() {
+  if (typeof document === 'undefined') return;
+  if (document.getElementById('guidehub-profile-modal')) return;
+
+  const modal = document.createElement('div');
+  modal.id = 'guidehub-profile-modal';
+  modal.className = 'hidden fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs transition-opacity duration-200';
+  modal.innerHTML = `
+    <div class="relative bg-white rounded-2xl shadow-2xl border border-slate-200 w-full max-w-lg max-h-[92vh] flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+      
+      <!-- Modal Header -->
+      <div class="px-6 py-4 bg-[#00205B] text-white flex items-center justify-between border-b border-white/10 shrink-0">
+        <div class="flex items-center gap-3">
+          <div class="w-9 h-9 rounded-xl bg-white/10 flex items-center justify-center text-[#F5B800] border border-white/10">
+            <i data-lucide="user-cog" class="w-5 h-5"></i>
+          </div>
+          <div>
+            <h3 class="text-sm font-bold text-white tracking-tight">Institutional Profile Dashboard</h3>
+            <p class="text-[11px] text-slate-300">National University Fairview Identity Management</p>
+          </div>
+        </div>
+        <button id="close-profile-modal-btn" type="button" class="text-slate-300 hover:text-white hover:bg-white/10 p-1.5 rounded-lg transition" title="Close Profile Modal">
+          <i data-lucide="x" class="w-4 h-4"></i>
+        </button>
+      </div>
+
+      <!-- Modal Body (Scrollable) -->
+      <div class="p-6 space-y-4 overflow-y-auto flex-1">
+        
+        <!-- User Identity Ribbon -->
+        <div class="p-3.5 bg-slate-50 border border-slate-200 rounded-xl flex items-center justify-between gap-3">
+          <div class="flex items-center gap-3">
+            <div id="profile-modal-avatar" class="w-10 h-10 rounded-full bg-[#00205B] text-[#F5B800] font-bold text-sm flex items-center justify-center uppercase shadow-xs">
+              NU
+            </div>
+            <div>
+              <div id="profile-modal-display-name" class="text-xs font-bold text-slate-900">User Profile</div>
+              <div id="profile-modal-display-role" class="text-[10px] text-slate-500 font-medium">Verified Account</div>
+            </div>
+          </div>
+          <div id="profile-modal-role-badge"></div>
+        </div>
+
+        <!-- Strict Immutability & RA 9258 Advisory Notice -->
+        <div class="p-3.5 rounded-xl bg-amber-50/90 border border-amber-200 text-amber-950 text-xs">
+          <div class="flex items-start gap-2.5">
+            <i data-lucide="shield-alert" class="w-4 h-4 text-amber-600 shrink-0 mt-0.5"></i>
+            <div class="space-y-1">
+              <span class="font-bold text-amber-900 block">Permanent Identity Credentials Notice:</span>
+              <p class="text-[11px] text-amber-800 leading-relaxed">
+                To uphold university audit integrity, student identity verification, and clinical confidentiality (RA 9258), your <strong>ID Number</strong> and <strong>Official Institutional Email</strong> are strictly locked and cannot be edited. Other profile details can be updated below.
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <!-- Form Inputs -->
+        <form id="profile-edit-form" class="space-y-3.5 text-xs">
+          
+          <!-- Locked ID Number -->
+          <div>
+            <div class="flex items-center justify-between mb-1">
+              <label class="font-bold text-slate-700" id="profile-label-id">Student / Employee ID Number</label>
+              <span class="inline-flex items-center gap-1 text-[10px] font-semibold text-slate-500 bg-slate-100 border border-slate-200 px-2 py-0.5 rounded-md">
+                <i data-lucide="lock" class="w-3 h-3 text-slate-400"></i> Locked / Permanent Record
+              </span>
+            </div>
+            <input type="text" id="profile-input-id" disabled readonly
+              class="w-full px-3.5 py-2.5 text-xs bg-slate-100 border border-slate-200 text-slate-500 rounded-xl cursor-not-allowed select-none font-mono font-medium focus:outline-none" />
+          </div>
+
+          <!-- Locked Institutional Email -->
+          <div>
+            <div class="flex items-center justify-between mb-1">
+              <label class="font-bold text-slate-700">Official Institutional Email</label>
+              <span class="inline-flex items-center gap-1 text-[10px] font-semibold text-slate-500 bg-slate-100 border border-slate-200 px-2 py-0.5 rounded-md">
+                <i data-lucide="lock" class="w-3 h-3 text-slate-400"></i> Locked / University Registered
+              </span>
+            </div>
+            <input type="text" id="profile-input-email" disabled readonly
+              class="w-full px-3.5 py-2.5 text-xs bg-slate-100 border border-slate-200 text-slate-500 rounded-xl cursor-not-allowed select-none font-mono font-medium focus:outline-none" />
+          </div>
+
+          <!-- Editable Full Legal Name -->
+          <div>
+            <label class="block font-bold text-slate-700 mb-1">
+              Full Legal Name <span class="text-rose-500">*</span>
+            </label>
+            <input type="text" id="profile-input-fullname" required placeholder="e.g. Maria Clara Santos"
+              class="w-full px-3.5 py-2.5 text-xs border border-slate-300 rounded-xl focus:border-[#00205B] focus:ring-1 focus:ring-[#00205B] focus:outline-none" />
+          </div>
+
+          <!-- Editable Gender Identity -->
+          <div>
+            <label class="block font-bold text-slate-700 mb-1">Gender Identity</label>
+            <select id="profile-input-gender"
+              class="w-full px-3.5 py-2.5 text-xs border border-slate-300 rounded-xl focus:border-[#00205B] focus:outline-none bg-white font-medium text-slate-700">
+              <option value="Female">Female</option>
+              <option value="Male">Male</option>
+              <option value="Prefer not to say">Prefer not to say</option>
+            </select>
+          </div>
+
+          <!-- Dynamic Academic Program / Department -->
+          <div id="profile-program-container">
+            <label class="block font-bold text-slate-700 mb-1" id="profile-label-program">
+              Academic Strand / Degree Program
+            </label>
+            <select id="profile-input-program"
+              class="w-full px-3.5 py-2.5 text-xs border border-slate-300 rounded-xl focus:border-[#00205B] focus:outline-none bg-white font-medium text-slate-700">
+            </select>
+          </div>
+
+          <!-- Year / Grade Level (Student only) -->
+          <div id="profile-year-container">
+            <label class="block font-bold text-slate-700 mb-1">Year / Grade Level</label>
+            <select id="profile-input-year"
+              class="w-full px-3.5 py-2.5 text-xs border border-slate-300 rounded-xl focus:border-[#00205B] focus:outline-none bg-white font-medium text-slate-700">
+              <option value="Grade 11">Grade 11 (SHS)</option>
+              <option value="Grade 12">Grade 12 (SHS)</option>
+              <option value="1st Year">1st Year (College)</option>
+              <option value="2nd Year">2nd Year (College)</option>
+              <option value="3rd Year">3rd Year (College)</option>
+              <option value="4th Year">4th Year (College)</option>
+            </select>
+          </div>
+
+          <!-- Contact Phone (Student only) -->
+          <div id="profile-contact-container">
+            <div class="flex items-center justify-between mb-1">
+              <label class="font-bold text-slate-700">Contact Phone Number <span class="text-rose-500">*</span></label>
+              <span class="text-[10px] text-slate-400">e.g. 0917-123-4567</span>
+            </div>
+            <input type="text" id="profile-input-contact" inputmode="tel" placeholder="0917-123-4567"
+              class="w-full px-3.5 py-2.5 text-xs border border-slate-300 rounded-xl focus:border-[#00205B] focus:ring-1 focus:ring-[#00205B] focus:outline-none" />
+            <p class="text-[10px] text-slate-500 mt-1">Counselors utilize this for urgent consultation notices and triage updates.</p>
+          </div>
+
+          <!-- Staff Phone Exemption Notice (Staff only) -->
+          <div id="profile-staff-exemption-note" class="hidden p-3 rounded-xl bg-slate-50 border border-slate-200 text-slate-600 text-[11px] flex items-center gap-2">
+            <i data-lucide="info" class="w-4 h-4 text-slate-400 shrink-0"></i>
+            <span>Staff / Counselor Exemption: Contact numbers are not required for guidance counselors or faculty. Institutional communication is routed via official university email.</span>
+          </div>
+
+        </form>
+
+      </div>
+
+      <!-- Modal Actions Footer -->
+      <div class="px-6 py-3.5 bg-slate-50 border-t border-slate-200 flex items-center justify-end gap-2.5 shrink-0">
+        <button type="button" id="btn-cancel-profile-modal"
+          class="px-4 py-2 rounded-xl text-xs font-semibold text-slate-700 hover:bg-slate-200 bg-slate-100 transition">
+          Cancel
+        </button>
+        <button type="button" id="btn-save-profile-modal"
+          class="inline-flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-semibold text-[#00205B] bg-[#F5B800] hover:bg-[#D99B00] shadow-sm transition">
+          <i data-lucide="check" class="w-3.5 h-3.5"></i>
+          <span>Save Profile Changes</span>
+        </button>
+      </div>
+
+    </div>
+  `;
+
+  document.body.appendChild(modal);
+
+  // Close triggers
+  document.getElementById('close-profile-modal-btn')?.addEventListener('click', closeProfileModal);
+  document.getElementById('btn-cancel-profile-modal')?.addEventListener('click', closeProfileModal);
+  modal.addEventListener('click', e => {
+    if (e.target === modal) closeProfileModal();
+  });
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Escape' && !modal.classList.contains('hidden')) {
+      closeProfileModal();
+    }
+  });
+
+  // Save handler
+  document.getElementById('btn-save-profile-modal')?.addEventListener('click', handleSaveProfile);
+}
+
+export function openProfileModal() {
+  const user = getCurrentUser();
+  if (!user) return;
+
+  initProfileModal();
+
+  const modal = document.getElementById('guidehub-profile-modal');
+  if (!modal) return;
+
+  const isStudent = user.role === 'student';
+
+  // Avatar & Basic Info
+  const avatar = document.getElementById('profile-modal-avatar');
+  if (avatar) {
+    const initials = (user.fullName || 'NU')
+      .split(' ')
+      .filter(Boolean)
+      .map(n => n[0])
+      .join('')
+      .slice(0, 2)
+      .toUpperCase();
+    avatar.textContent = initials || 'NU';
+  }
+
+  const dispName = document.getElementById('profile-modal-display-name');
+  if (dispName) dispName.textContent = user.fullName || 'User Profile';
+
+  const dispRole = document.getElementById('profile-modal-display-role');
+  if (dispRole) {
+    dispRole.textContent = `${(user.role || 'user').toUpperCase()} • ${user.studentOrEmpId || user.email}`;
+  }
+
+  const badgeContainer = document.getElementById('profile-modal-role-badge');
+  if (badgeContainer) badgeContainer.innerHTML = getRoleBadge(user.role);
+
+  // Locked Fields
+  const inputId = document.getElementById('profile-input-id');
+  if (inputId) inputId.value = user.studentOrEmpId || 'N/A';
+
+  const labelId = document.getElementById('profile-label-id');
+  if (labelId) labelId.textContent = isStudent ? 'Student ID Number' : 'Employee / Faculty ID';
+
+  const inputEmail = document.getElementById('profile-input-email');
+  if (inputEmail) inputEmail.value = user.email || '';
+
+  // Editable Fields
+  const inputName = document.getElementById('profile-input-fullname');
+  if (inputName) inputName.value = user.fullName || '';
+
+  const inputGender = document.getElementById('profile-input-gender');
+  if (inputGender) inputGender.value = user.gender || 'Prefer not to say';
+
+  // Dynamic Program/Department
+  const programSelect = document.getElementById('profile-input-program');
+  const programLabel = document.getElementById('profile-label-program');
+  const yearContainer = document.getElementById('profile-year-container');
+  const contactContainer = document.getElementById('profile-contact-container');
+  const staffExemptionNote = document.getElementById('profile-staff-exemption-note');
+
+  if (isStudent) {
+    if (programLabel) programLabel.textContent = 'Academic Strand or Degree Program';
+    if (programSelect) {
+      programSelect.innerHTML = `
+        <optgroup label="Senior High School (SHS Strands)">
+          <option value="SHS - STEM (Science, Technology, Engineering & Math)">SHS - STEM (Science, Technology, Engineering & Math)</option>
+          <option value="SHS - ABM (Accountancy, Business & Management)">SHS - ABM (Accountancy, Business & Management)</option>
+          <option value="SHS - HUMSS (Humanities & Social Sciences)">SHS - HUMSS (Humanities & Social Sciences)</option>
+          <option value="SHS - GAS (General Academic Strand)">SHS - GAS (General Academic Strand)</option>
+          <option value="SHS - TVL (Technical-Vocational-Livelihood)">SHS - TVL (Technical-Vocational-Livelihood)</option>
+        </optgroup>
+        <optgroup label="Higher Education Degree Programs">
+          <option value="BS Accountancy">BS Accountancy</option>
+          <option value="BSBA Major in Financial Management">BSBA Major in Financial Management</option>
+          <option value="BSBA Major in Marketing Management">BSBA Major in Marketing Management</option>
+          <option value="BS Hospitality Management">BS Hospitality Management</option>
+          <option value="BS Tourism Management">BS Tourism Management</option>
+          <option value="BS Architecture">BS Architecture</option>
+          <option value="BS Civil Engineering">BS Civil Engineering</option>
+          <option value="BS Computer Engineering">BS Computer Engineering</option>
+          <option value="BS Information Technology">BS Information Technology</option>
+          <option value="BS Psychology">BS Psychology</option>
+          <option value="AB Communication">AB Communication</option>
+        </optgroup>
+      `;
+      if (user.program) programSelect.value = user.program;
+    }
+
+    if (yearContainer) yearContainer.classList.remove('hidden');
+    const inputYear = document.getElementById('profile-input-year');
+    if (inputYear && user.yearLevel) inputYear.value = user.yearLevel;
+
+    if (contactContainer) contactContainer.classList.remove('hidden');
+    const inputContact = document.getElementById('profile-input-contact');
+    if (inputContact) inputContact.value = user.contactNumber || '';
+
+    if (staffExemptionNote) staffExemptionNote.classList.add('hidden');
+  } else {
+    // Counselor / Faculty / Head / Admin
+    if (programLabel) programLabel.textContent = 'University Department / College';
+    if (programSelect) {
+      programSelect.innerHTML = `
+        <option value="Guidance and Counseling Center">Guidance and Counseling Center</option>
+        <option value="Senior High School Department (SHS)">Senior High School Department (SHS)</option>
+        <option value="College of Computing and Information Technology">College of Computing and Information Technology</option>
+        <option value="College of Engineering and Architecture">College of Engineering and Architecture</option>
+        <option value="College of Business and Accountancy">College of Business and Accountancy</option>
+        <option value="College of Arts and Sciences">College of Arts and Sciences</option>
+        <option value="General Education Department">General Education Department</option>
+        <option value="Administration & Student Affairs">Administration & Student Affairs</option>
+      `;
+      if (user.department || user.program) {
+        programSelect.value = user.department || user.program;
+      }
+    }
+
+    if (yearContainer) yearContainer.classList.add('hidden');
+    if (contactContainer) contactContainer.classList.add('hidden');
+    if (staffExemptionNote) staffExemptionNote.classList.remove('hidden');
+  }
+
+  modal.classList.remove('hidden');
+  if (window.lucide) window.lucide.createIcons();
+  inputName?.focus();
+}
+
+export function closeProfileModal() {
+  const modal = document.getElementById('guidehub-profile-modal');
+  if (modal) modal.classList.add('hidden');
+}
+
+async function handleSaveProfile() {
+  const user = getCurrentUser();
+  if (!user) return;
+
+  const saveBtn = document.getElementById('btn-save-profile-modal');
+  const newName = (document.getElementById('profile-input-fullname')?.value || '').trim();
+  const newGender = document.getElementById('profile-input-gender')?.value || 'Prefer not to say';
+  const newProgram = document.getElementById('profile-input-program')?.value || 'General';
+  const newYear = document.getElementById('profile-input-year')?.value || '';
+  const newContact = (document.getElementById('profile-input-contact')?.value || '').trim();
+
+  if (!newName || newName.length < 3) {
+    showToast('Please enter your official full name (minimum 3 characters).', 'warning');
+    return;
+  }
+
+  const isStudent = user.role === 'student';
+  if (isStudent && !newContact) {
+    showToast('Please enter a contact phone number.', 'warning');
+    return;
+  }
+
+  try {
+    if (saveBtn) {
+      saveBtn.disabled = true;
+      saveBtn.innerHTML = `<span>Saving Changes...</span>`;
+    }
+
+    const updatedProfile = {
+      ...user,
+      fullName: newName,
+      gender: newGender,
+      program: newProgram,
+      department: isStudent ? (user.department || '') : newProgram,
+      yearLevel: isStudent ? newYear : (user.yearLevel || ''),
+      contactNumber: isStudent ? newContact : (user.contactNumber || ''),
+      // STRICT IMMUTABILITY: ID Number, Email, Role, UID cannot be changed
+      studentOrEmpId: user.studentOrEmpId,
+      email: user.email,
+      role: user.role,
+      uid: user.uid
+    };
+
+    // Save to Firestore and LocalState
+    await saveUserProfile(user.uid, updatedProfile);
+
+    // Update active user in session / localStorage
+    setCurrentUser(updatedProfile, true);
+
+    // Update Navbar DOM elements
+    const navNameEl = document.getElementById('nav-user-fullname');
+    if (navNameEl) navNameEl.textContent = updatedProfile.fullName;
+
+    // Update Welcome Text on active portal if present
+    const studentWelcome = document.getElementById('student-welcome-text');
+    if (studentWelcome) {
+      studentWelcome.textContent = `${updatedProfile.fullName} (${updatedProfile.studentOrEmpId || 'Student'}) • ${updatedProfile.program || 'Student Workspace'}`;
+    }
+    const counselorWelcome = document.getElementById('counselor-welcome-text');
+    if (counselorWelcome) {
+      counselorWelcome.textContent = `${updatedProfile.fullName} (${updatedProfile.studentOrEmpId || 'Counselor'}) • Clinical Workspace`;
+    }
+    const facultyWelcome = document.getElementById('faculty-welcome-text');
+    if (facultyWelcome) {
+      facultyWelcome.textContent = `${updatedProfile.fullName} (${updatedProfile.studentOrEmpId || 'Faculty'}) • Department of ${updatedProfile.department || updatedProfile.program || 'Faculty'}`;
+    }
+
+    // Audit log
+    await logAuditEvent(
+      user.uid,
+      updatedProfile.fullName,
+      user.role,
+      'USER_PROFILE_UPDATED',
+      `Updated institutional profile details (${updatedProfile.email}, ID: ${updatedProfile.studentOrEmpId})`
+    ).catch(() => {});
+
+    // Dispatch global event for active portal listeners
+    window.dispatchEvent(new CustomEvent('guidehub_profile_updated', { detail: { user: updatedProfile } }));
+
+    showToast('Profile updated successfully!', 'success');
+    closeProfileModal();
+  } catch (err) {
+    console.error('Failed to update profile:', err);
+    showToast(err.message || 'Failed to update profile.', 'error');
+  } finally {
+    if (saveBtn) {
+      saveBtn.disabled = false;
+      saveBtn.innerHTML = `<i data-lucide="check" class="w-3.5 h-3.5"></i><span>Save Profile Changes</span>`;
+      if (window.lucide) window.lucide.createIcons();
+    }
+  }
 }

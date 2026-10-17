@@ -33,13 +33,23 @@
           </p>
         </div>
 
-        <button
-          id="btn-open-referral-modal"
-          class="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-md bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold shadow-sm transition"
-        >
-          <i data-lucide="user-plus" class="w-3.5 h-3.5"></i>
-          <span>Submit Referral</span>
-        </button>
+        <div class="flex flex-wrap items-center gap-2.5">
+          <button
+            id="btn-open-faculty-profile"
+            data-action="open-profile"
+            class="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-md bg-white hover:bg-slate-50 text-slate-800 text-xs font-semibold border border-slate-200 shadow-sm transition"
+          >
+            <i data-lucide="user-cog" class="w-3.5 h-3.5 text-[#00205B]"></i>
+            <span>My Profile</span>
+          </button>
+          <button
+            id="btn-open-referral-modal"
+            class="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-md bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold shadow-sm transition"
+          >
+            <i data-lucide="user-plus" class="w-3.5 h-3.5"></i>
+            <span>Submit Referral</span>
+          </button>
+        </div>
       </div>
 
       <div class="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">

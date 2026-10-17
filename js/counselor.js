@@ -32,6 +32,13 @@ document.addEventListener('DOMContentLoaded', () => {
     welcomeText.textContent = `${currentUser.fullName} (${currentUser.studentOrEmpId || 'Counselor'}) • Clinical Workspace`;
   }
 
+  window.addEventListener('guidehub_profile_updated', e => {
+    const updated = e.detail?.user;
+    if (updated && welcomeText) {
+      welcomeText.textContent = `${updated.fullName} (${updated.studentOrEmpId || 'Counselor'}) • Clinical Workspace`;
+    }
+  });
+
   const tabButtons = document.querySelectorAll('.tab-btn');
   const tabContents = {
     agenda: document.getElementById('tab-content-agenda'),

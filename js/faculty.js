@@ -13,6 +13,13 @@ document.addEventListener('DOMContentLoaded', () => {
     welcomeText.textContent = `${currentUser.fullName} (${currentUser.studentOrEmpId || 'Faculty'}) • ${currentUser.program || 'Faculty Portal'}`;
   }
 
+  window.addEventListener('guidehub_profile_updated', e => {
+    const updated = e.detail?.user;
+    if (updated && welcomeText) {
+      welcomeText.textContent = `${updated.fullName} (${updated.studentOrEmpId || 'Faculty'}) • ${updated.program || 'Faculty Portal'}`;
+    }
+  });
+
   let cachedReferrals = [];
   const referralsTableBody = document.getElementById('referrals-table-body');
   const referralStatusFilter = document.getElementById('referral-status-filter');

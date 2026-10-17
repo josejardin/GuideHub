@@ -81,18 +81,27 @@ export async function getUserProfile(uid) {
   return state.users[uid] || null;
 }
 
-export async function saveUserProfile(uid, data) {
-  const category = getRoleCategory(data.role || 'student');
+export async function saveUserProfile(uid, data = {}) {
+  const state = getLocalState();
+  const existing = state.users[uid] || {};
+  const category = getRoleCategory(data.role || existing.role || 'student');
+
   const profileData = {
+    ...existing,
+    ...data,
     uid,
-    email: data.email || '',
-    fullName: data.fullName || 'User',
-    role: data.role || 'student',
-    studentOrEmpId: data.studentOrEmpId || '',
-    program: data.program || 'General',
-    gender: data.gender || 'Not Specified',
-    contactNumber: data.contactNumber || '',
-    createdAt: data.createdAt || new Date().toISOString()
+    // Strictly preserve permanent credentials
+    email: existing.email || data.email || '',
+    studentOrEmpId: existing.studentOrEmpId || data.studentOrEmpId || '',
+    role: existing.role || data.role || 'student',
+    fullName: (data.fullName || existing.fullName || 'User').trim(),
+    program: data.program || existing.program || 'General',
+    yearLevel: data.yearLevel !== undefined ? data.yearLevel : (existing.yearLevel || ''),
+    department: data.department !== undefined ? data.department : (existing.department || ''),
+    subjectArea: data.subjectArea !== undefined ? data.subjectArea : (existing.subjectArea || ''),
+    gender: data.gender || existing.gender || 'Prefer not to say',
+    contactNumber: data.contactNumber !== undefined ? data.contactNumber : (existing.contactNumber || ''),
+    updatedAt: new Date().toISOString()
   };
 
   try {
@@ -104,8 +113,7 @@ export async function saveUserProfile(uid, data) {
     console.warn('Firestore saveUserProfile fallback:', err.message);
   }
 
-  const state = getLocalState();
-  state.users[uid] = { ...(state.users[uid] || {}), ...profileData };
+  state.users[uid] = profileData;
   saveLocalState(state);
   return profileData;
 }

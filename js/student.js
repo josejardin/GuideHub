@@ -27,6 +27,13 @@ document.addEventListener('DOMContentLoaded', () => {
     welcomeText.textContent = `${currentUser.fullName} (${currentUser.studentOrEmpId || 'Student'}) • ${currentUser.program || 'Student Workspace'}`;
   }
 
+  window.addEventListener('guidehub_profile_updated', e => {
+    const updated = e.detail?.user;
+    if (updated && welcomeText) {
+      welcomeText.textContent = `${updated.fullName} (${updated.studentOrEmpId || 'Student'}) • ${updated.program || 'Student Workspace'}`;
+    }
+  });
+
   const counselorSelect = document.getElementById('counselorSelect');
 
   document.querySelectorAll('input[name="counselor_pref"]').forEach(radio => {
