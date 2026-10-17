@@ -618,30 +618,30 @@ document.addEventListener('DOMContentLoaded', () => {
 
         // Automated Email Notification when Counselor Confirms Booking
         if (status === 'Confirmed') {
-          const targetStudentEmail = targetApt?.studentEmail || '';
-          if (targetStudentEmail) {
-            fetch('/api/send-appointment-confirmation', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                studentEmail: targetStudentEmail,
-                studentName: targetApt?.studentName || 'Student',
-                studentNumber: targetApt?.studentNumber || '',
-                counselorName: currentUser.fullName || 'Guidance Counselor',
-                date: targetApt?.date || '',
-                timeSlot: targetApt?.timeSlot || '',
-                concernCategory: targetApt?.concernCategory || '',
-                appointmentId: id
-              })
+          const targetStudentEmail = targetApt?.studentEmail || targetApt?.email || '';
+          fetch('/api/send-appointment-confirmation', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              studentEmail: targetStudentEmail,
+              studentName: targetApt?.studentName || 'Student',
+              studentNumber: targetApt?.studentNumber || '',
+              counselorName: currentUser.fullName || 'Guidance Counselor',
+              date: targetApt?.date || '',
+              timeSlot: targetApt?.timeSlot || '',
+              concernCategory: targetApt?.concernCategory || '',
+              appointmentId: id
             })
-              .then(res => res.json())
-              .then(data => {
-                if (data.success) {
-                  showToast(`Confirmation email dispatched to ${targetStudentEmail}.`, 'success', 'Email Delivered');
-                }
-              })
-              .catch(err => console.warn('Confirmation email dispatch notice:', err));
-          }
+          })
+            .then(res => res.json())
+            .then(data => {
+              if (data.success && data.recipient) {
+                showToast(`Confirmation email dispatched to ${data.recipient}.`, 'success', 'Email Delivered');
+              } else if (!data.success) {
+                console.warn('Confirmation email dispatch warning:', data.error);
+              }
+            })
+            .catch(err => console.warn('Confirmation email dispatch notice:', err));
         }
 
         await logAuditEvent(
@@ -654,7 +654,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         showToast(
           status === 'Confirmed'
-            ? `Appointment confirmed! ${targetApt?.studentEmail ? 'A confirmation email with session details was sent to the student.' : ''}`
+            ? 'Appointment confirmed! Official confirmation email is being delivered to the student.'
             : `Appointment status updated to ${status}.`,
           'success',
           status === 'Confirmed' ? 'Confirmed & Scheduled' : 'Status Updated'

@@ -10,6 +10,7 @@ import {
   isFirebaseAdminInitialized,
   findAccountByEmail,
   findAccountById,
+  findAccountByFullName,
   verifyServerOtp,
   escapeHtml
 } from './db.js';
@@ -575,11 +576,40 @@ app.post('/api/send-appointment-confirmation', async (req, res) => {
       location = 'Guidance & Counseling Center (2nd Floor, Main Building)'
     } = req.body || {};
 
-    if (!studentEmail) {
-      return res.status(400).json({ success: false, error: 'Student email is required.' });
+    let targetEmail = (studentEmail || '').trim().toLowerCase();
+
+    // Auto-resolve student email by ID number or Full Name if omitted or missing
+    if (!targetEmail && studentNumber) {
+      try {
+        const acct = await findAccountById(studentNumber);
+        if (acct && acct.email) {
+          targetEmail = acct.email.trim().toLowerCase();
+        }
+      } catch (err) {
+        console.warn('[WARNING] ID-based email lookup notice:', err.message);
+      }
     }
 
-    const cleanEmail = studentEmail.trim().toLowerCase();
+    if (!targetEmail && studentName) {
+      try {
+        const acct = await findAccountByFullName(studentName);
+        if (acct && acct.email) {
+          targetEmail = acct.email.trim().toLowerCase();
+        }
+      } catch (err) {
+        console.warn('[WARNING] Name-based email lookup notice:', err.message);
+      }
+    }
+
+    if (!targetEmail) {
+      console.warn(`[WARNING] No email address could be resolved for student: "${studentName}" (${studentNumber})`);
+      return res.status(400).json({
+        success: false,
+        error: 'Unable to resolve registered student institutional email. Please verify student account credentials.'
+      });
+    }
+
+    const cleanEmail = targetEmail;
     const safeStudentName = escapeHtml(studentName || 'Nationalian');
     const safeCounselorName = escapeHtml(counselorName || 'Guidance Counselor');
     const safeDate = escapeHtml(date || 'Scheduled Date');
@@ -728,23 +758,23 @@ app.post('/api/send-appointment-confirmation', async (req, res) => {
         </body>
         </html>
       `,
-      attachments: [{ filename: 'nu-logo.png', path: logoPath, cid: 'nulogo' }]
+      attachments: [{ filename: 'nu-logo.png', path: logoPath, cid: 'nulogo' }],
+      headers: {
+        'X-Priority': '1',
+        'X-MSMail-Priority': 'High',
+        Importance: 'high'
+      }
     };
 
-    transporter.sendMail(mailOptions, (mailErr, info) => {
-      if (mailErr) {
-        console.warn(`[CONFIRMATION EMAIL NOTICE] Email dispatch to ${cleanEmail} logged note:`, mailErr.message);
-      } else {
-        console.log(`[CONFIRMATION EMAIL SENT] Appointment confirmation successfully delivered to ${cleanEmail} (${info.messageId})`);
-      }
-    });
-
+    const info = await transporter.sendMail(mailOptions);
+    console.log(` [LIVE CONFIRMATION DISPATCHED] Destination: ${cleanEmail} | MsgID: ${info.messageId}`);
     return res.status(200).json({
       success: true,
-      message: `Confirmation email dispatched to ${cleanEmail}`
+      messageId: info.messageId,
+      recipient: cleanEmail
     });
   } catch (err) {
-    console.error('Error in send-appointment-confirmation:', err);
+    console.error(' [CONFIRMATION EMAIL ERROR]:', err.message);
     return res.status(500).json({ success: false, error: err.message || 'Server error sending email.' });
   }
 });

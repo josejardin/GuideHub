@@ -319,55 +319,61 @@ document.addEventListener('DOMContentLoaded', () => {
             </div>
 
             <!-- Actions -->
-            <div class="flex items-center gap-2 self-end sm:self-center flex-wrap">
-              ${
-                isConfirmed
-                  ? `
-                <a
-                  href="${generateGoogleCalendarUrl(apt)}"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-blue-50 hover:bg-blue-100 text-[#00205B] border border-blue-200 transition shadow-2xs"
-                  title="Add to Google Calendar with automatic reminder"
-                >
-                  <i data-lucide="calendar-plus" class="w-3.5 h-3.5 text-blue-600"></i>
-                  <span>Add to Calendar</span>
-                </a>
-                `
-                  : ''
-              }
-              ${
-                isPending
-                  ? `
-                <button data-cancel-id="${escapeHtml(apt.id)}" class="btn-cancel-apt px-3 py-1.5 rounded-lg text-xs font-semibold text-rose-700 hover:bg-rose-50 border border-rose-200 transition shadow-sm" title="Cancel this pending request">
-                  Cancel Request
-                </button>
-                `
-                  : ''
-              }
-              ${
-                canCancelConfirmed
-                  ? `
-                <div class="flex flex-col items-end gap-1">
+            <div class="flex flex-col items-end gap-1.5 self-end sm:self-center shrink-0">
+              <div class="flex items-center gap-2">
+                ${
+                  isConfirmed
+                    ? `
+                  <a
+                    href="${generateGoogleCalendarUrl(apt)}"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-blue-50 hover:bg-blue-100 text-[#00205B] border border-blue-200 transition shadow-2xs"
+                    title="Add to Google Calendar with automatic reminder"
+                  >
+                    <i data-lucide="calendar-plus" class="w-3.5 h-3.5 text-blue-600"></i>
+                    <span>Add to Calendar</span>
+                  </a>
+                  `
+                    : ''
+                }
+                ${
+                  isPending
+                    ? `
+                  <button data-cancel-id="${escapeHtml(apt.id)}" class="btn-cancel-apt px-3 py-1.5 rounded-lg text-xs font-semibold text-rose-700 hover:bg-rose-50 border border-rose-200 transition shadow-sm" title="Cancel this pending request">
+                    Cancel Request
+                  </button>
+                  `
+                    : ''
+                }
+                ${
+                  canCancelConfirmed
+                    ? `
                   <button data-cancel-id="${escapeHtml(apt.id)}" class="btn-cancel-apt px-3 py-1.5 rounded-lg text-xs font-semibold text-rose-700 hover:bg-rose-50 border border-rose-200 transition shadow-sm" title="Cancel this confirmed appointment (Requires reason)">
                     Cancel Appointment
                   </button>
-                  <span class="text-[10px] text-slate-400">Can cancel until 24h prior</span>
-                </div>
-                `
+                  `
+                    : ''
+                }
+                ${
+                  isLockedConfirmed
+                    ? `
+                  <div class="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-amber-50 border border-amber-200 text-amber-800 text-[11px] font-medium" title="Cancellations are locked within 24 hours of the session.">
+                    <i data-lucide="lock" class="w-3.5 h-3.5 text-amber-600 shrink-0"></i>
+                    <span>Locked (Within 24h)</span>
+                  </div>
+                  `
+                    : ''
+                }
+              </div>
+              ${
+                canCancelConfirmed
+                  ? `<span class="text-[10px] text-slate-400">Can cancel until 24h prior</span>`
                   : ''
               }
               ${
                 isLockedConfirmed
-                  ? `
-                <div class="flex flex-col items-end gap-1">
-                  <div class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-amber-50 border border-amber-200 text-amber-800 text-[11px] font-medium" title="Cancellations are locked within 24 hours of the session.">
-                    <i data-lucide="lock" class="w-3.5 h-3.5 text-amber-600 shrink-0"></i>
-                    <span>Locked (Within 24h)</span>
-                  </div>
-                  <span class="text-[10px] text-slate-400">For urgent concerns, contact Guidance</span>
-                </div>
-                `
+                  ? `<span class="text-[10px] text-slate-400">For urgent concerns, contact Guidance</span>`
                   : ''
               }
             </div>
