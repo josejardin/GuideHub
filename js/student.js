@@ -38,14 +38,14 @@ document.addEventListener('DOMContentLoaded', () => {
 
   document.querySelectorAll('input[name="counselor_pref"]').forEach(radio => {
     radio.addEventListener('change', () => {
-      if (currentStep === 3) {
+      if (currentStep === 2) {
         updateCounselorsForChosenSlot();
       }
     });
   });
 
   document.getElementById('btn-edit-schedule')?.addEventListener('click', () => {
-    currentStep = 2;
+    currentStep = 1;
     renderStep();
   });
 
@@ -527,21 +527,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
   btnCloseWizard?.addEventListener('click', () => wizardModal?.classList.add('hidden'));
 
-  const sContactInit = document.getElementById('wiz-student-contact');
-  if (sContactInit) {
-    sContactInit.addEventListener('input', e => {
-      e.target.value = e.target.value.replace(/[^0-9+-]/g, '');
-    });
-    sContactInit.addEventListener('keydown', e => {
-      if (
-        ['Backspace', 'Delete', 'Tab', 'Escape', 'Enter', 'ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(e.key) ||
-        e.ctrlKey ||
-        e.metaKey
-      )
-        return;
-      if (!/[0-9+-]/.test(e.key)) e.preventDefault();
-    });
-  }
+  document.getElementById('wiz-btn-edit-profile')?.addEventListener('click', () => {
+    wizardModal?.classList.add('hidden');
+  });
 
   const dateInputInit = document.getElementById('wiz-schedule-date');
   dateInputInit?.addEventListener('change', () => {
@@ -554,19 +542,13 @@ document.addEventListener('DOMContentLoaded', () => {
     selectedSlot = null;
     wizardModal?.classList.remove('hidden');
 
-    const sNum = document.getElementById('wiz-student-number');
-    const sName = document.getElementById('wiz-student-name');
-    const sProg = document.getElementById('wiz-student-program');
-    const sContact = document.getElementById('wiz-student-contact');
-    const sGender = document.getElementById('wiz-student-gender');
+    const displayName = document.getElementById('wiz-display-name');
+    const displayId = document.getElementById('wiz-display-id');
+    const displayProg = document.getElementById('wiz-display-program');
 
-    if (sNum) sNum.value = currentUser.studentOrEmpId || '2024-10892';
-    if (sName) sName.value = currentUser.fullName || 'Student';
-    if (sProg) sProg.value = currentUser.program || 'BS Information Technology';
-    if (sContact) {
-      sContact.value = currentUser.contactNumber || '0917-123-4567';
-    }
-    if (sGender) sGender.value = currentUser.gender || 'Female';
+    if (displayName) displayName.textContent = currentUser.fullName || 'Student';
+    if (displayId) displayId.textContent = currentUser.studentOrEmpId || 'N/A';
+    if (displayProg) displayProg.textContent = currentUser.program || 'Student';
 
     const dateInput = document.getElementById('wiz-schedule-date');
     if (dateInput) {
@@ -688,7 +670,7 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   function renderStep() {
-    for (let i = 1; i <= 4; i++) {
+    for (let i = 1; i <= 3; i++) {
       const content = document.getElementById(`step-content-${i}`);
       const indicator = document.querySelector(`.step-item[data-step="${i}"] span`);
       if (content) {
@@ -711,22 +693,23 @@ document.addEventListener('DOMContentLoaded', () => {
 
     if (btnPrev) btnPrev.disabled = currentStep === 1;
     if (btnNext) {
-      btnNext.textContent = currentStep === 4 ? 'Submit Booking' : 'Next Step';
+      btnNext.textContent = currentStep === 3 ? 'Confirm & Book Appointment' : 'Next Step';
     }
 
-    if (currentStep === 2) {
+    if (currentStep === 1) {
       validateDateAndLoadSlots();
     }
 
-    if (currentStep === 3) {
+    if (currentStep === 2) {
       updateCounselorsForChosenSlot();
     }
 
-    if (currentStep === 4) {
+    if (currentStep === 3) {
       const dateInput = document.getElementById('wiz-schedule-date');
       const rDate = document.getElementById('wiz-review-date');
       const rSlot = document.getElementById('wiz-review-slot');
       const rCounselor = document.getElementById('wiz-review-counselor');
+      const rStudent = document.getElementById('wiz-review-student');
 
       const chosenOption = counselorSelect?.selectedOptions[0];
       const counselorLabel =
@@ -737,6 +720,7 @@ document.addEventListener('DOMContentLoaded', () => {
       if (rDate && dateInput) rDate.textContent = dateInput.value;
       if (rSlot) rSlot.textContent = selectedSlot || 'N/A';
       if (rCounselor) rCounselor.textContent = counselorLabel;
+      if (rStudent) rStudent.textContent = `${currentUser.fullName} (${currentUser.studentOrEmpId || 'ID'} • ${currentUser.program || 'Student'})`;
     }
 
     if (window.lucide) window.lucide.createIcons();
@@ -751,18 +735,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
   document.getElementById('btn-wiz-next')?.addEventListener('click', async () => {
     if (currentStep === 1) {
-      const prog = document.getElementById('wiz-student-program')?.value.trim();
-      const contact = document.getElementById('wiz-student-contact')?.value.trim();
-      if (!prog || !contact) {
-        showToast('Please complete program and contact details.', 'warning');
-        return;
-      }
-      currentStep++;
-      renderStep();
-      return;
-    }
-
-    if (currentStep === 2) {
       if (!selectedSlot) {
         showToast('Please choose an available 1-hour time slot.', 'warning');
         return;
@@ -772,7 +744,7 @@ document.addEventListener('DOMContentLoaded', () => {
       return;
     }
 
-    if (currentStep === 3) {
+    if (currentStep === 2) {
       if (!counselorSelect || !counselorSelect.value) {
         showToast('Please select an available guidance counselor or choose another slot.', 'warning');
         return;
@@ -782,10 +754,10 @@ document.addEventListener('DOMContentLoaded', () => {
       return;
     }
 
-    if (currentStep === 4) {
-      const studentProgram = document.getElementById('wiz-student-program')?.value;
-      const studentContact = document.getElementById('wiz-student-contact')?.value;
-      const studentGender = document.getElementById('wiz-student-gender')?.value;
+    if (currentStep === 3) {
+      const studentProgram = currentUser.program || 'Student';
+      const studentContact = currentUser.contactNumber || '';
+      const studentGender = currentUser.gender || 'Not Specified';
       const counselorPref = document.querySelector('input[name="counselor_pref"]:checked')?.value || 'Any';
       const date = document.getElementById('wiz-schedule-date')?.value;
       const concernCategory = document.getElementById('wiz-concern-category')?.value;
@@ -811,7 +783,7 @@ document.addEventListener('DOMContentLoaded', () => {
       const isStillAvailable = await checkSlotAvailable(date, selectedSlot, chosenCounselorId, counselorPref);
       if (!isStillAvailable) {
         showToast('Sorry! This time slot was just blocked by the guidance counselor due to an emergency. Please choose another slot.', 'error');
-        currentStep = 2;
+        currentStep = 1;
         renderStep();
         return;
       }

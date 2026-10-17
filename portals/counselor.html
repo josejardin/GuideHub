@@ -142,6 +142,19 @@
                       0
                     </span>
                   </button>
+                  <button
+                    type="button"
+                    id="btn-view-cancelled"
+                    class="px-3 py-1 rounded-md text-slate-600 hover:text-slate-900 transition flex items-center gap-1.5"
+                  >
+                    <span>Cancelled</span>
+                    <span
+                      id="badge-all-cancelled-count"
+                      class="px-1.5 py-0.2 rounded-full text-[10px] bg-rose-100 text-rose-800 font-bold"
+                    >
+                      0
+                    </span>
+                  </button>
                 </div>
 
                 <div id="agenda-date-wrapper" class="flex items-center gap-1.5">
@@ -179,6 +192,14 @@
                 <span>You have <strong id="pending-alert-count">0</strong> pending consultation request(s) waiting for confirmation.</span>
               </div>
               <button type="button" id="btn-jump-pending" class="px-2.5 py-1 bg-[#00205B] text-white rounded text-[11px] font-semibold hover:bg-blue-900 transition shrink-0 ml-2">Review Requests</button>
+            </div>
+
+            <div id="agenda-cancelled-alert" class="hidden mb-3 p-3 rounded-lg bg-rose-50 border border-rose-200 text-xs text-rose-900 flex items-center justify-between">
+              <div class="flex items-center gap-2">
+                <i data-lucide="calendar-x" class="w-4 h-4 text-rose-600 shrink-0"></i>
+                <span>You have <strong id="cancelled-alert-count">0</strong> cancelled appointment(s) with student reasons on record.</span>
+              </div>
+              <button type="button" id="btn-jump-cancelled" class="px-2.5 py-1 bg-rose-700 text-white rounded text-[11px] font-semibold hover:bg-rose-800 transition shrink-0 ml-2">Review Cancelled</button>
             </div>
 
             <div

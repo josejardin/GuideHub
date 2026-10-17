@@ -83,8 +83,10 @@ document.addEventListener('DOMContentLoaded', () => {
   const agendaDatePicker = document.getElementById('agenda-date-picker');
   const badgeAgendaCount = document.getElementById('badge-agenda-count');
   const badgeAllPendingCount = document.getElementById('badge-all-pending-count');
+  const badgeAllCancelledCount = document.getElementById('badge-all-cancelled-count');
   const btnViewDate = document.getElementById('btn-view-date');
   const btnViewPending = document.getElementById('btn-view-pending');
+  const btnViewCancelled = document.getElementById('btn-view-cancelled');
   const agendaDateWrapper = document.getElementById('agenda-date-wrapper');
 
   const todayIso = new Date().toISOString().split('T')[0];
@@ -114,24 +116,41 @@ document.addEventListener('DOMContentLoaded', () => {
     renderAgenda();
   });
 
+  btnViewCancelled?.addEventListener('click', () => {
+    activeViewFilter = 'all_cancelled';
+    updateFilterUI();
+    renderAgenda();
+  });
+
   document.getElementById('btn-jump-pending')?.addEventListener('click', () => {
     activeViewFilter = 'all_pending';
     updateFilterUI();
     renderAgenda();
   });
 
+  document.getElementById('btn-jump-cancelled')?.addEventListener('click', () => {
+    activeViewFilter = 'all_cancelled';
+    updateFilterUI();
+    renderAgenda();
+  });
+
   function updateFilterUI() {
+    [btnViewDate, btnViewPending, btnViewCancelled].forEach(btn => {
+      btn?.classList.remove('bg-white', 'text-[#00205B]', 'font-bold', 'shadow-sm');
+      btn?.classList.add('text-slate-600');
+    });
+
     if (activeViewFilter === 'selected_date') {
       btnViewDate?.classList.add('bg-white', 'text-[#00205B]', 'font-bold', 'shadow-sm');
       btnViewDate?.classList.remove('text-slate-600');
-      btnViewPending?.classList.remove('bg-white', 'text-[#00205B]', 'font-bold', 'shadow-sm');
-      btnViewPending?.classList.add('text-slate-600');
       agendaDateWrapper?.classList.remove('opacity-50');
-    } else {
+    } else if (activeViewFilter === 'all_pending') {
       btnViewPending?.classList.add('bg-white', 'text-[#00205B]', 'font-bold', 'shadow-sm');
       btnViewPending?.classList.remove('text-slate-600');
-      btnViewDate?.classList.remove('bg-white', 'text-[#00205B]', 'font-bold', 'shadow-sm');
-      btnViewDate?.classList.add('text-slate-600');
+      agendaDateWrapper?.classList.add('opacity-50');
+    } else if (activeViewFilter === 'all_cancelled') {
+      btnViewCancelled?.classList.add('bg-white', 'text-[#00205B]', 'font-bold', 'shadow-sm');
+      btnViewCancelled?.classList.remove('text-slate-600');
       agendaDateWrapper?.classList.add('opacity-50');
     }
   }
@@ -210,6 +229,9 @@ document.addEventListener('DOMContentLoaded', () => {
     const pendingCount = accessibleAppointments.filter(a => (a.status || '').toLowerCase() === 'pending').length;
     if (badgeAllPendingCount) badgeAllPendingCount.textContent = pendingCount;
 
+    const cancelledCount = accessibleAppointments.filter(a => (a.status || '').toLowerCase() === 'cancelled').length;
+    if (badgeAllCancelledCount) badgeAllCancelledCount.textContent = cancelledCount;
+
     const agendaPendingAlert = document.getElementById('agenda-pending-alert');
     const pendingAlertCount = document.getElementById('pending-alert-count');
     if (agendaPendingAlert) {
@@ -219,6 +241,18 @@ document.addEventListener('DOMContentLoaded', () => {
         if (window.lucide) window.lucide.createIcons();
       } else {
         agendaPendingAlert.classList.add('hidden');
+      }
+    }
+
+    const agendaCancelledAlert = document.getElementById('agenda-cancelled-alert');
+    const cancelledAlertCount = document.getElementById('cancelled-alert-count');
+    if (agendaCancelledAlert) {
+      if (cancelledCount > 0 && activeViewFilter === 'selected_date') {
+        if (cancelledAlertCount) cancelledAlertCount.textContent = cancelledCount;
+        agendaCancelledAlert.classList.remove('hidden');
+        if (window.lucide) window.lucide.createIcons();
+      } else {
+        agendaCancelledAlert.classList.add('hidden');
       }
     }
 
@@ -255,9 +289,11 @@ document.addEventListener('DOMContentLoaded', () => {
     const filtered = accessibleAppointments.filter(item => {
       const itemStatus = (item.status || 'pending').toLowerCase();
 
-      // Check view mode (all pending requests vs selected date)
+      // Check view mode (all pending requests vs all cancelled vs selected date)
       if (activeViewFilter === 'all_pending') {
         if (itemStatus !== 'pending') return false;
+      } else if (activeViewFilter === 'all_cancelled') {
+        if (itemStatus !== 'cancelled') return false;
       } else {
         if (item.date !== selectedDate) return false;
       }
@@ -279,6 +315,9 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     filtered.sort((a, b) => {
+      if (activeViewFilter === 'all_cancelled') {
+        return new Date(b.cancelledAt || b.date) - new Date(a.cancelledAt || a.date);
+      }
       const isAPending = (a.status || '').toLowerCase() === 'pending';
       const isBPending = (b.status || '').toLowerCase() === 'pending';
       if (isAPending && !isBPending) return -1;
@@ -290,8 +329,10 @@ document.addEventListener('DOMContentLoaded', () => {
       let emptyMsg = `No scheduled counseling sessions for ${selectedDate}.`;
       if (activeViewFilter === 'all_pending') {
         emptyMsg = 'No pending appointment requests currently.';
+      } else if (activeViewFilter === 'all_cancelled') {
+        emptyMsg = 'No cancelled appointments on record.';
       } else if (statusFilterVal === 'ACTIVE') {
-        emptyMsg = `No active consultations (Pending/Confirmed) for ${selectedDate}. Check status filter to view completed or cancelled appointments.`;
+        emptyMsg = `No active consultations (Pending/Confirmed) for ${selectedDate}. Check status filter or Cancelled tab to view other appointments.`;
       } else if (statusFilterVal !== 'ALL') {
         emptyMsg = `No ${statusFilterVal} consultations found for ${selectedDate}.`;
       }
@@ -316,13 +357,14 @@ document.addEventListener('DOMContentLoaded', () => {
 
         const isPending = statusLower === 'pending';
         const isConfirmed = statusLower === 'confirmed';
+        const isCancelled = statusLower === 'cancelled';
 
         const aptDay = apt.date ? DAY_NAMES[new Date(`${apt.date}T00:00:00`).getDay()] : '';
         const isConflict =
           blockedSet.has(`${aptDay}_${apt.timeSlot}`) || blockedSet.has(`${apt.date}_${apt.timeSlot}`);
 
         return `
- <div class="p-4 bg-white flex flex-col md:flex-row items-start md:items-center justify-between gap-3 hover:bg-slate-50/60 transition ${isPending ? 'border-l-4 border-amber-400 bg-amber-50/20' : ''} ${isConflict ? 'border-r-4 border-rose-500' : ''}">
+ <div class="p-4 bg-white flex flex-col md:flex-row items-start md:items-center justify-between gap-3 hover:bg-slate-50/60 transition ${isPending ? 'border-l-4 border-amber-400 bg-amber-50/20' : ''} ${isCancelled ? 'border-l-4 border-rose-500 bg-rose-50/20' : ''} ${isConflict ? 'border-r-4 border-rose-500' : ''}">
  <div class="flex items-start gap-3">
  <div class="w-16 py-1.5 rounded bg-[#00205B] text-white flex flex-col items-center justify-center flex-shrink-0 text-center font-mono">
  <span class="text-xs font-bold leading-tight">${escapeHtml(apt.timeSlot ? apt.timeSlot.split(' - ')[0] : 'TBD')}</span>
@@ -350,13 +392,14 @@ document.addEventListener('DOMContentLoaded', () => {
 
  ${apt.specificConcern ? `<p class="text-[11px] text-slate-600 italic mt-0.5">"${escapeHtml(apt.specificConcern)}"</p>` : ''}
               ${
-                statusLower === 'cancelled' && apt.cancellationReason
+                statusLower === 'cancelled'
                   ? `
-                <div class="mt-1.5 p-2 rounded-lg bg-rose-50 border border-rose-200 text-rose-800 text-[11px] leading-relaxed flex items-start gap-1.5">
-                  <i data-lucide="alert-circle" class="w-3.5 h-3.5 text-rose-600 shrink-0 mt-0.5"></i>
+                <div class="mt-2 p-2.5 rounded-lg bg-rose-50 border border-rose-200 text-rose-900 text-xs leading-relaxed flex items-start gap-2">
+                  <i data-lucide="calendar-x" class="w-4 h-4 text-rose-600 shrink-0 mt-0.5"></i>
                   <div>
-                    <strong>Reason for Cancellation:</strong> "${escapeHtml(apt.cancellationReason)}"
-                    ${apt.cancelledAt ? `<span class="text-[10px] text-rose-500 block mt-0.5">Cancelled: ${escapeHtml(formatDateIso(apt.cancelledAt))}</span>` : ''}
+                    <strong class="font-bold text-rose-800">Student Cancellation Reason:</strong>
+                    <span class="text-rose-950 font-medium italic block mt-0.5">"${escapeHtml(apt.cancellationReason || 'No detailed reason provided.')}"</span>
+                    ${apt.cancelledAt ? `<span class="text-[10px] text-rose-500 block mt-1">Recorded: ${escapeHtml(formatDateIso(apt.cancelledAt))}</span>` : ''}
                   </div>
                 </div>
                 `
@@ -1140,6 +1183,13 @@ document.addEventListener('DOMContentLoaded', () => {
       if (!studentEmail) studentEmail = matchedApt.studentEmail || '';
     }
 
+    const studentCancelledApts = allAppointments.filter(
+      a =>
+        ((a.studentNumber && a.studentNumber === caseRecord.studentNumber) ||
+          (a.studentId && (a.studentId === caseRecord.studentId || a.studentId === caseRecord.id))) &&
+        (a.status || '').toLowerCase() === 'cancelled'
+    );
+
     caseDetailPanel.innerHTML = `
       <!-- Case Header -->
       <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-200">
@@ -1194,6 +1244,32 @@ document.addEventListener('DOMContentLoaded', () => {
                 <span class="text-[10px] text-slate-400">For shifters &amp; SHS graduates transitioning with a new ID number.</span>
               </div>
               `
+          }
+
+          ${
+            studentCancelledApts.length > 0
+              ? `
+              <div class="mt-2.5 p-2.5 rounded-lg bg-rose-50/70 border border-rose-200 text-xs text-rose-900 space-y-1.5">
+                <div class="font-bold flex items-center gap-1.5 text-rose-800">
+                  <i data-lucide="calendar-x" class="w-3.5 h-3.5 text-rose-600"></i>
+                  <span>Cancelled Appointment Record (${studentCancelledApts.length}):</span>
+                </div>
+                <div class="space-y-1 pl-5">
+                  ${studentCancelledApts
+                    .map(
+                      ca => `
+                    <div class="text-[11px] text-slate-700">
+                      • <strong>${escapeHtml(ca.date)} (${escapeHtml(ca.timeSlot || 'Scheduled')})</strong>:
+                      <span class="font-medium text-rose-950 italic">"${escapeHtml(ca.cancellationReason || 'No reason provided')}"</span>
+                      ${ca.cancelledAt ? `<span class="text-[10px] text-slate-400">(${escapeHtml(formatDateIso(ca.cancelledAt))})</span>` : ''}
+                    </div>
+                  `
+                    )
+                    .join('')}
+                </div>
+              </div>
+              `
+              : ''
           }
         </div>
 
