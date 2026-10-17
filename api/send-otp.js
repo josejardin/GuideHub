@@ -2,7 +2,7 @@ import nodemailer from 'nodemailer';
 import path from 'path';
 import fs from 'fs';
 import dotenv from 'dotenv';
-import { findAccountByEmail, findAccountById, escapeHtml } from '../server/db.js';
+import { findAccountByEmail, findAccountById, findAccountByFullName, escapeHtml } from '../server/db.js';
 dotenv.config();
 
 const transporter = nodemailer.createTransport({
@@ -127,6 +127,15 @@ export default async function handler(req, res) {
         if (existingIdUser) {
           return res.status(409).json({
             error: `Student / Employee ID number (${cleanId}) is already registered to an existing account. Please verify your ID number or contact the Guidance and Counseling Office (nufairviewgco@gmail.com).`
+          });
+        }
+      }
+
+      if (recipientName) {
+        const existingNameUser = await findAccountByFullName(recipientName);
+        if (existingNameUser) {
+          return res.status(409).json({
+            error: `An account registered to "${escapeHtml(recipientName)}" already exists in GuideHub. Full name must be unique. If you already have an account, please log in or contact the Guidance and Counseling Office (nufairviewgco@gmail.com).`
           });
         }
       }

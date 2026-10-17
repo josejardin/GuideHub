@@ -14,8 +14,6 @@ import {
   addSessionNote,
   subscribeCaseNotes,
   updateCaseRiskFlags,
-  linkPreviousCase,
-  unlinkPreviousCase,
   getCounselorBlockedSlots,
   toggleCounselorBlockedSlot,
   subscribeAllCounselorSchedules,
@@ -1333,13 +1331,6 @@ document.addEventListener('DOMContentLoaded', () => {
       if (!studentEmail) studentEmail = matchedApt.studentEmail || '';
     }
 
-    const studentCancelledApts = allAppointments.filter(
-      a =>
-        ((a.studentNumber && a.studentNumber === caseRecord.studentNumber) ||
-          (a.studentId && (a.studentId === caseRecord.studentId || a.studentId === caseRecord.id))) &&
-        (a.status || '').toLowerCase() === 'cancelled'
-    );
-
     caseDetailPanel.innerHTML = `
       <!-- Case Header -->
       <div class="pb-3 border-b border-slate-200 space-y-2.5">
@@ -1371,70 +1362,23 @@ document.addEventListener('DOMContentLoaded', () => {
           ${studentEmail ? `<a href="mailto:${escapeHtml(studentEmail)}" class="inline-flex items-center gap-1 font-semibold text-slate-700 hover:text-[#00205B] transition"><i data-lucide="mail" class="w-3.5 h-3.5 text-blue-600"></i><span>${escapeHtml(studentEmail)}</span></a>` : ''}
         </div>
 
-        <!-- Row 3: Linked Past Student Records / Shift History -->
+        <!-- Row 3: Automatically Unified Past Student IDs / Shift History (Read-Only) -->
         ${
           caseRecord.previousStudentNumbers && caseRecord.previousStudentNumbers.length > 0
             ? `
             <div class="flex flex-wrap items-center gap-1.5 pt-2 border-t border-slate-100 text-xs">
-              <span class="text-[11px] font-bold text-slate-600 flex items-center gap-1">
-                <i data-lucide="link-2" class="w-3.5 h-3.5 text-blue-600"></i> Linked Past ID(s):
+              <span class="text-[11px] font-semibold text-slate-500 flex items-center gap-1">
+                <i data-lucide="history" class="w-3.5 h-3.5 text-blue-600"></i> Previous Student ID(s):
               </span>
               ${caseRecord.previousStudentNumbers
-                .map(oldNum => {
-                  const info = (caseRecord.linkedCasesInfo || []).find(i => i.studentNumber === oldNum) || {};
-                  return `
-                  <span class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-blue-50 text-[#00205B] border border-blue-200">
-                    <span>${escapeHtml(oldNum)}</span>
-                    ${info.program ? `<span class="text-[10px] text-blue-600 font-normal">(${escapeHtml(info.program)})</span>` : ''}
-                    <button type="button" class="btn-unlink-past-case text-slate-400 hover:text-rose-600 transition" data-old-num="${escapeHtml(oldNum)}" title="Unlink this past record">
-                      <i data-lucide="x" class="w-2.5 h-2.5"></i>
-                    </button>
-                  </span>
-                `;
-                })
+                .map(
+                  oldNum => `
+                <span class="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-mono font-semibold bg-slate-100 text-slate-700 border border-slate-200">
+                  ${escapeHtml(oldNum)}
+                </span>
+              `
+                )
                 .join('')}
-              <button type="button" id="btn-open-link-modal" class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-semibold text-slate-700 hover:text-[#00205B] bg-slate-100 hover:bg-slate-200 transition">
-                <i data-lucide="plus" class="w-3 h-3 text-slate-500"></i>
-                <span>Link Another Past ID</span>
-              </button>
-            </div>
-            `
-            : `
-            <div class="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-slate-100 text-xs">
-              <button type="button" id="btn-open-link-modal" class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold text-[#00205B] hover:bg-blue-50 bg-slate-100 border border-slate-200 transition" title="Link previous SHS ID or prior degree program case history">
-                <i data-lucide="link" class="w-3.5 h-3.5 text-blue-600"></i>
-                <span>Link Previous Student ID / Past Case</span>
-              </button>
-              <span class="text-[10px] text-slate-400">For shifters &amp; SHS graduates transitioning with a new ID number.</span>
-            </div>
-            `
-        }
-
-        <!-- Row 4: Cancelled Appointment Record (Scrollable, Clean, 12h AM/PM) -->
-        ${
-          studentCancelledApts.length > 0
-            ? `
-            <div class="mt-2 p-2.5 rounded-lg bg-rose-50/70 border border-rose-200 text-xs text-rose-900 space-y-1.5">
-              <div class="font-bold flex items-center justify-between text-rose-800">
-                <div class="flex items-center gap-1.5">
-                  <i data-lucide="calendar-x" class="w-3.5 h-3.5 text-rose-600"></i>
-                  <span>Cancelled Appointments Record (${studentCancelledApts.length}):</span>
-                </div>
-                <span class="text-[10px] font-normal text-rose-600">Prior student cancellation reasons</span>
-              </div>
-              <div class="space-y-1 pl-4 max-h-32 overflow-y-auto">
-                ${studentCancelledApts
-                  .map(
-                    ca => `
-                  <div class="text-[11px] text-slate-700">
-                    • <strong>${escapeHtml(ca.date)} (${escapeHtml(formatTimeSlot12h(ca.timeSlot) || 'Scheduled')})</strong>:
-                    <span class="font-medium text-rose-950 italic">"${escapeHtml(ca.cancellationReason || 'No reason provided')}"</span>
-                    ${ca.cancelledAt ? `<span class="text-[10px] text-slate-400">(${escapeHtml(formatDateIso(ca.cancelledAt))})</span>` : ''}
-                  </div>
-                `
-                  )
-                  .join('')}
-              </div>
             </div>
             `
             : ''
@@ -1844,253 +1788,7 @@ document.addEventListener('DOMContentLoaded', () => {
         .join('');
       if (window.lucide) window.lucide.createIcons();
     });
-
-    // Wire up Link Modal button
-    document.getElementById('btn-open-link-modal')?.addEventListener('click', () => {
-      openLinkModalForCase(caseRecord);
-    });
-
-    // Wire up unlinking triggers
-    document.querySelectorAll('.btn-unlink-past-case').forEach(btn => {
-      btn.addEventListener('click', async e => {
-        e.stopPropagation();
-        const oldNum = btn.getAttribute('data-old-num');
-        if (!oldNum) return;
-        if (!confirm(`Are you sure you want to unlink previous record (${oldNum}) from this case folder?`)) return;
-
-        try {
-          await unlinkPreviousCase(caseRecord.id, oldNum, currentUser.uid, currentUser.fullName);
-          showToast(`Unlinked past record (${oldNum}).`, 'info');
-          const updatedCase = allCases.find(c => c.id === caseRecord.id);
-          if (updatedCase) renderCaseDetail(updatedCase);
-        } catch (err) {
-          showToast(err.message || 'Failed to unlink case.', 'error');
-        }
-      });
-    });
   }
-
-  // --- Modal Logic: Link Previous Student Case Record ---
-  const modalLinkPrevCase = document.getElementById('modal-link-previous-case');
-  const btnCloseLinkModal = document.getElementById('btn-close-link-modal');
-  const btnCancelLinkModal = document.getElementById('btn-cancel-link-modal');
-  const btnConfirmLinkCase = document.getElementById('btn-confirm-link-case');
-  const linkSearchPrevInput = document.getElementById('link-search-prev-input');
-  const linkCandidatesList = document.getElementById('link-candidates-list');
-  const linkTargetName = document.getElementById('link-target-name');
-  const linkTargetId = document.getElementById('link-target-id');
-  const linkTargetProgram = document.getElementById('link-target-program');
-  const linkSelectedPreview = document.getElementById('link-selected-preview');
-  const previewPrevId = document.getElementById('preview-prev-id');
-  const previewPrevName = document.getElementById('preview-prev-name');
-  const previewPrevProgram = document.getElementById('preview-prev-program');
-
-  let activeLinkingCase = null;
-  let selectedCandidateCase = null;
-
-  function closeLinkModal() {
-    if (!modalLinkPrevCase) return;
-    modalLinkPrevCase.classList.add('hidden');
-    activeLinkingCase = null;
-    selectedCandidateCase = null;
-    if (linkSearchPrevInput) linkSearchPrevInput.value = '';
-    if (linkSelectedPreview) linkSelectedPreview.classList.add('hidden');
-    setConfirmButtonState(false);
-  }
-
-  function setConfirmButtonState(enabled) {
-    if (!btnConfirmLinkCase) return;
-    btnConfirmLinkCase.disabled = !enabled;
-    if (enabled) {
-      btnConfirmLinkCase.classList.remove('opacity-50', 'cursor-not-allowed');
-    } else {
-      btnConfirmLinkCase.classList.add('opacity-50', 'cursor-not-allowed');
-    }
-  }
-
-  function openLinkModalForCase(caseRecord) {
-    if (!modalLinkPrevCase || !caseRecord) return;
-    activeLinkingCase = caseRecord;
-    selectedCandidateCase = null;
-
-    if (linkTargetName) linkTargetName.textContent = caseRecord.studentName || 'Student';
-    if (linkTargetId) linkTargetId.textContent = caseRecord.studentNumber || 'No ID';
-    if (linkTargetProgram) linkTargetProgram.textContent = caseRecord.program || 'No Program Listed';
-
-    if (linkSearchPrevInput) linkSearchPrevInput.value = '';
-    if (linkSelectedPreview) linkSelectedPreview.classList.add('hidden');
-    setConfirmButtonState(false);
-
-    renderLinkCandidates('');
-    modalLinkPrevCase.classList.remove('hidden');
-    if (linkSearchPrevInput) linkSearchPrevInput.focus();
-    if (window.lucide) window.lucide.createIcons();
-  }
-
-  function renderLinkCandidates(searchTerm = '') {
-    if (!linkCandidatesList || !activeLinkingCase) return;
-    const query = (searchTerm || '').trim().toLowerCase();
-
-    const alreadyLinkedIds = new Set(activeLinkingCase.linkedCaseIds || []);
-    const alreadyLinkedNumbers = new Set(activeLinkingCase.previousStudentNumbers || []);
-
-    // Filter available cases: exclude active target case itself and already linked cases
-    let candidates = allCases.filter(c => {
-      if (c.id === activeLinkingCase.id) return false;
-      if (c.studentNumber === activeLinkingCase.studentNumber) return false;
-      if (alreadyLinkedIds.has(c.id) || alreadyLinkedNumbers.has(c.studentNumber)) return false;
-
-      if (!query) return true;
-      const numMatch = (c.studentNumber || '').toLowerCase().includes(query);
-      const nameMatch = (c.studentName || '').toLowerCase().includes(query);
-      const progMatch = (c.program || '').toLowerCase().includes(query);
-      return numMatch || nameMatch || progMatch;
-    });
-
-    // Smart sorting: records with exact or partial matching student name come first
-    const targetName = (activeLinkingCase.studentName || '').trim().toLowerCase();
-    candidates.sort((a, b) => {
-      const aName = (a.studentName || '').trim().toLowerCase();
-      const bName = (b.studentName || '').trim().toLowerCase();
-      const aMatches = targetName && (aName.includes(targetName) || targetName.includes(aName));
-      const bMatches = targetName && (bName.includes(targetName) || targetName.includes(bName));
-      if (aMatches && !bMatches) return -1;
-      if (!aMatches && bMatches) return 1;
-      return (a.studentName || '').localeCompare(b.studentName || '');
-    });
-
-    if (candidates.length === 0) {
-      if (query.length >= 3) {
-        linkCandidatesList.innerHTML = `
-          <div class="p-3">
-            <div data-custom-id="${escapeHtml(query)}" class="candidate-custom-option p-3 cursor-pointer rounded-xl border border-dashed border-blue-300 bg-blue-50/50 hover:bg-blue-100/70 text-xs text-[#00205B] flex items-center justify-between transition">
-              <div>
-                <div class="font-bold flex items-center gap-1.5"><i data-lucide="search" class="w-3.5 h-3.5 text-blue-600"></i> Link by entered ID / Case ID</div>
-                <div class="text-[11px] text-slate-500 font-mono mt-0.5">${escapeHtml(query.toUpperCase())}</div>
-              </div>
-              <button type="button" class="px-2.5 py-1 text-[11px] font-semibold rounded-lg bg-[#00205B] text-white">Select</button>
-            </div>
-            <div class="p-2 text-center text-slate-400 text-[11px]">No existing case matched "${escapeHtml(query)}". You can still link using this custom ID.</div>
-          </div>
-        `;
-      } else {
-        linkCandidatesList.innerHTML = `
-          <div class="p-4 text-center text-slate-400 text-xs">
-            ${query ? `No previous case records found matching "${escapeHtml(query)}".` : 'No other student case records available to link.'}
-          </div>
-        `;
-      }
-      if (window.lucide) window.lucide.createIcons();
-      return;
-    }
-
-    linkCandidatesList.innerHTML = candidates
-      .map(c => {
-        const isSelected = selectedCandidateCase && selectedCandidateCase.id === c.id;
-        const cName = (c.studentName || '').trim().toLowerCase();
-        const isLikelySameStudent = targetName && (cName.includes(targetName) || targetName.includes(cName));
-
-        return `
-          <div
-            data-candidate-id="${escapeHtml(c.id)}"
-            class="candidate-item p-2.5 cursor-pointer transition flex items-center justify-between text-xs hover:bg-blue-50/60 ${isSelected ? 'bg-blue-100/70 border-l-4 border-[#00205B]' : ''}"
-          >
-            <div class="space-y-0.5">
-              <div class="flex items-center gap-2">
-                <span class="font-bold text-slate-900">${escapeHtml(c.studentName)}</span>
-                ${isLikelySameStudent ? '<span class="px-1.5 py-0.2 rounded text-[9px] font-bold bg-amber-100 text-amber-800 border border-amber-300">Name Match</span>' : ''}
-                <span class="text-[10px] text-slate-500 bg-slate-100 px-1.5 py-0.2 rounded">${escapeHtml(c.status || 'Case Record')}</span>
-              </div>
-              <div class="text-[11px] text-slate-500 font-mono flex items-center gap-2">
-                <span class="font-bold text-[#00205B]">${escapeHtml(c.studentNumber)}</span>
-                <span class="font-sans text-slate-600">${escapeHtml(c.program || 'N/A')}</span>
-              </div>
-            </div>
-            <button
-              type="button"
-              class="px-2.5 py-1 text-[11px] font-semibold rounded-lg ${isSelected ? 'bg-[#00205B] text-white' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'}"
-            >
-              ${isSelected ? 'Selected' : 'Select'}
-            </button>
-          </div>
-        `;
-      })
-      .join('');
-    if (window.lucide) window.lucide.createIcons();
-  }
-
-  linkCandidatesList?.addEventListener('click', e => {
-    const customItem = e.target.closest('.candidate-custom-option');
-    if (customItem) {
-      const customId = customItem.getAttribute('data-custom-id');
-      selectedCandidateCase = {
-        id: customId,
-        studentNumber: customId.toUpperCase(),
-        studentName: 'Previous Case (' + customId.toUpperCase() + ')',
-        program: 'Previous Program / SHS'
-      };
-      if (linkSelectedPreview) linkSelectedPreview.classList.remove('hidden');
-      if (previewPrevId) previewPrevId.textContent = selectedCandidateCase.studentNumber;
-      if (previewPrevName) previewPrevName.textContent = selectedCandidateCase.studentName;
-      if (previewPrevProgram) previewPrevProgram.textContent = selectedCandidateCase.program;
-      setConfirmButtonState(true);
-      return;
-    }
-
-    const item = e.target.closest('.candidate-item');
-    if (!item) return;
-    const cid = item.getAttribute('data-candidate-id');
-    selectedCandidateCase = allCases.find(c => c.id === cid) || null;
-
-    if (selectedCandidateCase) {
-      if (linkSelectedPreview) linkSelectedPreview.classList.remove('hidden');
-      if (previewPrevId) previewPrevId.textContent = selectedCandidateCase.studentNumber || selectedCandidateCase.id;
-      if (previewPrevName) previewPrevName.textContent = selectedCandidateCase.studentName || 'Student';
-      if (previewPrevProgram) previewPrevProgram.textContent = selectedCandidateCase.program || 'Previous Program';
-      setConfirmButtonState(true);
-      renderLinkCandidates(linkSearchPrevInput?.value || '');
-      if (window.lucide) window.lucide.createIcons();
-    }
-  });
-
-  linkSearchPrevInput?.addEventListener('input', e => {
-    renderLinkCandidates(e.target.value);
-  });
-
-  btnCloseLinkModal?.addEventListener('click', closeLinkModal);
-  btnCancelLinkModal?.addEventListener('click', closeLinkModal);
-  modalLinkPrevCase?.addEventListener('click', e => {
-    if (e.target === modalLinkPrevCase) closeLinkModal();
-  });
-
-  btnConfirmLinkCase?.addEventListener('click', async () => {
-    if (!activeLinkingCase || !selectedCandidateCase) return;
-
-    btnConfirmLinkCase.disabled = true;
-    const originalText = btnConfirmLinkCase.innerHTML;
-    btnConfirmLinkCase.innerHTML = '<span>Linking Records...</span>';
-
-    try {
-      await linkPreviousCase(
-        activeLinkingCase.id,
-        selectedCandidateCase.studentNumber || selectedCandidateCase.id,
-        currentUser.uid,
-        currentUser.fullName
-      );
-      showToast(`Successfully linked past record (${selectedCandidateCase.studentNumber}) to active case.`, 'success');
-      const targetId = activeLinkingCase.id;
-      closeLinkModal();
-
-      // Refresh active case details
-      const refreshed = allCases.find(c => c.id === targetId);
-      if (refreshed) renderCaseDetail(refreshed);
-    } catch (err) {
-      console.error('Error linking case:', err);
-      showToast(err.message || 'Failed to link previous case.', 'error');
-      setConfirmButtonState(true);
-      btnConfirmLinkCase.innerHTML = originalText;
-    }
-  });
 
   const availabilityGrid = document.getElementById('availability-slots-grid');
   const DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'];

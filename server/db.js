@@ -201,3 +201,71 @@ export async function findAccountById(idNumber) {
 
   return null;
 }
+
+export function normalizePersonName(name = '') {
+  return String(name || '')
+    .toLowerCase()
+    .replace(/[^a-z0-9\s]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+export function isSamePersonName(nameA = '', nameB = '') {
+  const normA = normalizePersonName(nameA);
+  const normB = normalizePersonName(nameB);
+  if (!normA || !normB) return false;
+  if (normA === normB) return true;
+
+  const partsA = normA.split(' ').filter(Boolean);
+  const partsB = normB.split(' ').filter(Boolean);
+
+  if (partsA.length < 2 || partsB.length < 2) {
+    return normA === normB;
+  }
+
+  const firstA = partsA[0];
+  const firstB = partsB[0];
+  const lastA = partsA[partsA.length - 1];
+  const lastB = partsB[partsB.length - 1];
+
+  if (firstA === firstB && lastA === lastB) {
+    return true;
+  }
+
+  const compoundPrefixes = ['de', 'del', 'dela', 'delos', 'san', 'santa', 'sta'];
+  if (partsA.length >= 3 && partsB.length >= 3) {
+    const isCompA = compoundPrefixes.includes(partsA[partsA.length - 2]);
+    const isCompB = compoundPrefixes.includes(partsB[partsB.length - 2]);
+    if (isCompA && isCompB) {
+      const compA = `${partsA[partsA.length - 2]} ${partsA[partsA.length - 1]}`;
+      const compB = `${partsB[partsB.length - 2]} ${partsB[partsB.length - 1]}`;
+      if (firstA === firstB && compA === compB) return true;
+    }
+  }
+
+  return false;
+}
+
+export async function findAccountByFullName(rawFullName) {
+  const cleanName = (rawFullName || '').trim();
+  if (!cleanName) return null;
+
+  try {
+    for (const cat of ROLE_CATEGORIES) {
+      const catDoc = await getDoc(doc(clientDb, 'users', cat));
+      if (catDoc.exists()) {
+        const data = catDoc.data();
+        for (const [key, val] of Object.entries(data)) {
+          if (val && typeof val === 'object' && val.fullName && isSamePersonName(val.fullName, cleanName)) {
+            return { id: key, path: `users/${cat}#${key}`, ...val };
+          }
+        }
+      }
+    }
+  } catch (err) {
+    console.warn('[WARNING] Role doc map FullName notice:', err.message);
+  }
+
+  return null;
+}
+

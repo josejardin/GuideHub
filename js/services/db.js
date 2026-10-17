@@ -17,7 +17,7 @@ import {
   Timestamp,
   collectionGroup
 } from '../firebase-config.js';
-import { getRoleCategory, formatTimeSlot12h, normalizeTimeSlot } from '../utils/validation.js';
+import { getRoleCategory, formatTimeSlot12h, normalizeTimeSlot, isSamePersonName, normalizePersonName } from '../utils/validation.js';
 
 const LOCAL_STORE_KEY = 'guidehub_local_firestore_state';
 
@@ -822,50 +822,105 @@ export async function updateReferralStatus(referralId, status, extraFields = {})
 
 export async function getOrCreateCase(studentNumber, studentName, program, counselorId) {
   const cleanNum = (studentNumber || 'unknown').trim();
-  const normalizedId = 'case_' + cleanNum.replace(/[^a-zA-Z0-9]/g, '_');
+  const cleanName = (studentName || '').trim();
+
+  let existingCase = null;
 
   try {
     if (db) {
-      // 1. Check direct case ID in Firestore (deterministic key prevents duplication)
-      const directSnap = await getDoc(doc(db, 'cases', normalizedId));
-      if (directSnap.exists()) {
-        const existingData = directSnap.data();
-        if (program && program !== existingData.program && program !== 'Student' && program !== 'N/A') {
-          await setDoc(doc(db, 'cases', normalizedId), { program, updatedAt: new Date().toISOString() }, { merge: true });
-          existingData.program = program;
+      // 1. Fetch all cases from Firestore to perform robust automatic name & ID matching
+      const snap = await getDocs(collection(db, 'cases'));
+      if (!snap.empty) {
+        const allList = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+        // Match by student name (handles case-insensitivity, shifted ID, missing/middle names)
+        if (cleanName && cleanName !== 'Student') {
+          existingCase = allList.find(c => isSamePersonName(c.studentName, cleanName));
         }
-        return { id: directSnap.id, ...existingData };
-      }
-
-      // 2. Query Firestore cases by studentNumber
-      const qCase = query(collection(db, 'cases'), where('studentNumber', '==', cleanNum));
-      const querySnap = await getDocs(qCase);
-      if (!querySnap.empty) {
-        const docSnap = querySnap.docs[0];
-        return { id: docSnap.id, ...docSnap.data() };
+        // Fallback match by current student number or previous student numbers
+        if (!existingCase && cleanNum && cleanNum !== 'unknown') {
+          existingCase = allList.find(
+            c =>
+              (c.studentNumber && c.studentNumber.toLowerCase() === cleanNum.toLowerCase()) ||
+              ((c.previousStudentNumbers || []).some(pn => String(pn).toLowerCase() === cleanNum.toLowerCase()))
+          );
+        }
       }
     }
   } catch (err) {
     console.warn('Firestore getOrCreateCase lookup notice:', err.message);
   }
 
-  const state = getLocalState();
-  let existingCase = Object.values(state.cases).find(
-    c => (c.studentNumber || '').trim().toLowerCase() === cleanNum.toLowerCase() || c.id === normalizedId
-  );
+  // Check local state fallback
+  if (!existingCase) {
+    const state = getLocalState();
+    const localList = Object.values(state.cases || {});
+    if (cleanName && cleanName !== 'Student') {
+      existingCase = localList.find(c => isSamePersonName(c.studentName, cleanName));
+    }
+    if (!existingCase && cleanNum && cleanNum !== 'unknown') {
+      existingCase = localList.find(
+        c =>
+          (c.studentNumber && c.studentNumber.toLowerCase() === cleanNum.toLowerCase()) ||
+          ((c.previousStudentNumbers || []).some(pn => String(pn).toLowerCase() === cleanNum.toLowerCase()))
+      );
+    }
+  }
 
+  // If existing case is found: automatic match without manual linking!
   if (existingCase) {
+    const caseId = existingCase.id;
+    const updates = { updatedAt: new Date().toISOString() };
+    let hasUpdates = false;
+
+    // Track previous student number if student has shifted or changed ID number
+    if (cleanNum && cleanNum !== 'unknown' && cleanNum !== existingCase.studentNumber) {
+      const prevNumbers = new Set(existingCase.previousStudentNumbers || []);
+      if (existingCase.studentNumber && existingCase.studentNumber !== 'unknown') {
+        prevNumbers.add(existingCase.studentNumber);
+      }
+      existingCase.previousStudentNumbers = Array.from(prevNumbers);
+      existingCase.studentNumber = cleanNum;
+      updates.previousStudentNumbers = existingCase.previousStudentNumbers;
+      updates.studentNumber = cleanNum;
+      hasUpdates = true;
+    }
+
     if (program && program !== existingCase.program && program !== 'Student' && program !== 'N/A') {
       existingCase.program = program;
-      existingCase.updatedAt = new Date().toISOString();
+      updates.program = program;
+      hasUpdates = true;
+    }
+
+    if (cleanName && cleanName !== 'Student' && cleanName !== existingCase.studentName) {
+      existingCase.studentName = cleanName;
+      updates.studentName = cleanName;
+      hasUpdates = true;
+    }
+
+    if (hasUpdates) {
+      try {
+        if (db) {
+          await setDoc(doc(db, 'cases', caseId), updates, { merge: true });
+        }
+      } catch (e) {
+        console.warn('Firestore case update fallback notice:', e.message);
+      }
+      const state = getLocalState();
+      state.cases[caseId] = { ...existingCase, ...updates };
       saveLocalState(state);
     }
+
     return existingCase;
   }
 
+  // Create new case if none exists
+  const cleanIdKey = cleanName
+    ? 'case_' + cleanName.toLowerCase().replace(/[^a-z0-9]/g, '_')
+    : 'case_' + cleanNum.replace(/[^a-zA-Z0-9]/g, '_');
+
   const newCase = {
     studentNumber: cleanNum,
-    studentName: studentName || 'Student',
+    studentName: cleanName || 'Student',
     program: program || 'General',
     assignedCounselorId: counselorId,
     status: 'Active',
@@ -875,39 +930,66 @@ export async function getOrCreateCase(studentNumber, studentName, program, couns
       threatToOthers: false
     },
     category: 'General Counseling',
+    previousStudentNumbers: [],
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString()
   };
 
   try {
     if (db) {
-      const caseRef = doc(db, 'cases', normalizedId);
+      const caseRef = doc(db, 'cases', cleanIdKey);
       await setDoc(caseRef, newCase, { merge: true });
     }
   } catch (err) {
     console.warn('Firestore getOrCreateCase fallback:', err.message);
   }
 
-  state.cases[normalizedId] = { id: normalizedId, ...newCase };
+  const state = getLocalState();
+  state.cases[cleanIdKey] = { id: cleanIdKey, ...newCase };
   saveLocalState(state);
-  return { id: normalizedId, ...newCase };
+  return { id: cleanIdKey, ...newCase };
 }
 
 export function subscribeAllCases(callback) {
+  function deduplicateCasesByName(rawList) {
+    const merged = [];
+    for (const c of rawList) {
+      const existing = merged.find(m => isSamePersonName(m.studentName, c.studentName));
+      if (!existing) {
+        merged.push({ ...c });
+      } else {
+        const allPrev = new Set([
+          ...(existing.previousStudentNumbers || []),
+          ...(c.previousStudentNumbers || [])
+        ]);
+        if (c.studentNumber && c.studentNumber !== existing.studentNumber) {
+          allPrev.add(c.studentNumber);
+        }
+        existing.previousStudentNumbers = Array.from(allPrev);
+        if (new Date(c.updatedAt || c.createdAt) > new Date(existing.updatedAt || existing.createdAt)) {
+          existing.status = c.status || existing.status;
+          existing.program = c.program || existing.program;
+          existing.studentNumber = c.studentNumber || existing.studentNumber;
+        }
+      }
+    }
+    return merged;
+  }
+
   try {
     if (db) {
       const q = query(collection(db, 'cases'));
       const unsubscribe = onSnapshot(q, snap => {
+        let list = [];
         if (!snap.empty) {
-          const list = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-          list.sort((a, b) => new Date(b.updatedAt || b.createdAt) - new Date(a.updatedAt || a.createdAt));
-          callback(list);
+          list = snap.docs.map(d => ({ id: d.id, ...d.data() }));
         } else {
           const state = getLocalState();
-          const list = Object.values(state.cases);
-          list.sort((a, b) => new Date(b.updatedAt || b.createdAt) - new Date(a.updatedAt || a.createdAt));
-          callback(list);
+          list = Object.values(state.cases || {});
         }
+        const deduped = deduplicateCasesByName(list);
+        deduped.sort((a, b) => new Date(b.updatedAt || b.createdAt) - new Date(a.updatedAt || a.createdAt));
+        callback(deduped);
       });
       return unsubscribe;
     }
@@ -917,9 +999,10 @@ export function subscribeAllCases(callback) {
 
   const handler = () => {
     const state = getLocalState();
-    const list = Object.values(state.cases);
-    list.sort((a, b) => new Date(b.updatedAt || b.createdAt) - new Date(a.updatedAt || a.createdAt));
-    callback(list);
+    const list = Object.values(state.cases || {});
+    const deduped = deduplicateCasesByName(list);
+    deduped.sort((a, b) => new Date(b.updatedAt || b.createdAt) - new Date(a.updatedAt || a.createdAt));
+    callback(deduped);
   };
   window.addEventListener('guidehub_data_changed', handler);
   handler();

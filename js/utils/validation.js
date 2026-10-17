@@ -88,6 +88,52 @@ export function normalizeTimeSlot(slot = '') {
   return to24h(slot);
 }
 
+export function normalizePersonName(name = '') {
+  return String(name || '')
+    .toLowerCase()
+    .replace(/[^a-z0-9\s]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+export function isSamePersonName(nameA = '', nameB = '') {
+  const normA = normalizePersonName(nameA);
+  const normB = normalizePersonName(nameB);
+  if (!normA || !normB) return false;
+  if (normA === normB) return true;
+
+  const partsA = normA.split(' ').filter(Boolean);
+  const partsB = normB.split(' ').filter(Boolean);
+
+  if (partsA.length < 2 || partsB.length < 2) {
+    return normA === normB;
+  }
+
+  const firstA = partsA[0];
+  const firstB = partsB[0];
+  const lastA = partsA[partsA.length - 1];
+  const lastB = partsB[partsB.length - 1];
+
+  // Match if first name AND last name are identical
+  if (firstA === firstB && lastA === lastB) {
+    return true;
+  }
+
+  // Also check compound surnames e.g. "de la cruz", "delos santos"
+  const compoundPrefixes = ['de', 'del', 'dela', 'delos', 'san', 'santa', 'sta'];
+  if (partsA.length >= 3 && partsB.length >= 3) {
+    const isCompA = compoundPrefixes.includes(partsA[partsA.length - 2]);
+    const isCompB = compoundPrefixes.includes(partsB[partsB.length - 2]);
+    if (isCompA && isCompB) {
+      const compA = `${partsA[partsA.length - 2]} ${partsA[partsA.length - 1]}`;
+      const compB = `${partsB[partsB.length - 2]} ${partsB[partsB.length - 1]}`;
+      if (firstA === firstB && compA === compB) return true;
+    }
+  }
+
+  return false;
+}
+
 export function validateIdentityFormat({ fullName, emailPrefix, idNumber, role }) {
   const isStudent = role === 'student' || role === 'college_student' || role === 'shs_student';
 
