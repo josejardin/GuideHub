@@ -1351,7 +1351,7 @@ document.addEventListener('DOMContentLoaded', () => {
     caseDetailPanel.innerHTML = `
       <!-- Case Header -->
       <div class="pb-3 border-b border-slate-200 space-y-2.5">
-        <!-- Top Row: Student Name, ID, Header Badge (Left) & Status Dropdown (Right, kahilera ng name) -->
+        <!-- Top Row: Student Name, ID, Header Badge (Left) & Status Dropdown (Right, inline with name) -->
         <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div class="flex flex-wrap items-center gap-2">
             <h3 class="text-base font-bold text-slate-900">${escapeHtml(caseRecord.studentName)}</h3>
