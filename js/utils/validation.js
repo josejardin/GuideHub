@@ -44,6 +44,50 @@ export function formatDateIso(val) {
   }
 }
 
+export function formatTime12h(timeStr = '') {
+  if (!timeStr) return '';
+  const trimmed = String(timeStr).trim();
+  if (/am|pm/i.test(trimmed)) return trimmed;
+  if (!trimmed.includes(':')) return trimmed;
+  const parts = trimmed.split(':');
+  let h = parseInt(parts[0], 10);
+  if (isNaN(h)) return trimmed;
+  const ampm = h >= 12 ? 'PM' : 'AM';
+  h = h % 12;
+  if (h === 0) h = 12;
+  const m = (parts[1] || '00').substring(0, 2);
+  return `${h}:${m} ${ampm}`;
+}
+
+export function formatTimeSlot12h(slot = '') {
+  if (!slot) return '';
+  const str = String(slot).trim();
+  if (str.includes('-')) {
+    const parts = str.split('-');
+    return `${formatTime12h(parts[0])} - ${formatTime12h(parts[1])}`;
+  }
+  return formatTime12h(str);
+}
+
+export function normalizeTimeSlot(slot = '') {
+  if (!slot) return '';
+  function to24h(t) {
+    const match = String(t).trim().match(/^(\d{1,2}):(\d{2})\s*(am|pm)?$/i);
+    if (!match) return String(t).trim();
+    let h = parseInt(match[1], 10);
+    const m = match[2];
+    const ampm = match[3] ? match[3].toLowerCase() : null;
+    if (ampm === 'pm' && h < 12) h += 12;
+    if (ampm === 'am' && h === 12) h = 0;
+    return `${String(h).padStart(2, '0')}:${m}`;
+  }
+  if (slot.includes('-')) {
+    const [p1, p2] = slot.split('-');
+    return `${to24h(p1)} - ${to24h(p2)}`;
+  }
+  return to24h(slot);
+}
+
 export function validateIdentityFormat({ fullName, emailPrefix, idNumber, role }) {
   const isStudent = role === 'student' || role === 'college_student' || role === 'shs_student';
 

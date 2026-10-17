@@ -664,6 +664,128 @@
       </div>
     </div>
 
+    <!-- Modal: Appointment Details -->
+    <div
+      id="modal-appointment-details"
+      class="fixed inset-0 z-50 flex items-center justify-center p-4 modal-backdrop hidden no-print"
+    >
+      <div class="bg-white rounded-2xl max-w-lg w-full p-6 shadow-2xl relative border border-slate-100 max-h-[90vh] flex flex-col">
+        <!-- Header -->
+        <div class="flex items-center justify-between pb-3 border-b border-slate-100">
+          <div class="flex items-center gap-2">
+            <div class="w-8 h-8 rounded-lg bg-blue-50 text-[#00205B] flex items-center justify-center">
+              <i data-lucide="file-text" class="w-4 h-4"></i>
+            </div>
+            <div>
+              <h3 class="font-bold text-slate-900 text-sm">Consultation Details</h3>
+              <p class="text-[11px] text-slate-500">Full appointment submission and student background</p>
+            </div>
+          </div>
+          <button id="btn-close-apt-details" class="text-slate-400 hover:text-slate-600 p-1.5 rounded-lg hover:bg-slate-50 transition">
+            <i data-lucide="x" class="w-4 h-4"></i>
+          </button>
+        </div>
+
+        <!-- Scrollable Body -->
+        <div class="overflow-y-auto py-4 space-y-4 text-xs pr-1 flex-1">
+          <!-- Student Profile Pill Card -->
+          <div class="p-3.5 bg-slate-50 rounded-xl border border-slate-200/80 space-y-2">
+            <div class="flex items-center justify-between">
+              <div>
+                <h4 id="apt-modal-student-name" class="font-bold text-slate-900 text-sm">Student Name</h4>
+                <div class="text-[11px] text-slate-500 font-mono mt-0.5">
+                  <span id="apt-modal-student-id">202X-XXXXXX</span> • <span id="apt-modal-student-prog">Program</span>
+                </div>
+              </div>
+              <span id="apt-modal-status-badge" class="px-2.5 py-1 rounded-full text-[10px] font-bold border">
+                Status
+              </span>
+            </div>
+
+            <!-- Contact Row -->
+            <div class="pt-2 border-t border-slate-200/60 flex flex-wrap items-center gap-x-4 gap-y-1.5 text-[11px]">
+              <div class="flex items-center gap-1.5 text-slate-700">
+                <i data-lucide="phone" class="w-3.5 h-3.5 text-emerald-600"></i>
+                <span id="apt-modal-student-phone" class="font-medium font-mono">None</span>
+              </div>
+              <div class="flex items-center gap-1.5 text-slate-700">
+                <i data-lucide="mail" class="w-3.5 h-3.5 text-blue-600"></i>
+                <span id="apt-modal-student-email" class="font-medium font-mono">None</span>
+              </div>
+              <div class="flex items-center gap-1.5 text-slate-700">
+                <i data-lucide="user" class="w-3.5 h-3.5 text-slate-400"></i>
+                <span>Gender: <strong id="apt-modal-student-gender">N/A</strong></span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Schedule & Counselor Assignment -->
+          <div class="grid grid-cols-2 gap-2.5">
+            <div class="p-3 bg-white rounded-xl border border-slate-200">
+              <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Session Schedule</span>
+              <div id="apt-modal-date" class="font-bold text-slate-900 mt-1">Date</div>
+              <div id="apt-modal-time" class="text-slate-600 font-mono text-[11px] mt-0.5">Time Slot</div>
+            </div>
+            <div class="p-3 bg-white rounded-xl border border-slate-200">
+              <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Counselor Assigned</span>
+              <div id="apt-modal-counselor" class="font-bold text-slate-900 mt-1">Counselor Name</div>
+              <div class="text-[11px] text-slate-500 mt-0.5">
+                Preference: <span id="apt-modal-pref" class="font-semibold text-slate-700">Any</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Primary Observed / Stated Concern -->
+          <div class="p-3 bg-white rounded-xl border border-slate-200 space-y-1">
+            <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Primary Concern Category</span>
+            <div id="apt-modal-concern-cat" class="font-bold text-[#00205B] text-xs">Category</div>
+          </div>
+
+          <!-- Student's Story / Specific Notes -->
+          <div class="p-3 bg-white rounded-xl border border-slate-200 space-y-1">
+            <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Student's Shared Story / Notes</span>
+            <div id="apt-modal-specific-concern" class="text-slate-700 leading-relaxed italic bg-slate-50 p-2.5 rounded-lg border border-slate-100 text-xs">
+              No additional notes provided by student.
+            </div>
+          </div>
+
+          <!-- Cancellation Notice Box (hidden if not cancelled) -->
+          <div id="apt-modal-cancel-box" class="p-3.5 bg-rose-50 border border-rose-200 rounded-xl space-y-1.5 hidden">
+            <div class="flex items-center gap-1.5 text-rose-800 font-bold">
+              <i data-lucide="calendar-x" class="w-4 h-4 text-rose-600"></i>
+              <span>Appointment Cancellation Record</span>
+            </div>
+            <div class="text-xs text-rose-950">
+              <span class="font-semibold">Reason:</span>
+              <span id="apt-modal-cancel-reason" class="italic font-medium">Reason here</span>
+            </div>
+            <div id="apt-modal-cancel-time" class="text-[10px] text-rose-600">
+              Recorded at: 2026-10-18 10:00 AM
+            </div>
+          </div>
+        </div>
+
+        <!-- Modal Footer -->
+        <div class="pt-3 border-t border-slate-100 flex items-center justify-between">
+          <button
+            type="button"
+            id="apt-modal-btn-open-case"
+            class="px-3.5 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-800 font-semibold text-xs transition flex items-center gap-1.5"
+          >
+            <i data-lucide="folder" class="w-3.5 h-3.5 text-slate-500"></i>
+            <span>Open Student Case</span>
+          </button>
+          <button
+            type="button"
+            id="btn-dismiss-apt-details"
+            class="px-4 py-1.5 rounded-xl bg-[#00205B] text-white hover:bg-[#0A192F] font-semibold text-xs shadow-sm transition"
+          >
+            Close
+          </button>
+        </div>
+      </div>
+    </div>
+
     <div id="printable-call-slip" class="hidden print-only">
       <div class="max-w-xl mx-auto border-2 border-slate-900 p-8 font-serif text-slate-900">
         <div class="text-center border-b-2 border-slate-900 pb-3 mb-4">

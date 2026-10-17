@@ -17,7 +17,7 @@ import {
   Timestamp,
   collectionGroup
 } from '../firebase-config.js';
-import { getRoleCategory } from '../utils/validation.js';
+import { getRoleCategory, formatTimeSlot12h, normalizeTimeSlot } from '../utils/validation.js';
 
 const LOCAL_STORE_KEY = 'guidehub_local_firestore_state';
 
@@ -471,9 +471,10 @@ export async function getAvailableCounselorsForSlot(date, timeSlot, genderPrefer
       const qApts = query(collection(db, 'appointments'), where('date', '==', date));
       const snap = await getDocs(qApts);
       if (!snap.empty) {
+        const normTargetSlot = normalizeTimeSlot(timeSlot);
         activeApts = snap.docs
           .map(d => ({ id: d.id, ...d.data() }))
-          .filter(apt => apt.timeSlot === timeSlot && apt.status !== 'Cancelled' && apt.status !== 'No-Show');
+          .filter(apt => normalizeTimeSlot(apt.timeSlot) === normTargetSlot && apt.status !== 'Cancelled' && apt.status !== 'No-Show');
       }
     }
   } catch (err) {
@@ -499,10 +500,17 @@ export async function getAvailableCounselorsForSlot(date, timeSlot, genderPrefer
     });
     if (hasCollision) return true;
 
+    const normSlot = normalizeTimeSlot(timeSlot);
+    const slot12h = formatTimeSlot12h(timeSlot);
+
     // 2. Local State Block Check
     const localDayBlocked = !!(
       (state.counselorSchedules[`${cId}_${dayOfWeek}_${timeSlot}`] || {}).isBlocked ||
-      (state.counselorSchedules[`${cId}_${date}_${timeSlot}`] || {}).isBlocked
+      (state.counselorSchedules[`${cId}_${dayOfWeek}_${normSlot}`] || {}).isBlocked ||
+      (state.counselorSchedules[`${cId}_${dayOfWeek}_${slot12h}`] || {}).isBlocked ||
+      (state.counselorSchedules[`${cId}_${date}_${timeSlot}`] || {}).isBlocked ||
+      (state.counselorSchedules[`${cId}_${date}_${normSlot}`] || {}).isBlocked ||
+      (state.counselorSchedules[`${cId}_${date}_${slot12h}`] || {}).isBlocked
     );
     if (localDayBlocked) return true;
 
@@ -512,9 +520,25 @@ export async function getAvailableCounselorsForSlot(date, timeSlot, genderPrefer
         if (dayOfWeek) {
           const daySnap = await getDoc(doc(db, 'counselorSchedules', `${cId}_${dayOfWeek}_${timeSlot}`));
           if (daySnap.exists() && daySnap.data().isBlocked) return true;
+          if (normSlot !== timeSlot) {
+            const daySnapNorm = await getDoc(doc(db, 'counselorSchedules', `${cId}_${dayOfWeek}_${normSlot}`));
+            if (daySnapNorm.exists() && daySnapNorm.data().isBlocked) return true;
+          }
+          if (slot12h !== timeSlot) {
+            const daySnap12 = await getDoc(doc(db, 'counselorSchedules', `${cId}_${dayOfWeek}_${slot12h}`));
+            if (daySnap12.exists() && daySnap12.data().isBlocked) return true;
+          }
         }
         const dateSnap = await getDoc(doc(db, 'counselorSchedules', `${cId}_${date}_${timeSlot}`));
         if (dateSnap.exists() && dateSnap.data().isBlocked) return true;
+        if (normSlot !== timeSlot) {
+          const dateSnapNorm = await getDoc(doc(db, 'counselorSchedules', `${cId}_${date}_${normSlot}`));
+          if (dateSnapNorm.exists() && dateSnapNorm.data().isBlocked) return true;
+        }
+        if (slot12h !== timeSlot) {
+          const dateSnap12 = await getDoc(doc(db, 'counselorSchedules', `${cId}_${date}_${slot12h}`));
+          if (dateSnap12.exists() && dateSnap12.data().isBlocked) return true;
+        }
       } catch (e) {}
     }
 

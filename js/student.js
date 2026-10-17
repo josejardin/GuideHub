@@ -14,7 +14,7 @@ import {
   subscribeAllAppointments,
   logAuditEvent
 } from './db.js';
-import { escapeHtml, formatDateIso } from './utils/validation.js';
+import { escapeHtml, formatDateIso, formatTimeSlot12h, normalizeTimeSlot } from './utils/validation.js';
 
 document.addEventListener('DOMContentLoaded', () => {
   const currentUser = requireRole(['student']);
@@ -205,7 +205,7 @@ document.addEventListener('DOMContentLoaded', () => {
               
               <div class="text-[11px] text-slate-500 flex flex-wrap items-center gap-x-3 gap-y-0.5">
                 <span>Date: <strong class="text-slate-700">${escapeHtml(apt.date)}</strong></span>
-                <span>Time: <strong class="text-slate-700">${escapeHtml(apt.timeSlot)}</strong></span>
+                <span>Time: <strong class="text-slate-700">${escapeHtml(formatTimeSlot12h(apt.timeSlot))}</strong></span>
                 <span>Counselor: <strong class="text-slate-700">${escapeHtml(apt.counselorName || 'Assigned Counselor')}</strong></span>
               </div>
 
@@ -282,19 +282,12 @@ document.addEventListener('DOMContentLoaded', () => {
 
   function getAppointmentScheduledDate(apt) {
     if (!apt || !apt.date) return null;
+    const norm = normalizeTimeSlot(apt.timeSlot || '08:00');
     let timeStr = '08:00';
-    if (apt.timeSlot && apt.timeSlot.includes('-')) {
-      timeStr = apt.timeSlot.split('-')[0].trim();
-    } else if (apt.timeSlot) {
-      timeStr = apt.timeSlot.trim();
-    }
-    if (!timeStr.includes(':')) {
-      timeStr = '08:00';
-    } else {
-      const parts = timeStr.split(':');
-      const h = parts[0].padStart(2, '0');
-      const m = (parts[1] || '00').substring(0, 2);
-      timeStr = `${h}:${m}`;
+    if (norm.includes('-')) {
+      timeStr = norm.split('-')[0].trim();
+    } else if (norm) {
+      timeStr = norm.trim();
     }
     return new Date(`${apt.date}T${timeStr}:00`);
   }
@@ -326,7 +319,7 @@ document.addEventListener('DOMContentLoaded', () => {
     activeCancellingAppointment = apt;
 
     if (cancelAptCategory) cancelAptCategory.textContent = apt.concernCategory || 'Counseling Session';
-    if (cancelAptDateTime) cancelAptDateTime.textContent = `${apt.date || 'Scheduled Date'} (${apt.timeSlot || 'Scheduled Time'})`;
+    if (cancelAptDateTime) cancelAptDateTime.textContent = `${apt.date || 'Scheduled Date'} (${formatTimeSlot12h(apt.timeSlot) || 'Scheduled Time'})`;
     if (cancelAptCounselor) cancelAptCounselor.textContent = apt.counselorName || 'Assigned Counselor';
     if (cancelReasonPreset) cancelReasonPreset.value = '';
     if (cancelReasonDetails) cancelReasonDetails.value = '';
@@ -566,14 +559,14 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   const TIME_SLOTS = [
-    '08:00 - 09:00',
-    '09:00 - 10:00',
-    '10:00 - 11:00',
-    '11:00 - 12:00',
-    '13:00 - 14:00',
-    '14:00 - 15:00',
-    '15:00 - 16:00',
-    '16:00 - 17:00'
+    '8:00 AM - 9:00 AM',
+    '9:00 AM - 10:00 AM',
+    '10:00 AM - 11:00 AM',
+    '11:00 AM - 12:00 PM',
+    '1:00 PM - 2:00 PM',
+    '2:00 PM - 3:00 PM',
+    '3:00 PM - 4:00 PM',
+    '4:00 PM - 5:00 PM'
   ];
 
   async function validateDateAndLoadSlots() {
@@ -597,17 +590,18 @@ document.addEventListener('DOMContentLoaded', () => {
     for (const slot of TIME_SLOTS) {
       const isAvailable = await checkSlotAvailable(dateInput.value, slot, 'any', 'Any');
       const isSelected = selectedSlot === slot;
+      const slotDisplay = formatTimeSlot12h(slot);
 
       if (isAvailable) {
         html += `
           <button type="button" data-slot="${slot}" class="btn-slot p-2 rounded text-xs font-medium border transition ${isSelected ? 'bg-[#00205B] text-[#F5B800] border-[#00205B] font-bold shadow-xs' : 'bg-white hover:bg-slate-50 text-slate-700 border-slate-200'}">
-            ${slot}
+            ${slotDisplay}
           </button>
         `;
       } else {
         html += `
           <button type="button" disabled class="p-2 rounded text-xs font-medium bg-rose-50/60 text-rose-400 border border-rose-100 cursor-not-allowed line-through" title="All counselors blocked / unavailable at this time">
-            ${slot}
+            ${slotDisplay}
           </button>
         `;
       }
@@ -630,7 +624,7 @@ document.addEventListener('DOMContentLoaded', () => {
     if (!counselorSelect || !dateInput) return;
 
     if (summaryDateTime) {
-      summaryDateTime.textContent = `${dateInput.value} (${selectedSlot || 'No slot selected'})`;
+      summaryDateTime.textContent = `${dateInput.value} (${formatTimeSlot12h(selectedSlot) || 'No slot selected'})`;
     }
 
     if (!selectedSlot) {
@@ -649,7 +643,7 @@ document.addEventListener('DOMContentLoaded', () => {
         counselorSelect.innerHTML = '<option value="" disabled selected>No counselors available for this selection</option>';
         if (noticeEl) {
           const prefDesc = chosenPref !== 'Any' ? `${chosenPref} ` : '';
-          noticeEl.textContent = `No ${prefDesc}guidance counselors are available at ${selectedSlot} on ${dateInput.value}. Please choose another schedule or select another gender preference.`;
+          noticeEl.textContent = `No ${prefDesc}guidance counselors are available at ${formatTimeSlot12h(selectedSlot)} on ${dateInput.value}. Please choose another schedule or select another gender preference.`;
           noticeEl.classList.remove('hidden');
         }
         return;

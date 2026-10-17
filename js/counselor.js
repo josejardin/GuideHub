@@ -21,7 +21,7 @@ import {
   subscribeAllCounselorSchedules,
   logAuditEvent
 } from './db.js';
-import { escapeHtml, formatDateIso } from './utils/validation.js';
+import { escapeHtml, formatDateIso, formatTime12h, formatTimeSlot12h, normalizeTimeSlot } from './utils/validation.js';
 
 document.addEventListener('DOMContentLoaded', () => {
   const currentUser = requireRole(['counselor', 'head', 'admin']);
@@ -162,14 +162,14 @@ document.addEventListener('DOMContentLoaded', () => {
 
   const DAY_NAMES = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
   const SLOTS = [
-    '08:00 - 09:00',
-    '09:00 - 10:00',
-    '10:00 - 11:00',
-    '11:00 - 12:00',
-    '13:00 - 14:00',
-    '14:00 - 15:00',
-    '15:00 - 16:00',
-    '16:00 - 17:00'
+    '8:00 AM - 9:00 AM',
+    '9:00 AM - 10:00 AM',
+    '10:00 AM - 11:00 AM',
+    '11:00 AM - 12:00 PM',
+    '1:00 PM - 2:00 PM',
+    '2:00 PM - 3:00 PM',
+    '3:00 PM - 4:00 PM',
+    '4:00 PM - 5:00 PM'
   ];
 
   async function renderAgenda() {
@@ -179,11 +179,14 @@ document.addEventListener('DOMContentLoaded', () => {
     const currentEmail = (currentUser.email || '').toLowerCase();
     const currentName = (currentUser.fullName || '').toLowerCase();
 
-    // Fetch this counselor's blocked slots
+    // Fetch this counselor's blocked slots (support both 12h and 24h formats)
     const blockedRecords = await getCounselorBlockedSlots(currentUser.uid);
-    const blockedSet = new Set(
-      blockedRecords.map(b => `${b.dayOfWeek}_${b.timeSlot}`)
-    );
+    const blockedSet = new Set();
+    blockedRecords.forEach(b => {
+      blockedSet.add(`${b.dayOfWeek}_${b.timeSlot}`);
+      blockedSet.add(`${b.dayOfWeek}_${normalizeTimeSlot(b.timeSlot)}`);
+      blockedSet.add(`${b.dayOfWeek}_${formatTimeSlot12h(b.timeSlot)}`);
+    });
 
     const accessibleAppointments = allAppointments.filter(apt => {
       const aptCId = apt.counselorId;
@@ -215,8 +218,15 @@ document.addEventListener('DOMContentLoaded', () => {
 
       // Exclude if I have BLOCKED this day/date & time slot
       const aptDay = apt.date ? DAY_NAMES[new Date(`${apt.date}T00:00:00`).getDay()] : '';
+      const normAptSlot = normalizeTimeSlot(apt.timeSlot);
+      const slot12h = formatTimeSlot12h(apt.timeSlot);
       const isMyBlockedSlot =
-        blockedSet.has(`${aptDay}_${apt.timeSlot}`) || blockedSet.has(`${apt.date}_${apt.timeSlot}`);
+        blockedSet.has(`${aptDay}_${apt.timeSlot}`) ||
+        blockedSet.has(`${aptDay}_${normAptSlot}`) ||
+        blockedSet.has(`${aptDay}_${slot12h}`) ||
+        blockedSet.has(`${apt.date}_${apt.timeSlot}`) ||
+        blockedSet.has(`${apt.date}_${normAptSlot}`) ||
+        blockedSet.has(`${apt.date}_${slot12h}`);
 
       if (isMyBlockedSlot) {
         // I have blocked this schedule, so this pending unassigned request is not for me
@@ -262,9 +272,18 @@ document.addEventListener('DOMContentLoaded', () => {
     const agendaBlockedBanner = document.getElementById('agenda-blocked-banner');
     if (agendaBlockedBanner) {
       const selectedDayOfWeek = selectedDate ? DAY_NAMES[new Date(`${selectedDate}T00:00:00`).getDay()] : '';
-      const blockedSlotsOnDate = SLOTS.filter(
-        slot => blockedSet.has(`${selectedDayOfWeek}_${slot}`) || blockedSet.has(`${selectedDate}_${slot}`)
-      );
+      const blockedSlotsOnDate = SLOTS.filter(slot => {
+        const norm = normalizeTimeSlot(slot);
+        const slot12 = formatTimeSlot12h(slot);
+        return (
+          blockedSet.has(`${selectedDayOfWeek}_${slot}`) ||
+          blockedSet.has(`${selectedDayOfWeek}_${norm}`) ||
+          blockedSet.has(`${selectedDayOfWeek}_${slot12}`) ||
+          blockedSet.has(`${selectedDate}_${slot}`) ||
+          blockedSet.has(`${selectedDate}_${norm}`) ||
+          blockedSet.has(`${selectedDate}_${slot12}`)
+        );
+      }).map(s => formatTimeSlot12h(s));
 
       if (blockedSlotsOnDate.length > 0 && activeViewFilter === 'selected_date') {
         agendaBlockedBanner.innerHTML = `
@@ -322,7 +341,7 @@ document.addEventListener('DOMContentLoaded', () => {
       const isBPending = (b.status || '').toLowerCase() === 'pending';
       if (isAPending && !isBPending) return -1;
       if (!isAPending && isBPending) return 1;
-      return (a.timeSlot || '').localeCompare(b.timeSlot || '');
+      return normalizeTimeSlot(a.timeSlot || '').localeCompare(normalizeTimeSlot(b.timeSlot || ''));
     });
 
     if (filtered.length === 0) {
@@ -360,88 +379,87 @@ document.addEventListener('DOMContentLoaded', () => {
         const isCancelled = statusLower === 'cancelled';
 
         const aptDay = apt.date ? DAY_NAMES[new Date(`${apt.date}T00:00:00`).getDay()] : '';
+        const normAptSlot = normalizeTimeSlot(apt.timeSlot);
+        const slot12h = formatTimeSlot12h(apt.timeSlot);
         const isConflict =
-          blockedSet.has(`${aptDay}_${apt.timeSlot}`) || blockedSet.has(`${apt.date}_${apt.timeSlot}`);
+          blockedSet.has(`${aptDay}_${apt.timeSlot}`) ||
+          blockedSet.has(`${aptDay}_${normAptSlot}`) ||
+          blockedSet.has(`${aptDay}_${slot12h}`) ||
+          blockedSet.has(`${apt.date}_${apt.timeSlot}`) ||
+          blockedSet.has(`${apt.date}_${normAptSlot}`) ||
+          blockedSet.has(`${apt.date}_${slot12h}`);
+
+        const formattedSlot = formatTimeSlot12h(apt.timeSlot || '');
+        const slotParts = formattedSlot.includes('-')
+          ? formattedSlot.split('-').map(s => s.trim())
+          : [formattedSlot, ''];
 
         return `
- <div class="p-4 bg-white flex flex-col md:flex-row items-start md:items-center justify-between gap-3 hover:bg-slate-50/60 transition ${isPending ? 'border-l-4 border-amber-400 bg-amber-50/20' : ''} ${isCancelled ? 'border-l-4 border-rose-500 bg-rose-50/20' : ''} ${isConflict ? 'border-r-4 border-rose-500' : ''}">
- <div class="flex items-start gap-3">
- <div class="w-16 py-1.5 rounded bg-[#00205B] text-white flex flex-col items-center justify-center flex-shrink-0 text-center font-mono">
- <span class="text-xs font-bold leading-tight">${escapeHtml(apt.timeSlot ? apt.timeSlot.split(' - ')[0] : 'TBD')}</span>
- <span class="text-[9px] text-[#F5B800]">${escapeHtml(apt.timeSlot ? apt.timeSlot.split(' - ')[1] : '')}</span>
- </div>
- 
- <div class="space-y-0.5">
- <div class="flex flex-wrap items-center gap-2">
- <span class="font-bold text-xs text-slate-900">${escapeHtml(apt.studentName)}</span>
- <span class="text-[11px] text-slate-500 font-mono">(${escapeHtml(apt.studentNumber)} • ${escapeHtml(apt.program)})</span>
- <span class="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-medium border ${badgeStyles[statusLower] || badgeStyles.pending}">
- ${escapeHtml(apt.status)}
- </span>
- ${apt.date !== todayIso ? `<span class="px-1.5 py-0.2 rounded text-[10px] font-semibold bg-slate-100 text-slate-600 border border-slate-200">${escapeHtml(apt.date)}</span>` : ''}
- ${isConflict ? `<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-rose-100 text-rose-800 border border-rose-300">BLOCKED SLOT CONFLICT</span>` : ''}
- </div>
- 
- <div class="text-[11px] text-slate-500 flex flex-wrap items-center gap-x-3 gap-y-0.5">
- <span class="font-medium text-[#00205B]">${escapeHtml(apt.concernCategory)}</span>
- <span>Counselor: <strong class="text-slate-700">${escapeHtml(apt.counselorName || 'Any Available')}</strong></span>
- <span>Pref: <strong>${escapeHtml(apt.counselorGenderPreference || 'Any')}</strong></span>
- ${apt.contactNumber ? `<a href="tel:${escapeHtml(apt.contactNumber)}" class="inline-flex items-center gap-1 text-slate-700 font-medium hover:text-[#00205B] transition"><i data-lucide="phone" class="w-3 h-3 text-emerald-600"></i><span>${escapeHtml(apt.contactNumber)}</span></a>` : ''}
- ${apt.studentEmail ? `<a href="mailto:${escapeHtml(apt.studentEmail)}" class="inline-flex items-center gap-1 text-slate-700 font-medium hover:text-[#00205B] transition"><i data-lucide="mail" class="w-3 h-3 text-blue-600"></i><span>${escapeHtml(apt.studentEmail)}</span></a>` : ''}
- </div>
-
- ${apt.specificConcern ? `<p class="text-[11px] text-slate-600 italic mt-0.5">"${escapeHtml(apt.specificConcern)}"</p>` : ''}
-              ${
-                statusLower === 'cancelled'
-                  ? `
-                <div class="mt-2 p-2.5 rounded-lg bg-rose-50 border border-rose-200 text-rose-900 text-xs leading-relaxed flex items-start gap-2">
-                  <i data-lucide="calendar-x" class="w-4 h-4 text-rose-600 shrink-0 mt-0.5"></i>
-                  <div>
-                    <strong class="font-bold text-rose-800">Student Cancellation Reason:</strong>
-                    <span class="text-rose-950 font-medium italic block mt-0.5">"${escapeHtml(apt.cancellationReason || 'No detailed reason provided.')}"</span>
-                    ${apt.cancelledAt ? `<span class="text-[10px] text-rose-500 block mt-1">Recorded: ${escapeHtml(formatDateIso(apt.cancelledAt))}</span>` : ''}
-                  </div>
+          <div class="p-4 bg-white flex flex-col md:flex-row items-start md:items-center justify-between gap-3 hover:bg-slate-50/60 transition ${isPending ? 'border-l-4 border-amber-400 bg-amber-50/20' : ''} ${isCancelled ? 'border-l-4 border-rose-500 bg-rose-50/20' : ''} ${isConflict ? 'border-r-4 border-rose-500' : ''}">
+            <div class="flex items-center gap-3">
+              <div class="w-20 py-2 px-1 rounded-lg bg-[#00205B] text-white flex flex-col items-center justify-center flex-shrink-0 text-center font-mono shadow-2xs">
+                <span class="text-xs font-bold leading-tight">${escapeHtml(slotParts[0] || 'TBD')}</span>
+                <span class="text-[10px] text-[#F5B800] font-medium leading-tight">${escapeHtml(slotParts[1] || '')}</span>
+              </div>
+              
+              <div class="space-y-1">
+                <div class="flex flex-wrap items-center gap-2">
+                  <span class="font-bold text-xs text-slate-900">${escapeHtml(apt.studentName)}</span>
+                  <span class="text-[11px] text-slate-500 font-mono">(${escapeHtml(apt.studentNumber)} • ${escapeHtml(apt.program)})</span>
+                  <span class="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-medium border ${badgeStyles[statusLower] || badgeStyles.pending}">
+                    ${escapeHtml(apt.status)}
+                  </span>
+                  ${apt.date !== todayIso ? `<span class="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-slate-100 text-slate-600 border border-slate-200">${escapeHtml(apt.date)}</span>` : ''}
+                  ${isConflict ? `<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-rose-100 text-rose-800 border border-rose-300">BLOCKED SLOT CONFLICT</span>` : ''}
                 </div>
-                `
+                
+                <div class="text-[11px] text-slate-500 flex flex-wrap items-center gap-x-3 gap-y-0.5">
+                  <span class="font-semibold text-[#00205B]">${escapeHtml(apt.concernCategory)}</span>
+                  <span>Counselor: <strong class="text-slate-700">${escapeHtml(apt.counselorName || 'Any Available')}</strong></span>
+                  ${isCancelled ? `<span class="inline-flex items-center gap-1 text-[11px] font-semibold text-rose-700 bg-rose-50 px-2 py-0.5 rounded border border-rose-200"><i data-lucide="calendar-x" class="w-3 h-3 text-rose-600"></i> Cancelled</span>` : ''}
+                </div>
+              </div>
+            </div>
+
+            <!-- Actions -->
+            <div class="flex items-center gap-1.5 self-end md:self-center">
+              <button data-id="${escapeHtml(apt.id)}" class="btn-view-apt-details px-2.5 py-1.5 rounded-lg border border-slate-200 hover:bg-slate-100 text-slate-700 text-xs font-semibold transition flex items-center gap-1 shadow-2xs" title="View complete details, contact info, notes, and cancellation reason">
+                <i data-lucide="eye" class="w-3.5 h-3.5 text-slate-500"></i>
+                <span>Details</span>
+              </button>
+
+              ${
+                isPending
+                  ? `
+              <button data-action="Confirmed" data-id="${escapeHtml(apt.id)}" class="btn-apt-status px-3 py-1.5 rounded-lg bg-[#00205B] hover:bg-[#0A192F] text-white text-xs font-semibold shadow-sm transition flex items-center gap-1">
+                <span>Accept</span>
+              </button>
+              <button data-action="Cancelled" data-id="${escapeHtml(apt.id)}" class="btn-apt-status px-2.5 py-1.5 rounded-lg border border-rose-200 hover:bg-rose-50 text-rose-700 text-xs font-medium transition">
+                Decline
+              </button>
+              `
                   : ''
               }
- </div>
- </div>
 
- <!-- Actions -->
- <div class="flex items-center gap-1.5 self-end md:self-center">
- ${
-   isPending
-     ? `
- <button data-action="Confirmed" data-id="${escapeHtml(apt.id)}" class="btn-apt-status px-3 py-1.5 rounded-lg bg-[#00205B] hover:bg-[#0A192F] text-white text-xs font-semibold shadow-sm transition flex items-center gap-1">
- <span>Accept & Confirm</span>
- </button>
- <button data-action="Cancelled" data-id="${escapeHtml(apt.id)}" class="btn-apt-status px-2.5 py-1.5 rounded-lg border border-rose-200 hover:bg-rose-50 text-rose-700 text-xs font-medium transition">
- Decline
- </button>
- `
-     : ''
- }
+              ${
+                isConfirmed
+                  ? `
+              <button data-action="Completed" data-id="${escapeHtml(apt.id)}" class="btn-apt-status px-3 py-1.5 rounded-lg bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-semibold shadow-sm transition">
+                Mark Completed
+              </button>
+              <button data-action="No-Show" data-id="${escapeHtml(apt.id)}" class="btn-apt-status px-2.5 py-1.5 rounded-lg border border-slate-200 hover:bg-slate-100 text-slate-700 text-xs font-medium transition">
+                No-Show
+              </button>
+              `
+                  : ''
+              }
 
- ${
-   isConfirmed
-     ? `
- <button data-action="Completed" data-id="${escapeHtml(apt.id)}" class="btn-apt-status px-3 py-1.5 rounded-lg bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-semibold shadow-sm transition">
- Mark Completed
- </button>
- <button data-action="No-Show" data-id="${escapeHtml(apt.id)}" class="btn-apt-status px-2.5 py-1.5 rounded-lg border border-slate-200 hover:bg-slate-100 text-slate-700 text-xs font-medium transition">
- No-Show
- </button>
- `
-     : ''
- }
-
- <button data-student-num="${escapeHtml(apt.studentNumber)}" data-student-name="${escapeHtml(apt.studentName)}" data-program="${escapeHtml(apt.program)}" class="btn-open-case-direct px-2.5 py-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-medium transition">
- Open Case
- </button>
- </div>
- </div>
- `;
+              <button data-student-num="${escapeHtml(apt.studentNumber)}" data-student-name="${escapeHtml(apt.studentName)}" data-program="${escapeHtml(apt.program)}" class="btn-open-case-direct px-2.5 py-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-medium transition">
+                Open Case
+              </button>
+            </div>
+          </div>
+        `;
       })
       .join('');
 
@@ -449,6 +467,18 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   agendaList?.addEventListener('click', async e => {
+    const detailsBtn = e.target.closest('.btn-view-apt-details');
+    if (detailsBtn) {
+      e.preventDefault();
+      e.stopPropagation();
+      const id = detailsBtn.getAttribute('data-id');
+      const apt = allAppointments.find(a => a.id === id);
+      if (apt) {
+        openAppointmentDetailsModal(apt);
+      }
+      return;
+    }
+
     const statusBtn = e.target.closest('.btn-apt-status');
     if (statusBtn) {
       e.preventDefault();
@@ -516,6 +546,111 @@ document.addEventListener('DOMContentLoaded', () => {
       selectCaseFolder(caseRecord.id);
     }
   });
+
+  // --- Appointment Details Modal Controller ---
+  const modalAptDetails = document.getElementById('modal-appointment-details');
+  const btnCloseAptDetails = document.getElementById('btn-close-apt-details');
+  const btnDismissAptDetails = document.getElementById('btn-dismiss-apt-details');
+  const aptModalOpenCase = document.getElementById('apt-modal-btn-open-case');
+
+  function closeAppointmentDetailsModal() {
+    if (modalAptDetails) modalAptDetails.classList.add('hidden');
+  }
+
+  btnCloseAptDetails?.addEventListener('click', closeAppointmentDetailsModal);
+  btnDismissAptDetails?.addEventListener('click', closeAppointmentDetailsModal);
+  modalAptDetails?.addEventListener('click', e => {
+    if (e.target === modalAptDetails) closeAppointmentDetailsModal();
+  });
+
+  function openAppointmentDetailsModal(apt) {
+    if (!modalAptDetails || !apt) return;
+
+    const nameEl = document.getElementById('apt-modal-student-name');
+    const idEl = document.getElementById('apt-modal-student-id');
+    const progEl = document.getElementById('apt-modal-student-prog');
+    const statusBadge = document.getElementById('apt-modal-status-badge');
+    const phoneEl = document.getElementById('apt-modal-student-phone');
+    const emailEl = document.getElementById('apt-modal-student-email');
+    const genderEl = document.getElementById('apt-modal-student-gender');
+    const dateEl = document.getElementById('apt-modal-date');
+    const timeEl = document.getElementById('apt-modal-time');
+    const counselorEl = document.getElementById('apt-modal-counselor');
+    const prefEl = document.getElementById('apt-modal-pref');
+    const concernCatEl = document.getElementById('apt-modal-concern-cat');
+    const specificConcernEl = document.getElementById('apt-modal-specific-concern');
+    const cancelBox = document.getElementById('apt-modal-cancel-box');
+    const cancelReasonEl = document.getElementById('apt-modal-cancel-reason');
+    const cancelTimeEl = document.getElementById('apt-modal-cancel-time');
+
+    if (nameEl) nameEl.textContent = apt.studentName || 'Student';
+    if (idEl) idEl.textContent = apt.studentNumber || 'N/A';
+    if (progEl) progEl.textContent = apt.program || 'N/A';
+
+    const statusLower = (apt.status || 'pending').toLowerCase();
+    const badgeStyles = {
+      pending: 'bg-amber-50 text-amber-700 border-amber-200',
+      confirmed: 'bg-emerald-50 text-emerald-700 border-emerald-200',
+      completed: 'bg-slate-100 text-slate-700 border-slate-200',
+      cancelled: 'bg-rose-50 text-rose-700 border-rose-200',
+      'no-show': 'bg-slate-100 text-slate-500 border-slate-200'
+    };
+
+    if (statusBadge) {
+      statusBadge.textContent = apt.status || 'Pending';
+      statusBadge.className = `px-2.5 py-1 rounded-full text-[10px] font-bold border ${badgeStyles[statusLower] || badgeStyles.pending}`;
+    }
+
+    if (phoneEl) phoneEl.textContent = apt.contactNumber || 'None provided';
+    if (emailEl) emailEl.textContent = apt.studentEmail || 'None provided';
+    if (genderEl) genderEl.textContent = apt.gender || 'Not specified';
+    if (dateEl) dateEl.textContent = apt.date || 'TBD';
+    if (timeEl) timeEl.textContent = formatTimeSlot12h(apt.timeSlot) || 'TBD';
+    if (counselorEl) counselorEl.textContent = apt.counselorName || 'Any Available Counselor';
+    if (prefEl) prefEl.textContent = apt.counselorGenderPreference || 'Any';
+    if (concernCatEl) concernCatEl.textContent = apt.concernCategory || 'General Guidance Consultation';
+
+    if (specificConcernEl) {
+      if (apt.specificConcern && apt.specificConcern.trim()) {
+        specificConcernEl.textContent = `"${apt.specificConcern.trim()}"`;
+        specificConcernEl.classList.remove('text-slate-400');
+        specificConcernEl.classList.add('text-slate-700');
+      } else {
+        specificConcernEl.textContent = 'No additional notes or disclosures provided by student.';
+        specificConcernEl.classList.remove('text-slate-700');
+        specificConcernEl.classList.add('text-slate-400');
+      }
+    }
+
+    if (cancelBox) {
+      if (statusLower === 'cancelled') {
+        cancelBox.classList.remove('hidden');
+        if (cancelReasonEl) cancelReasonEl.textContent = `"${apt.cancellationReason || 'No detailed reason provided.'}"`;
+        if (cancelTimeEl) {
+          cancelTimeEl.textContent = apt.cancelledAt ? `Recorded: ${formatDateIso(apt.cancelledAt)}` : '';
+        }
+      } else {
+        cancelBox.classList.add('hidden');
+      }
+    }
+
+    if (aptModalOpenCase) {
+      aptModalOpenCase.onclick = async () => {
+        closeAppointmentDetailsModal();
+        const caseRecord = await getOrCreateCase(apt.studentNumber, apt.studentName, apt.program, currentUser.uid);
+        if (caseRecord.status === 'Closed') {
+          await updateCaseStatus(caseRecord.id, 'Active');
+          caseRecord.status = 'Active';
+          showToast(`Retrieved past clinical records for ${apt.studentName}. Case reopened as Active.`, 'info');
+        }
+        switchTab('cases');
+        selectCaseFolder(caseRecord.id);
+      };
+    }
+
+    modalAptDetails.classList.remove('hidden');
+    if (window.lucide) window.lucide.createIcons();
+  }
 
   let allWalkinQueue = [];
   const listWaiting = document.getElementById('queue-list-waiting');
@@ -1192,96 +1327,103 @@ document.addEventListener('DOMContentLoaded', () => {
 
     caseDetailPanel.innerHTML = `
       <!-- Case Header -->
-      <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-200">
-        <div>
-          <div class="flex items-center gap-2">
+      <div class="pb-3 border-b border-slate-200 space-y-2.5">
+        <!-- Top Row: Student Name, ID, Header Badge (Left) & Status Dropdown (Right, kahilera ng name) -->
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div class="flex flex-wrap items-center gap-2">
             <h3 class="text-base font-bold text-slate-900">${escapeHtml(caseRecord.studentName)}</h3>
             <span class="text-xs text-slate-500 font-mono">(${escapeHtml(caseRecord.studentNumber)})</span>
             <span id="case-header-badge" class="px-2 py-0.5 rounded text-[10px] border ${badgeStyles[currentStatus] || badgeStyles.Active}">
               ${escapeHtml(currentStatus)}
             </span>
           </div>
-          <div class="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-slate-500 mt-1">
-            <span>${escapeHtml(caseRecord.program)} • ${escapeHtml(caseRecord.category || 'Clinical Record')}</span>
-            ${studentPhone ? `<a href="tel:${escapeHtml(studentPhone)}" class="inline-flex items-center gap-1 font-semibold text-slate-700 hover:text-[#00205B] transition"><i data-lucide="phone" class="w-3.5 h-3.5 text-emerald-600"></i><span>${escapeHtml(studentPhone)}</span></a>` : ''}
-            ${studentEmail ? `<a href="mailto:${escapeHtml(studentEmail)}" class="inline-flex items-center gap-1 font-semibold text-slate-700 hover:text-[#00205B] transition"><i data-lucide="mail" class="w-3.5 h-3.5 text-blue-600"></i><span>${escapeHtml(studentEmail)}</span></a>` : ''}
+
+          <div class="flex items-center gap-2 self-start sm:self-center shrink-0">
+            <label for="case-status-select" class="text-xs text-slate-500 font-semibold">Status:</label>
+            <select id="case-status-select" class="text-xs border border-slate-300 rounded-lg px-2.5 py-1.5 bg-white font-bold text-slate-800 focus:border-[#00205B] focus:outline-none shadow-sm">
+              <option value="Active" ${currentStatus === 'Active' ? 'selected' : ''}>Active</option>
+              <option value="High Risk" ${currentStatus === 'High Risk' ? 'selected' : ''}>High Risk</option>
+              <option value="Monitoring" ${currentStatus === 'Monitoring' ? 'selected' : ''}>Monitoring</option>
+              <option value="Closed" ${currentStatus === 'Closed' ? 'selected' : ''}>Closed</option>
+            </select>
           </div>
+        </div>
 
-          <!-- Linked Past Student Records / Shift History -->
-          ${
-            caseRecord.previousStudentNumbers && caseRecord.previousStudentNumbers.length > 0
-              ? `
-              <div class="flex flex-wrap items-center gap-1.5 mt-2 pt-2 border-t border-slate-100 text-xs">
-                <span class="text-[11px] font-bold text-slate-600 flex items-center gap-1">
-                  <i data-lucide="link-2" class="w-3.5 h-3.5 text-blue-600"></i> Linked Past ID(s):
-                </span>
-                ${caseRecord.previousStudentNumbers
-                  .map(oldNum => {
-                    const info = (caseRecord.linkedCasesInfo || []).find(i => i.studentNumber === oldNum) || {};
-                    return `
-                    <span class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-blue-50 text-[#00205B] border border-blue-200">
-                      <span>${escapeHtml(oldNum)}</span>
-                      ${info.program ? `<span class="text-[10px] text-blue-600 font-normal">(${escapeHtml(info.program)})</span>` : ''}
-                      <button type="button" class="btn-unlink-past-case text-slate-400 hover:text-rose-600 transition" data-old-num="${escapeHtml(oldNum)}" title="Unlink this past record">
-                        <i data-lucide="x" class="w-2.5 h-2.5"></i>
-                      </button>
-                    </span>
-                  `;
-                  })
-                  .join('')}
-                <button type="button" id="btn-open-link-modal" class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-semibold text-slate-700 hover:text-[#00205B] bg-slate-100 hover:bg-slate-200 transition">
-                  <i data-lucide="plus" class="w-3 h-3 text-slate-500"></i>
-                  <span>Link Another Past ID</span>
-                </button>
-              </div>
-              `
-              : `
-              <div class="flex flex-wrap items-center justify-between gap-2 mt-2 pt-2 border-t border-slate-100 text-xs">
-                <button type="button" id="btn-open-link-modal" class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold text-[#00205B] hover:bg-blue-50 bg-slate-100 border border-slate-200 transition" title="Link previous SHS ID or prior degree program case history">
-                  <i data-lucide="link" class="w-3.5 h-3.5 text-blue-600"></i>
-                  <span>Link Previous Student ID / Past Case</span>
-                </button>
-                <span class="text-[10px] text-slate-400">For shifters &amp; SHS graduates transitioning with a new ID number.</span>
-              </div>
-              `
-          }
+        <!-- Row 2: Program, Category, Phone, Email -->
+        <div class="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-slate-500">
+          <span>${escapeHtml(caseRecord.program)} • ${escapeHtml(caseRecord.category || 'Clinical Record')}</span>
+          ${studentPhone ? `<a href="tel:${escapeHtml(studentPhone)}" class="inline-flex items-center gap-1 font-semibold text-slate-700 hover:text-[#00205B] transition"><i data-lucide="phone" class="w-3.5 h-3.5 text-emerald-600"></i><span>${escapeHtml(studentPhone)}</span></a>` : ''}
+          ${studentEmail ? `<a href="mailto:${escapeHtml(studentEmail)}" class="inline-flex items-center gap-1 font-semibold text-slate-700 hover:text-[#00205B] transition"><i data-lucide="mail" class="w-3.5 h-3.5 text-blue-600"></i><span>${escapeHtml(studentEmail)}</span></a>` : ''}
+        </div>
 
-          ${
-            studentCancelledApts.length > 0
-              ? `
-              <div class="mt-2.5 p-2.5 rounded-lg bg-rose-50/70 border border-rose-200 text-xs text-rose-900 space-y-1.5">
-                <div class="font-bold flex items-center gap-1.5 text-rose-800">
+        <!-- Row 3: Linked Past Student Records / Shift History -->
+        ${
+          caseRecord.previousStudentNumbers && caseRecord.previousStudentNumbers.length > 0
+            ? `
+            <div class="flex flex-wrap items-center gap-1.5 pt-2 border-t border-slate-100 text-xs">
+              <span class="text-[11px] font-bold text-slate-600 flex items-center gap-1">
+                <i data-lucide="link-2" class="w-3.5 h-3.5 text-blue-600"></i> Linked Past ID(s):
+              </span>
+              ${caseRecord.previousStudentNumbers
+                .map(oldNum => {
+                  const info = (caseRecord.linkedCasesInfo || []).find(i => i.studentNumber === oldNum) || {};
+                  return `
+                  <span class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-blue-50 text-[#00205B] border border-blue-200">
+                    <span>${escapeHtml(oldNum)}</span>
+                    ${info.program ? `<span class="text-[10px] text-blue-600 font-normal">(${escapeHtml(info.program)})</span>` : ''}
+                    <button type="button" class="btn-unlink-past-case text-slate-400 hover:text-rose-600 transition" data-old-num="${escapeHtml(oldNum)}" title="Unlink this past record">
+                      <i data-lucide="x" class="w-2.5 h-2.5"></i>
+                    </button>
+                  </span>
+                `;
+                })
+                .join('')}
+              <button type="button" id="btn-open-link-modal" class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-semibold text-slate-700 hover:text-[#00205B] bg-slate-100 hover:bg-slate-200 transition">
+                <i data-lucide="plus" class="w-3 h-3 text-slate-500"></i>
+                <span>Link Another Past ID</span>
+              </button>
+            </div>
+            `
+            : `
+            <div class="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-slate-100 text-xs">
+              <button type="button" id="btn-open-link-modal" class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold text-[#00205B] hover:bg-blue-50 bg-slate-100 border border-slate-200 transition" title="Link previous SHS ID or prior degree program case history">
+                <i data-lucide="link" class="w-3.5 h-3.5 text-blue-600"></i>
+                <span>Link Previous Student ID / Past Case</span>
+              </button>
+              <span class="text-[10px] text-slate-400">For shifters &amp; SHS graduates transitioning with a new ID number.</span>
+            </div>
+            `
+        }
+
+        <!-- Row 4: Cancelled Appointment Record (Scrollable, Clean, 12h AM/PM) -->
+        ${
+          studentCancelledApts.length > 0
+            ? `
+            <div class="mt-2 p-2.5 rounded-lg bg-rose-50/70 border border-rose-200 text-xs text-rose-900 space-y-1.5">
+              <div class="font-bold flex items-center justify-between text-rose-800">
+                <div class="flex items-center gap-1.5">
                   <i data-lucide="calendar-x" class="w-3.5 h-3.5 text-rose-600"></i>
-                  <span>Cancelled Appointment Record (${studentCancelledApts.length}):</span>
+                  <span>Cancelled Appointments Record (${studentCancelledApts.length}):</span>
                 </div>
-                <div class="space-y-1 pl-5">
-                  ${studentCancelledApts
-                    .map(
-                      ca => `
-                    <div class="text-[11px] text-slate-700">
-                      • <strong>${escapeHtml(ca.date)} (${escapeHtml(ca.timeSlot || 'Scheduled')})</strong>:
-                      <span class="font-medium text-rose-950 italic">"${escapeHtml(ca.cancellationReason || 'No reason provided')}"</span>
-                      ${ca.cancelledAt ? `<span class="text-[10px] text-slate-400">(${escapeHtml(formatDateIso(ca.cancelledAt))})</span>` : ''}
-                    </div>
-                  `
-                    )
-                    .join('')}
-                </div>
+                <span class="text-[10px] font-normal text-rose-600">Prior student cancellation reasons</span>
               </div>
-              `
-              : ''
-          }
-        </div>
-
-        <div class="flex items-center gap-2">
-          <span class="text-xs text-slate-500 font-semibold">Status:</span>
-          <select id="case-status-select" class="text-xs border border-slate-300 rounded-lg px-2.5 py-1.5 bg-white font-bold text-slate-800 focus:border-[#00205B] focus:outline-none shadow-sm">
-            <option value="Active" ${currentStatus === 'Active' ? 'selected' : ''}>Active</option>
-            <option value="High Risk" ${currentStatus === 'High Risk' ? 'selected' : ''}>High Risk</option>
-            <option value="Monitoring" ${currentStatus === 'Monitoring' ? 'selected' : ''}>Monitoring</option>
-            <option value="Closed" ${currentStatus === 'Closed' ? 'selected' : ''}>Closed</option>
-          </select>
-        </div>
+              <div class="space-y-1 pl-4 max-h-32 overflow-y-auto">
+                ${studentCancelledApts
+                  .map(
+                    ca => `
+                  <div class="text-[11px] text-slate-700">
+                    • <strong>${escapeHtml(ca.date)} (${escapeHtml(formatTimeSlot12h(ca.timeSlot) || 'Scheduled')})</strong>:
+                    <span class="font-medium text-rose-950 italic">"${escapeHtml(ca.cancellationReason || 'No reason provided')}"</span>
+                    ${ca.cancelledAt ? `<span class="text-[10px] text-slate-400">(${escapeHtml(formatDateIso(ca.cancelledAt))})</span>` : ''}
+                  </div>
+                `
+                  )
+                  .join('')}
+              </div>
+            </div>
+            `
+            : ''
+        }
       </div>
 
       ${
@@ -1941,23 +2083,34 @@ document.addEventListener('DOMContentLoaded', () => {
   async function renderAvailabilityGrid() {
     if (!availabilityGrid) return;
     const blockedRecords = await getCounselorBlockedSlots(currentUser.uid);
-    const blockedSet = new Set(blockedRecords.map(b => `${b.dayOfWeek}_${b.timeSlot}`));
+    const blockedSet = new Set();
+    blockedRecords.forEach(b => {
+      blockedSet.add(`${b.dayOfWeek}_${b.timeSlot}`);
+      blockedSet.add(`${b.dayOfWeek}_${normalizeTimeSlot(b.timeSlot)}`);
+      blockedSet.add(`${b.dayOfWeek}_${formatTimeSlot12h(b.timeSlot)}`);
+    });
 
     let html = '';
     DAYS.forEach(day => {
       html += `
- <div class="col-span-2 sm:col-span-4 mt-2 font-bold text-xs text-slate-800 border-b border-slate-200 pb-1">
- ${day}
- </div>
- `;
+        <div class="col-span-2 sm:col-span-4 mt-2 font-bold text-xs text-slate-800 border-b border-slate-200 pb-1">
+          ${day}
+        </div>
+      `;
       SLOTS.forEach(slot => {
-        const isBlocked = blockedSet.has(`${day}_${slot}`);
+        const norm = normalizeTimeSlot(slot);
+        const slot12 = formatTimeSlot12h(slot);
+        const isBlocked =
+          blockedSet.has(`${day}_${slot}`) ||
+          blockedSet.has(`${day}_${norm}`) ||
+          blockedSet.has(`${day}_${slot12}`);
+
         html += `
- <button data-day="${day}" data-slot="${slot}" data-blocked="${isBlocked}" class="btn-toggle-slot p-2 rounded border text-xs text-center transition ${isBlocked ? 'bg-rose-50 border-rose-200 text-rose-700 font-semibold' : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50'}">
- <div class="text-[10px] text-slate-400">${slot}</div>
- <div class="text-xs mt-0.5">${isBlocked ? 'BLOCKED' : 'AVAILABLE'}</div>
- </button>
- `;
+          <button data-day="${day}" data-slot="${slot}" data-blocked="${isBlocked}" class="btn-toggle-slot p-2 rounded border text-xs text-center transition ${isBlocked ? 'bg-rose-50 border-rose-200 text-rose-700 font-semibold' : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50'}">
+            <div class="text-[10px] text-slate-400 font-mono">${formatTimeSlot12h(slot)}</div>
+            <div class="text-xs mt-0.5">${isBlocked ? 'BLOCKED' : 'AVAILABLE'}</div>
+          </button>
+        `;
       });
     });
 
