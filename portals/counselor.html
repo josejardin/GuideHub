@@ -279,6 +279,27 @@
               </div>
               <div class="flex flex-wrap items-center gap-2">
                 <div class="flex items-center gap-1.5">
+                  <label class="text-xs text-slate-400 font-medium">Program:</label>
+                  <select
+                    id="case-program-filter"
+                    class="text-xs border border-slate-200 rounded-md px-2.5 py-1 bg-white font-medium focus:border-[#00205B] focus:outline-none shadow-2xs max-w-[150px]"
+                  >
+                    <option value="ALL" selected>All Programs</option>
+                    <option value="BS Psychology">BS Psychology</option>
+                    <option value="BS Information Technology">BS Information Technology</option>
+                    <option value="BS Business Administration">BS Business Administration</option>
+                    <option value="BS Accountancy">BS Accountancy</option>
+                    <option value="BS Hospitality Management">BS Hospitality Management</option>
+                    <option value="BS Tourism Management">BS Tourism Management</option>
+                    <option value="BS Medical Technology">BS Medical Technology</option>
+                    <option value="BS Nursing">BS Nursing</option>
+                    <option value="SHS STEM">SHS STEM</option>
+                    <option value="SHS ABM">SHS ABM</option>
+                    <option value="SHS HUMSS">SHS HUMSS</option>
+                    <option value="SHS GAS">SHS GAS</option>
+                  </select>
+                </div>
+                <div class="flex items-center gap-1.5">
                   <label class="text-xs text-slate-400 font-medium">Status:</label>
                   <select
                     id="case-status-filter"
@@ -297,7 +318,7 @@
                   <input
                     type="text"
                     id="case-search-input"
-                    placeholder="Search folder..."
+                    placeholder="Search name or ID..."
                     class="w-full pl-8 pr-2.5 py-1 text-xs border border-slate-200 rounded-md focus:outline-none focus:border-slate-900"
                   />
                 </div>

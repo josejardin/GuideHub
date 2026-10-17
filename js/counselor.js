@@ -892,9 +892,45 @@ document.addEventListener('DOMContentLoaded', () => {
   const caseDetailPanel = document.getElementById('case-detail-panel');
   const caseSearchInput = document.getElementById('case-search-input');
   const caseStatusFilter = document.getElementById('case-status-filter');
+  const caseProgramFilter = document.getElementById('case-program-filter');
+
+  function updateProgramFilterOptions() {
+    if (!caseProgramFilter) return;
+    const currentVal = caseProgramFilter.value || 'ALL';
+    const knownPrograms = new Set([
+      'BS Psychology',
+      'BS Information Technology',
+      'BS Computer Science',
+      'BS Business Administration',
+      'BS Accountancy',
+      'BS Hospitality Management',
+      'BS Tourism Management',
+      'BS Medical Technology',
+      'BS Nursing',
+      'SHS STEM',
+      'SHS ABM',
+      'SHS HUMSS',
+      'SHS GAS'
+    ]);
+
+    allCases.forEach(c => {
+      if (c.program && c.program.trim()) {
+        knownPrograms.add(c.program.trim());
+      }
+    });
+
+    const sorted = Array.from(knownPrograms).sort((a, b) => a.localeCompare(b));
+    let html = '<option value="ALL">All Programs</option>';
+    sorted.forEach(p => {
+      html += `<option value="${escapeHtml(p)}" ${p.toLowerCase() === currentVal.toLowerCase() ? 'selected' : ''}>${escapeHtml(p)}</option>`;
+    });
+    caseProgramFilter.innerHTML = html;
+    caseProgramFilter.value = currentVal;
+  }
 
   subscribeAllCases(cases => {
     allCases = cases;
+    updateProgramFilterOptions();
     renderCaseFolders();
     if (selectedCaseId) {
       const active = allCases.find(c => c.id === selectedCaseId);
@@ -904,6 +940,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   caseSearchInput?.addEventListener('input', renderCaseFolders);
   caseStatusFilter?.addEventListener('change', renderCaseFolders);
+  caseProgramFilter?.addEventListener('change', renderCaseFolders);
 
   caseFolderList?.addEventListener('click', e => {
     const item = e.target.closest('.case-item');
@@ -914,16 +951,28 @@ document.addEventListener('DOMContentLoaded', () => {
 
   function renderCaseFolders() {
     if (!caseFolderList) return;
-    const query = (caseSearchInput?.value || '').toLowerCase();
+    const query = (caseSearchInput?.value || '').trim().toLowerCase();
     const statusFilter = caseStatusFilter?.value || 'ACTIVE';
+    const programFilter = caseProgramFilter?.value || 'ALL';
 
     const filtered = allCases.filter(c => {
-      const matchesSearch =
-        (c.studentName || '').toLowerCase().includes(query) ||
-        (c.studentNumber || '').toLowerCase().includes(query) ||
-        (c.program || '').toLowerCase().includes(query);
-      if (!matchesSearch) return false;
+      // 1. Search text filter (Student Name OR Student Number / ID)
+      if (query) {
+        const nameMatch = (c.studentName || '').toLowerCase().includes(query);
+        const numberMatch = (c.studentNumber || '').toLowerCase().includes(query);
+        if (!nameMatch && !numberMatch) return false;
+      }
 
+      // 2. Program filter (e.g. BS Psychology)
+      if (programFilter !== 'ALL') {
+        const progLower = (c.program || '').toLowerCase();
+        const targetProg = programFilter.toLowerCase();
+        if (!progLower.includes(targetProg) && !targetProg.includes(progLower)) {
+          return false;
+        }
+      }
+
+      // 3. Status filter
       const isHighRisk =
         c.status === 'High Risk' ||
         (c.riskFlags &&
@@ -944,10 +993,16 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     if (filtered.length === 0) {
-      const emptyMsg =
-        statusFilter === 'ACTIVE'
-          ? 'No active student cases. (Closed cases can be viewed via status filter)'
-          : `No cases found matching "${statusFilter}".`;
+      let emptyMsg = 'No matching cases found.';
+      if (query) {
+        emptyMsg = `No cases matching "${escapeHtml(query)}".`;
+      } else if (programFilter !== 'ALL') {
+        emptyMsg = `No cases found for ${escapeHtml(programFilter)}.`;
+      } else if (statusFilter === 'ACTIVE') {
+        emptyMsg = 'No active student cases. (Closed cases can be viewed via status filter)';
+      } else if (statusFilter !== 'ALL') {
+        emptyMsg = `No cases found with status "${escapeHtml(statusFilter)}".`;
+      }
       caseFolderList.innerHTML = `<div class="p-4 text-center text-xs text-slate-400">${emptyMsg}</div>`;
       return;
     }
@@ -981,7 +1036,10 @@ document.addEventListener('DOMContentLoaded', () => {
                 ${escapeHtml(displayStatus.toUpperCase())}
               </span>
             </div>
-            <div class="text-[11px] text-slate-500 font-mono mt-0.5">${escapeHtml(c.studentNumber)} • ${escapeHtml(c.program)}</div>
+            <div class="text-[11px] text-slate-500 font-mono mt-0.5 flex items-center justify-between">
+              <span>${escapeHtml(c.studentNumber)}</span>
+              <span class="font-sans font-semibold text-[#00205B] truncate max-w-[125px]" title="${escapeHtml(c.program)}">${escapeHtml(c.program)}</span>
+            </div>
           </div>
         `;
       })
