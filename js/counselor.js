@@ -1414,9 +1414,11 @@ document.addEventListener('DOMContentLoaded', () => {
         .map(
           n => `
  <div class="bg-white p-3.5 rounded border border-slate-200 space-y-1.5 text-xs">
- <div class="flex items-center justify-between border-b border-slate-100 pb-1.5">
+ <div class="flex items-center justify-between border-b border-slate-100 pb-1.5 flex-wrap gap-1">
  <span class="font-bold text-slate-900">${escapeHtml(n.noteType || 'Clinical Session')} • ${escapeHtml(n.sessionDate || formatDateIso(n.createdAt) || 'Recent')}</span>
- <span class="text-[11px] text-slate-400">${escapeHtml(n.counselorName || 'Guidance Counselor')}</span>
+ <span class="text-[10px] font-medium text-slate-600 bg-slate-100 px-2 py-0.5 rounded border border-slate-200">
+ Counselor: <strong class="text-slate-900">${escapeHtml(n.counselorName || 'Guidance Counselor')}</strong>
+ </span>
  </div>
  
  <div class="space-y-1 text-slate-700 pt-1">
