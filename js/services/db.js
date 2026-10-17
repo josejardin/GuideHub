@@ -36,6 +36,7 @@ function getLocalState() {
     cases: {},
     caseNotes: {},
     counselorSchedules: {},
+    counselorLeaves: {},
     auditLogs: []
   };
 }
@@ -499,6 +500,16 @@ export async function getAvailableCounselorsForSlot(date, timeSlot, genderPrefer
       );
     });
     if (hasCollision) return true;
+
+    // Check scheduled multi-day leave/absence
+    const leaves = Object.values(state.counselorLeaves || {}).filter(
+      l => l && l.counselorId === cId && l.status !== 'Cancelled'
+    );
+    const isOnLeave = leaves.some(l => {
+      if (l.dates && Array.isArray(l.dates)) return l.dates.includes(date);
+      return l.startDate && l.endDate && date >= l.startDate && date <= l.endDate;
+    });
+    if (isOnLeave) return true;
 
     const normSlot = normalizeTimeSlot(timeSlot);
     const slot12h = formatTimeSlot12h(timeSlot);
@@ -1495,6 +1506,245 @@ export function subscribeAllCounselorSchedules(callback) {
     }
   } catch (e) {
     console.warn('subscribeAllCounselorSchedules exception:', e);
+  }
+
+  window.addEventListener('guidehub_data_changed', deliver);
+  deliver();
+
+  return () => {
+    if (unsubFirestore) unsubFirestore();
+    window.removeEventListener('guidehub_data_changed', deliver);
+  };
+}
+
+export function getBusinessDatesInRange(startDateStr, endDateStr) {
+  const dates = [];
+  if (!startDateStr || !endDateStr) return dates;
+  let curr = new Date(startDateStr + 'T00:00:00');
+  const end = new Date(endDateStr + 'T00:00:00');
+  if (isNaN(curr.getTime()) || isNaN(end.getTime()) || curr > end) return dates;
+
+  while (curr <= end) {
+    const day = curr.getDay();
+    if (day !== 0 && day !== 6) {
+      // Monday to Friday
+      const y = curr.getFullYear();
+      const m = String(curr.getMonth() + 1).padStart(2, '0');
+      const d = String(curr.getDate()).padStart(2, '0');
+      dates.push(`${y}-${m}-${d}`);
+    }
+    curr.setDate(curr.getDate() + 1);
+  }
+  return dates;
+}
+
+export async function blockCounselorLeave(counselorId, counselorName, leaveData) {
+  const dates = getBusinessDatesInRange(leaveData.startDate, leaveData.endDate);
+  if (dates.length === 0) {
+    throw new Error('Please select valid dates that include regular weekdays (Monday to Friday).');
+  }
+
+  const leaveId = 'leave_' + Date.now() + '_' + Math.random().toString(36).substr(2, 4);
+  const nowIso = new Date().toISOString();
+
+  const leaveRecord = {
+    id: leaveId,
+    counselorId,
+    counselorName: counselorName || 'Guidance Counselor',
+    leaveType: leaveData.leaveType || 'Scheduled Leave',
+    startDate: leaveData.startDate,
+    endDate: leaveData.endDate,
+    dates,
+    totalDays: dates.length,
+    remarks: leaveData.remarks || '',
+    status: 'Active',
+    createdAt: nowIso,
+    updatedAt: nowIso
+  };
+
+  const state = getLocalState();
+  if (!state.counselorLeaves) state.counselorLeaves = {};
+  if (!state.counselorSchedules) state.counselorSchedules = {};
+
+  state.counselorLeaves[leaveId] = leaveRecord;
+
+  // Block all consultation slots for every date in range
+  const standardSlots = [
+    '08:00 - 09:00',
+    '09:00 - 10:00',
+    '10:00 - 11:00',
+    '11:00 - 12:00',
+    '13:00 - 14:00',
+    '14:00 - 15:00',
+    '15:00 - 16:00',
+    '16:00 - 17:00'
+  ];
+
+  const scheduleUpdates = [];
+  dates.forEach(d => {
+    standardSlots.forEach(slot => {
+      const slot12 = formatTimeSlot12h(slot);
+      const canonicalKey = `${counselorId}_${d}_${slot}`;
+      const key12 = `${counselorId}_${d}_${slot12}`;
+      const schedRec = {
+        counselorId,
+        date: d,
+        timeSlot: slot,
+        timeSlot12h: slot12,
+        isBlocked: true,
+        leaveId,
+        leaveType: leaveRecord.leaveType,
+        updatedAt: nowIso
+      };
+      state.counselorSchedules[canonicalKey] = schedRec;
+      state.counselorSchedules[key12] = { ...schedRec, timeSlot: slot12 };
+      scheduleUpdates.push(schedRec);
+    });
+  });
+
+  saveLocalState(state);
+
+  // Firestore sync
+  try {
+    if (db) {
+      await setDoc(doc(db, 'counselorLeaves', leaveId), leaveRecord);
+      const batchPromises = scheduleUpdates.map(sr => {
+        const cKey = `${sr.counselorId}_${sr.date}_${sr.timeSlot}`;
+        return setDoc(doc(db, 'counselorSchedules', cKey), sr, { merge: true });
+      });
+      await Promise.allSettled(batchPromises);
+    }
+  } catch (err) {
+    console.warn('Firestore blockCounselorLeave fallback:', err.message);
+  }
+
+  return leaveRecord;
+}
+
+export async function unblockCounselorLeave(counselorId, leaveId, actorName = 'Counselor') {
+  const state = getLocalState();
+  const leave = (state.counselorLeaves || {})[leaveId];
+  const nowIso = new Date().toISOString();
+
+  if (leave) {
+    leave.status = 'Cancelled';
+    leave.updatedAt = nowIso;
+    leave.cancelledAt = nowIso;
+    leave.cancelledBy = actorName;
+  }
+
+  // Unblock all date-slot records associated with this leaveId
+  const schedUpdates = [];
+  if (state.counselorSchedules) {
+    Object.keys(state.counselorSchedules).forEach(k => {
+      const s = state.counselorSchedules[k];
+      if (s && s.counselorId === counselorId) {
+        if (s.leaveId === leaveId || (leave && leave.dates && leave.dates.includes(s.date))) {
+          s.isBlocked = false;
+          s.updatedAt = nowIso;
+          schedUpdates.push({ key: k, record: s });
+        }
+      }
+    });
+  }
+
+  saveLocalState(state);
+
+  try {
+    if (db) {
+      if (leave) {
+        await setDoc(
+          doc(db, 'counselorLeaves', leaveId),
+          {
+            status: 'Cancelled',
+            cancelledAt: nowIso,
+            cancelledBy: actorName,
+            updatedAt: nowIso
+          },
+          { merge: true }
+        );
+      }
+      const batchPromises = schedUpdates.map(u => {
+        return setDoc(
+          doc(db, 'counselorSchedules', u.key),
+          {
+            isBlocked: false,
+            updatedAt: nowIso
+          },
+          { merge: true }
+        );
+      });
+      await Promise.allSettled(batchPromises);
+    }
+  } catch (err) {
+    console.warn('Firestore unblockCounselorLeave fallback:', err.message);
+  }
+
+  return leave;
+}
+
+export async function getCounselorLeaves(counselorId) {
+  let allLeaves = [];
+  try {
+    if (db && counselorId) {
+      const q = query(collection(db, 'counselorLeaves'), where('counselorId', '==', counselorId));
+      const snap = await getDocs(q);
+      if (!snap.empty) {
+        const state = getLocalState();
+        if (!state.counselorLeaves) state.counselorLeaves = {};
+        snap.docs.forEach(d => {
+          state.counselorLeaves[d.id] = d.data();
+        });
+        try {
+          localStorage.setItem(LOCAL_STORE_KEY, JSON.stringify(state));
+        } catch (e) {}
+        allLeaves = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+      }
+    }
+  } catch (err) {
+    console.warn('Firestore getCounselorLeaves fallback:', err.message);
+  }
+
+  if (allLeaves.length === 0) {
+    const state = getLocalState();
+    allLeaves = Object.values(state.counselorLeaves || {}).filter(l => l && l.counselorId === counselorId);
+  }
+
+  return allLeaves.filter(l => l.status !== 'Cancelled');
+}
+
+export function subscribeCounselorLeaves(counselorId, callback) {
+  let unsubFirestore = null;
+  const deliver = () => {
+    const state = getLocalState();
+    const list = Object.values(state.counselorLeaves || {}).filter(
+      l => l && l.counselorId === counselorId && l.status !== 'Cancelled'
+    );
+    list.sort((a, b) => new Date(b.startDate || b.createdAt) - new Date(a.startDate || a.createdAt));
+    callback(list);
+  };
+
+  try {
+    if (db && counselorId) {
+      const q = query(collection(db, 'counselorLeaves'), where('counselorId', '==', counselorId));
+      unsubFirestore = onSnapshot(
+        q,
+        snap => {
+          const state = getLocalState();
+          if (!state.counselorLeaves) state.counselorLeaves = {};
+          snap.docs.forEach(d => {
+            state.counselorLeaves[d.id] = d.data();
+          });
+          deliver();
+        },
+        err => {
+          console.warn('subscribeCounselorLeaves snapshot err:', err);
+          deliver();
+        }
+      );
+    }
+  } catch (e) {
+    console.warn('subscribeCounselorLeaves exception:', e);
   }
 
   window.addEventListener('guidehub_data_changed', deliver);

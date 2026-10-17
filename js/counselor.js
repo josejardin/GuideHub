@@ -17,6 +17,11 @@ import {
   getCounselorBlockedSlots,
   toggleCounselorBlockedSlot,
   subscribeAllCounselorSchedules,
+  blockCounselorLeave,
+  unblockCounselorLeave,
+  getCounselorLeaves,
+  subscribeCounselorLeaves,
+  getBusinessDatesInRange,
   logAuditEvent
 } from './db.js';
 import { escapeHtml, formatDateIso, formatTime12h, formatTimeSlot12h, normalizeTimeSlot } from './utils/validation.js';
@@ -297,14 +302,15 @@ document.addEventListener('DOMContentLoaded', () => {
       }).map(s => formatTimeSlot12h(s));
 
       if (blockedSlotsOnDate.length > 0 && activeViewFilter === 'selected_date') {
+        const isAllSlotsBlocked = blockedSlotsOnDate.length >= SLOTS.length;
         agendaBlockedBanner.innerHTML = `
           <div class="flex items-center gap-2.5">
-            <i data-lucide="shield-alert" class="w-4 h-4 text-amber-600 shrink-0"></i>
+            <i data-lucide="${isAllSlotsBlocked ? 'calendar-off' : 'shield-alert'}" class="w-4 h-4 text-amber-600 shrink-0"></i>
             <div>
-              <span class="font-bold text-amber-900">Your Availability on ${escapeHtml(selectedDayOfWeek)}:</span>
-              <span class="text-amber-800"> You have blocked </span>
-              <strong class="text-amber-950 font-mono">${escapeHtml(blockedSlotsOnDate.join(', '))}</strong>.
-              <span class="text-amber-700 block text-[11px] mt-0.5">Students cannot book appointments with you during these hours.</span>
+              <span class="font-bold text-amber-900">${isAllSlotsBlocked ? 'Scheduled Leave / Absence Active on ' : 'Your Availability on '}${escapeHtml(selectedDayOfWeek)} (${escapeHtml(selectedDate)}):</span>
+              <span class="text-amber-800">${isAllSlotsBlocked ? 'All 8 consultation slots are blocked for this date.' : ' You have blocked '}</span>
+              ${!isAllSlotsBlocked ? `<strong class="text-amber-950 font-mono">${escapeHtml(blockedSlotsOnDate.join(', '))}</strong>.` : ''}
+              <span class="text-amber-700 block text-[11px] mt-0.5">Students cannot book appointments with you during these blocked hours.</span>
             </div>
           </div>
         `;
@@ -1866,8 +1872,233 @@ document.addEventListener('DOMContentLoaded', () => {
 
   renderAvailabilityGrid();
 
-  subscribeAllCounselorSchedules(() => {
-    renderAgenda();
-    renderAvailabilityGrid();
+  // --- Leave / Multi-Day Absence Management ---
+  const formCounselorLeave = document.getElementById('form-counselor-leave');
+  const leaveTypeSelect = document.getElementById('leave-type-select');
+  const leaveStartDate = document.getElementById('leave-start-date');
+  const leaveEndDate = document.getElementById('leave-end-date');
+  const leaveDaysBadge = document.getElementById('leave-days-badge');
+  const leaveRemarksInput = document.getElementById('leave-remarks-input');
+  const btnSubmitLeave = document.getElementById('btn-submit-leave');
+  const counselorLeavesFeed = document.getElementById('counselor-leaves-feed');
+  const activeLeavesCount = document.getElementById('active-leaves-count');
+
+  if (leaveStartDate && leaveEndDate) {
+    const today = new Date().toISOString().split('T')[0];
+    if (!leaveStartDate.value) leaveStartDate.value = today;
+    if (!leaveEndDate.value) leaveEndDate.value = today;
+    leaveStartDate.min = today;
+    leaveEndDate.min = today;
+  }
+
+  function updateLeaveDaysCalculation() {
+    if (!leaveStartDate || !leaveEndDate || !leaveDaysBadge) return;
+    const startVal = leaveStartDate.value;
+    const endVal = leaveEndDate.value;
+    if (!startVal || !endVal) {
+      leaveDaysBadge.classList.add('hidden');
+      return;
+    }
+    if (startVal > endVal) {
+      leaveEndDate.value = startVal;
+    }
+    const dates = getBusinessDatesInRange(leaveStartDate.value, leaveEndDate.value);
+    const count = dates.length;
+    leaveDaysBadge.textContent =
+      count === 1
+        ? 'Calculated: 1 Business Day (8 slots)'
+        : `Calculated: ${count} Business Days (${count * 8} slots)`;
+    leaveDaysBadge.classList.remove('hidden');
+  }
+
+  leaveStartDate?.addEventListener('change', () => {
+    if (leaveEndDate && leaveEndDate.value < leaveStartDate.value) {
+      leaveEndDate.value = leaveStartDate.value;
+    }
+    if (leaveEndDate) leaveEndDate.min = leaveStartDate.value;
+    updateLeaveDaysCalculation();
   });
+
+  leaveEndDate?.addEventListener('change', updateLeaveDaysCalculation);
+
+  function toYmd(d) {
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${y}-${m}-${day}`;
+  }
+
+  // Quick Preset Buttons (1 Day, 2 Days, 3 Days, 5 Days)
+  document.querySelectorAll('.btn-leave-preset').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const daysCount = parseInt(btn.getAttribute('data-days') || '1', 10);
+      const startVal = leaveStartDate?.value || todayIso;
+      let curr = new Date(startVal + 'T00:00:00');
+      if (isNaN(curr.getTime())) curr = new Date();
+
+      // If starting on a weekend, push to Monday
+      if (curr.getDay() === 0) curr.setDate(curr.getDate() + 1);
+      if (curr.getDay() === 6) curr.setDate(curr.getDate() + 2);
+      if (leaveStartDate) leaveStartDate.value = toYmd(curr);
+
+      let addedBusinessDays = 0;
+      let endCurr = new Date(curr);
+      while (addedBusinessDays < daysCount) {
+        const d = endCurr.getDay();
+        if (d !== 0 && d !== 6) {
+          addedBusinessDays++;
+          if (addedBusinessDays === daysCount) break;
+        }
+        endCurr.setDate(endCurr.getDate() + 1);
+      }
+
+      if (leaveEndDate) {
+        leaveEndDate.value = toYmd(endCurr);
+        leaveEndDate.min = leaveStartDate.value;
+      }
+      updateLeaveDaysCalculation();
+    });
+  });
+
+  formCounselorLeave?.addEventListener('submit', async e => {
+    e.preventDefault();
+    const startDate = leaveStartDate?.value;
+    const endDate = leaveEndDate?.value;
+    const leaveType = leaveTypeSelect?.value || 'Scheduled Leave';
+    const remarks = leaveRemarksInput?.value.trim() || '';
+
+    if (!startDate || !endDate) {
+      showToast('Please select valid start and end dates.', 'warning');
+      return;
+    }
+    if (startDate > endDate) {
+      showToast('End date cannot be earlier than start date.', 'warning');
+      return;
+    }
+
+    if (btnSubmitLeave) {
+      btnSubmitLeave.disabled = true;
+      btnSubmitLeave.innerHTML = '<span>Blocking Schedule...</span>';
+    }
+
+    try {
+      const leaveRec = await blockCounselorLeave(currentUser.uid, currentUser.fullName, {
+        startDate,
+        endDate,
+        leaveType,
+        remarks
+      });
+
+      await logAuditEvent(
+        currentUser.uid,
+        currentUser.fullName,
+        currentUser.role,
+        'COUNSELOR_LEAVE_FILED',
+        `Filed ${leaveType} for ${startDate} to ${endDate} (${leaveRec.totalDays} business days, ${leaveRec.totalDays * 8} slots blocked)`
+      );
+
+      showToast(`Schedule blocked for ${leaveRec.totalDays} business day(s) (${startDate} to ${endDate}).`, 'success');
+      if (leaveRemarksInput) leaveRemarksInput.value = '';
+      await renderAvailabilityGrid();
+      renderAgenda();
+    } catch (err) {
+      console.error('Leave filing error:', err);
+      showToast(err.message || 'Failed to file leave.', 'error');
+    } finally {
+      if (btnSubmitLeave) {
+        btnSubmitLeave.disabled = false;
+        btnSubmitLeave.innerHTML =
+          '<i data-lucide="calendar-off" class="w-3.5 h-3.5 text-[#F5B800]"></i><span>Block Schedule for Selected Days</span>';
+        if (window.lucide) window.lucide.createIcons();
+      }
+    }
+  });
+
+  function renderCounselorLeaves(leaves = []) {
+    if (!counselorLeavesFeed) return;
+    if (activeLeavesCount) activeLeavesCount.textContent = `${leaves.length} active / scheduled`;
+
+    if (leaves.length === 0) {
+      counselorLeavesFeed.innerHTML = `
+        <div class="p-4 text-center text-xs text-slate-400 bg-white rounded-xl border border-slate-200">
+          No scheduled leaves or multi-day absences logged yet.
+        </div>
+      `;
+      return;
+    }
+
+    counselorLeavesFeed.innerHTML = leaves
+      .map(l => {
+        const datesLabel = l.startDate === l.endDate ? l.startDate : `${l.startDate} to ${l.endDate}`;
+        return `
+        <div class="p-3 bg-white rounded-xl border border-blue-200/80 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 text-xs">
+          <div class="space-y-1">
+            <div class="flex items-center gap-2 flex-wrap">
+              <span class="font-bold text-slate-900 flex items-center gap-1.5">
+                <i data-lucide="calendar-off" class="w-3.5 h-3.5 text-rose-600"></i>
+                <span>${escapeHtml(l.leaveType || 'Scheduled Leave')}</span>
+              </span>
+              <span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-900 border border-amber-300">
+                ${l.totalDays || 1} Business Day${(l.totalDays || 1) > 1 ? 's' : ''} (${(l.totalDays || 1) * 8} slots blocked)
+              </span>
+            </div>
+            <div class="text-[11px] text-slate-600 flex items-center gap-2">
+              <span class="font-mono font-semibold text-[#00205B]">${escapeHtml(datesLabel)}</span>
+              ${l.remarks ? `<span class="text-slate-500 italic">• "${escapeHtml(l.remarks)}"</span>` : ''}
+            </div>
+          </div>
+          <button
+            type="button"
+            data-leave-id="${escapeHtml(l.id)}"
+            class="btn-unblock-leave inline-flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-semibold text-rose-700 bg-rose-50 hover:bg-rose-100 border border-rose-200 transition shrink-0 shadow-2xs"
+            title="Cancel this leave and restore all slots to available"
+          >
+            <i data-lucide="rotate-ccw" class="w-3 h-3 text-rose-600"></i>
+            <span>Unblock / Cancel Leave</span>
+          </button>
+        </div>
+      `;
+      })
+      .join('');
+
+    if (window.lucide) window.lucide.createIcons();
+
+    counselorLeavesFeed.querySelectorAll('.btn-unblock-leave').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        const leaveId = btn.getAttribute('data-leave-id');
+        if (!leaveId) return;
+        if (
+          !confirm(
+            'Are you sure you want to cancel this scheduled leave and restore all blocked slots back to Available?'
+          )
+        )
+          return;
+
+        btn.disabled = true;
+        try {
+          await unblockCounselorLeave(currentUser.uid, leaveId, currentUser.fullName);
+          await logAuditEvent(
+            currentUser.uid,
+            currentUser.fullName,
+            currentUser.role,
+            'COUNSELOR_LEAVE_CANCELLED',
+            `Cancelled leave ${leaveId} and restored slots to available`
+          );
+          showToast('Leave cancelled and consultation slots restored.', 'success');
+          await renderAvailabilityGrid();
+          renderAgenda();
+        } catch (err) {
+          showToast(err.message || 'Failed to cancel leave.', 'error');
+        } finally {
+          btn.disabled = false;
+        }
+      });
+    });
+  }
+
+  subscribeCounselorLeaves(currentUser.uid, leaves => {
+    renderCounselorLeaves(leaves);
+  });
+
+  updateLeaveDaysCalculation();
 });
