@@ -946,19 +946,59 @@ export async function addSessionNote(caseId, noteData) {
 }
 
 export function subscribeCaseNotes(caseId, callback) {
+  const fetchAndMergeNotes = async (directList = []) => {
+    const state = getLocalState();
+    const currentCase = state.cases[caseId] || {};
+    const linkedCaseIds = currentCase.linkedCaseIds || [];
+
+    const merged = directList.map(n => ({ ...n, isLinkedRecord: false }));
+
+    if (linkedCaseIds.length > 0) {
+      for (const lId of linkedCaseIds) {
+        const linkedCase = state.cases[lId] || {};
+        const linkedInfo = (currentCase.linkedCasesInfo || []).find(i => i.caseId === lId) || {};
+        let lNotes = [];
+
+        if (db) {
+          try {
+            const lSnap = await getDocs(query(collection(db, 'cases', lId, 'notes'), orderBy('createdAt', 'desc')));
+            if (!lSnap.empty) {
+              lNotes = lSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+            }
+          } catch (e) {}
+        }
+        if (lNotes.length === 0) {
+          lNotes = state.caseNotes[lId] || [];
+        }
+
+        lNotes.forEach(note => {
+          merged.push({
+            ...note,
+            isLinkedRecord: true,
+            sourceStudentNumber: linkedInfo.studentNumber || linkedCase.studentNumber || 'Previous ID',
+            sourceProgram: linkedInfo.program || linkedCase.program || 'Previous Program'
+          });
+        });
+      }
+    }
+
+    merged.sort((a, b) => new Date(b.createdAt || b.sessionDate || 0) - new Date(a.createdAt || a.sessionDate || 0));
+    return merged;
+  };
+
   try {
     if (db) {
       const q = query(collection(db, 'cases', caseId, 'notes'), orderBy('createdAt', 'desc'));
-      const unsubscribe = onSnapshot(q, snap => {
+      const unsubscribe = onSnapshot(q, async snap => {
+        let directList = [];
         if (!snap.empty) {
-          const list = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-          callback(list);
+          directList = snap.docs.map(d => ({ id: d.id, ...d.data() }));
         } else {
           const state = getLocalState();
-          const list = state.caseNotes[caseId] || [];
-          list.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
-          callback([...list]);
+          directList = state.caseNotes[caseId] || [];
         }
+        const fullNotes = await fetchAndMergeNotes(directList);
+        callback(fullNotes);
       });
       return unsubscribe;
     }
@@ -966,15 +1006,175 @@ export function subscribeCaseNotes(caseId, callback) {
     console.warn('subscribeCaseNotes firestore exception', e);
   }
 
-  const handler = () => {
+  const handler = async () => {
     const state = getLocalState();
-    const list = state.caseNotes[caseId] || [];
-    list.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
-    callback([...list]);
+    const directList = state.caseNotes[caseId] || [];
+    const fullNotes = await fetchAndMergeNotes(directList);
+    callback(fullNotes);
   };
   window.addEventListener('guidehub_data_changed', handler);
   handler();
   return () => window.removeEventListener('guidehub_data_changed', handler);
+}
+
+export async function linkPreviousCase(currentCaseId, previousStudentNumberOrCaseId, counselorUid = '', counselorName = '') {
+  const state = getLocalState();
+  let currentCase = state.cases[currentCaseId];
+  if (!currentCase && db) {
+    try {
+      const cSnap = await getDoc(doc(db, 'cases', currentCaseId));
+      if (cSnap.exists()) {
+        currentCase = { id: cSnap.id, ...cSnap.data() };
+      }
+    } catch (e) {}
+  }
+  if (!currentCase) {
+    throw new Error('Target active case folder not found.');
+  }
+
+  const cleanQuery = (previousStudentNumberOrCaseId || '').trim();
+  if (!cleanQuery) {
+    throw new Error('Please enter a valid previous Student ID number.');
+  }
+
+  const queryLower = cleanQuery.toLowerCase();
+  const normalizedQueryId = 'case_' + cleanQuery.replace(/[^a-zA-Z0-9]/g, '_').toLowerCase();
+
+  let prevCase = Object.values(state.cases).find(
+    c => (c.id || '').toLowerCase() === queryLower ||
+         (c.studentNumber || '').trim().toLowerCase() === queryLower ||
+         (c.id || '').toLowerCase() === normalizedQueryId
+  );
+
+  if (!prevCase && db) {
+    try {
+      const snapDirect = await getDoc(doc(db, 'cases', cleanQuery));
+      if (snapDirect.exists()) {
+        prevCase = { id: snapDirect.id, ...snapDirect.data() };
+      } else {
+        const snapNorm = await getDoc(doc(db, 'cases', 'case_' + cleanQuery.replace(/[^a-zA-Z0-9]/g, '_')));
+        if (snapNorm.exists()) {
+          prevCase = { id: snapNorm.id, ...snapNorm.data() };
+        } else {
+          const qPrev = query(collection(db, 'cases'), where('studentNumber', '==', cleanQuery));
+          const qSnap = await getDocs(qPrev);
+          if (!qSnap.empty) {
+            prevCase = { id: qSnap.docs[0].id, ...qSnap.docs[0].data() };
+          }
+        }
+      }
+    } catch (e) {
+      console.warn('Firestore previous case query:', e.message);
+    }
+  }
+
+  if (!prevCase) {
+    throw new Error(`Previous case record for "${cleanQuery}" was not found in the confidential case directory.`);
+  }
+
+  if (prevCase.id === currentCase.id || prevCase.studentNumber === currentCase.studentNumber) {
+    throw new Error('Cannot link a student case folder to itself.');
+  }
+
+  currentCase.linkedCaseIds = currentCase.linkedCaseIds || [];
+  currentCase.previousStudentNumbers = currentCase.previousStudentNumbers || [];
+  currentCase.linkedCasesInfo = currentCase.linkedCasesInfo || [];
+
+  if (currentCase.linkedCaseIds.includes(prevCase.id) || currentCase.previousStudentNumbers.includes(prevCase.studentNumber)) {
+    throw new Error(`Student ID ${prevCase.studentNumber} is already linked to this case folder.`);
+  }
+
+  currentCase.linkedCaseIds.push(prevCase.id);
+  currentCase.previousStudentNumbers.push(prevCase.studentNumber);
+  currentCase.linkedCasesInfo.push({
+    caseId: prevCase.id,
+    studentNumber: prevCase.studentNumber,
+    studentName: prevCase.studentName,
+    program: prevCase.program || 'Previous Program',
+    linkedAt: new Date().toISOString(),
+    linkedBy: counselorName || counselorUid || 'Guidance Counselor'
+  });
+  currentCase.updatedAt = new Date().toISOString();
+
+  // Mark previous case as closed/transferred to prevent orphaned active cases
+  prevCase.transferredToCaseId = currentCase.id;
+  prevCase.transferredToStudentNumber = currentCase.studentNumber;
+  prevCase.status = 'Closed';
+  prevCase.updatedAt = new Date().toISOString();
+
+  if (db) {
+    try {
+      await setDoc(doc(db, 'cases', currentCase.id), {
+        linkedCaseIds: currentCase.linkedCaseIds,
+        previousStudentNumbers: currentCase.previousStudentNumbers,
+        linkedCasesInfo: currentCase.linkedCasesInfo,
+        updatedAt: currentCase.updatedAt
+      }, { merge: true });
+
+      await setDoc(doc(db, 'cases', prevCase.id), {
+        transferredToCaseId: currentCase.id,
+        transferredToStudentNumber: currentCase.studentNumber,
+        status: 'Closed',
+        updatedAt: prevCase.updatedAt
+      }, { merge: true });
+    } catch (err) {
+      console.warn('Firestore linkPreviousCase fallback:', err.message);
+    }
+  }
+
+  state.cases[currentCase.id] = currentCase;
+  state.cases[prevCase.id] = prevCase;
+  saveLocalState(state);
+
+  await logAuditEvent(
+    counselorUid || 'counselor',
+    counselorName || 'Guidance Counselor',
+    'counselor',
+    'CASE_LINKED',
+    `Linked past records from ${prevCase.studentNumber} (${prevCase.program}) to active case ${currentCase.studentNumber} (${currentCase.program})`
+  ).catch(() => {});
+
+  window.dispatchEvent(new CustomEvent('guidehub_data_changed'));
+  return { success: true, linkedCase: prevCase };
+}
+
+export async function unlinkPreviousCase(currentCaseId, previousStudentNumber, counselorUid = '', counselorName = '') {
+  const state = getLocalState();
+  const currentCase = state.cases[currentCaseId];
+  if (!currentCase) throw new Error('Active case not found.');
+
+  const targetLinkedInfo = (currentCase.linkedCasesInfo || []).find(i => i.studentNumber === previousStudentNumber);
+  const targetCaseId = targetLinkedInfo ? targetLinkedInfo.caseId : null;
+
+  currentCase.linkedCaseIds = (currentCase.linkedCaseIds || []).filter(id => id !== targetCaseId);
+  currentCase.previousStudentNumbers = (currentCase.previousStudentNumbers || []).filter(num => num !== previousStudentNumber);
+  currentCase.linkedCasesInfo = (currentCase.linkedCasesInfo || []).filter(info => info.studentNumber !== previousStudentNumber);
+  currentCase.updatedAt = new Date().toISOString();
+
+  if (db) {
+    try {
+      await setDoc(doc(db, 'cases', currentCase.id), {
+        linkedCaseIds: currentCase.linkedCaseIds,
+        previousStudentNumbers: currentCase.previousStudentNumbers,
+        linkedCasesInfo: currentCase.linkedCasesInfo,
+        updatedAt: currentCase.updatedAt
+      }, { merge: true });
+    } catch (e) {}
+  }
+
+  state.cases[currentCase.id] = currentCase;
+  saveLocalState(state);
+
+  await logAuditEvent(
+    counselorUid || 'counselor',
+    counselorName || 'Guidance Counselor',
+    'counselor',
+    'CASE_UNLINKED',
+    `Unlinked past record ${previousStudentNumber} from case ${currentCase.studentNumber}`
+  ).catch(() => {});
+
+  window.dispatchEvent(new CustomEvent('guidehub_data_changed'));
+  return { success: true };
 }
 
 export async function updateCaseRiskFlags(caseId, riskFlags) {
