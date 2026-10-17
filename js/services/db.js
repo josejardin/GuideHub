@@ -503,41 +503,36 @@ export async function getAvailableCounselorsForSlot(date, timeSlot, genderPrefer
     const normSlot = normalizeTimeSlot(timeSlot);
     const slot12h = formatTimeSlot12h(timeSlot);
 
-    // 2. Local State Block Check
-    const localDayBlocked = !!(
-      (state.counselorSchedules[`${cId}_${dayOfWeek}_${timeSlot}`] || {}).isBlocked ||
-      (state.counselorSchedules[`${cId}_${dayOfWeek}_${normSlot}`] || {}).isBlocked ||
-      (state.counselorSchedules[`${cId}_${dayOfWeek}_${slot12h}`] || {}).isBlocked ||
-      (state.counselorSchedules[`${cId}_${date}_${timeSlot}`] || {}).isBlocked ||
-      (state.counselorSchedules[`${cId}_${date}_${normSlot}`] || {}).isBlocked ||
-      (state.counselorSchedules[`${cId}_${date}_${slot12h}`] || {}).isBlocked
+    // 2. Local State Block Check using latest timestamp
+    const scheds = Object.values(state.counselorSchedules || {}).filter(
+      s => s && s.counselorId === cId && (s.dayOfWeek === dayOfWeek || s.date === date)
     );
-    if (localDayBlocked) return true;
+    let latestSched = null;
+    scheds.forEach(s => {
+      if (normalizeTimeSlot(s.timeSlot) === normSlot || formatTimeSlot12h(s.timeSlot) === slot12h) {
+        if (!latestSched || new Date(s.updatedAt || 0) >= new Date(latestSched.updatedAt || 0)) {
+          latestSched = s;
+        }
+      }
+    });
+
+    if (latestSched !== null) {
+      if (latestSched.isBlocked === true) return true;
+    }
 
     // 3. Firestore Block Check
     if (db) {
       try {
         if (dayOfWeek) {
-          const daySnap = await getDoc(doc(db, 'counselorSchedules', `${cId}_${dayOfWeek}_${timeSlot}`));
-          if (daySnap.exists() && daySnap.data().isBlocked) return true;
-          if (normSlot !== timeSlot) {
-            const daySnapNorm = await getDoc(doc(db, 'counselorSchedules', `${cId}_${dayOfWeek}_${normSlot}`));
-            if (daySnapNorm.exists() && daySnapNorm.data().isBlocked) return true;
-          }
-          if (slot12h !== timeSlot) {
-            const daySnap12 = await getDoc(doc(db, 'counselorSchedules', `${cId}_${dayOfWeek}_${slot12h}`));
-            if (daySnap12.exists() && daySnap12.data().isBlocked) return true;
-          }
+          const daySnap = await getDoc(doc(db, 'counselorSchedules', `${cId}_${dayOfWeek}_${normSlot}`));
+          if (daySnap.exists()) return daySnap.data().isBlocked === true;
+
+          const daySnap12 = await getDoc(doc(db, 'counselorSchedules', `${cId}_${dayOfWeek}_${slot12h}`));
+          if (daySnap12.exists()) return daySnap12.data().isBlocked === true;
         }
-        const dateSnap = await getDoc(doc(db, 'counselorSchedules', `${cId}_${date}_${timeSlot}`));
-        if (dateSnap.exists() && dateSnap.data().isBlocked) return true;
-        if (normSlot !== timeSlot) {
-          const dateSnapNorm = await getDoc(doc(db, 'counselorSchedules', `${cId}_${date}_${normSlot}`));
-          if (dateSnapNorm.exists() && dateSnapNorm.data().isBlocked) return true;
-        }
-        if (slot12h !== timeSlot) {
-          const dateSnap12 = await getDoc(doc(db, 'counselorSchedules', `${cId}_${date}_${slot12h}`));
-          if (dateSnap12.exists() && dateSnap12.data().isBlocked) return true;
+        if (date) {
+          const dateSnap = await getDoc(doc(db, 'counselorSchedules', `${cId}_${date}_${normSlot}`));
+          if (dateSnap.exists()) return dateSnap.data().isBlocked === true;
         }
       } catch (e) {}
     }
@@ -1326,6 +1321,7 @@ export async function updateCaseStatus(caseId, status, extra = {}) {
 }
 
 export async function getCounselorBlockedSlots(counselorId) {
+  let allRecords = [];
   try {
     if (db && counselorId) {
       const q = query(collection(db, 'counselorSchedules'), where('counselorId', '==', counselorId));
@@ -1338,7 +1334,7 @@ export async function getCounselorBlockedSlots(counselorId) {
         try {
           localStorage.setItem(LOCAL_STORE_KEY, JSON.stringify(state));
         } catch (e) {}
-        return snap.docs.map(d => d.data()).filter(s => s.isBlocked);
+        allRecords = snap.docs.map(d => d.data());
       }
     }
   } catch (err) {
@@ -1346,25 +1342,116 @@ export async function getCounselorBlockedSlots(counselorId) {
   }
 
   const state = getLocalState();
-  return Object.values(state.counselorSchedules).filter(s => s.counselorId === counselorId && s.isBlocked);
+  const localList = Object.values(state.counselorSchedules || {}).filter(s => s && s.counselorId === counselorId);
+  const combined = [...localList, ...allRecords];
+
+  // Deduplicate by dayOfWeek + normalizeTimeSlot(timeSlot), taking the record with the newest updatedAt
+  const slotMap = new Map();
+  combined.forEach(rec => {
+    if (!rec || !rec.dayOfWeek || !rec.timeSlot) return;
+    const norm = normalizeTimeSlot(rec.timeSlot);
+    const key = `${rec.dayOfWeek}_${norm}`;
+    const existing = slotMap.get(key);
+    if (!existing || new Date(rec.updatedAt || 0) >= new Date(existing.updatedAt || 0)) {
+      slotMap.set(key, rec);
+    }
+  });
+
+  return Array.from(slotMap.values()).filter(s => s.isBlocked === true);
 }
 
 export async function toggleCounselorBlockedSlot(counselorId, dayOfWeek, timeSlot, isBlocked) {
-  const key = `${counselorId}_${dayOfWeek}_${timeSlot}`;
-  const record = { counselorId, dayOfWeek, timeSlot, isBlocked, updatedAt: new Date().toISOString() };
+  const normSlot = normalizeTimeSlot(timeSlot);
+  const slot12h = formatTimeSlot12h(timeSlot);
+  const nowIso = new Date().toISOString();
+
+  const slotVariants = Array.from(
+    new Set([
+      timeSlot,
+      normSlot,
+      slot12h,
+      timeSlot.replace(/\s+/g, ''),
+      normSlot.replace(/\s+/g, ''),
+      slot12h.replace(/\s+/g, '')
+    ].filter(Boolean))
+  );
+
+  const canonicalKey = `${counselorId}_${dayOfWeek}_${normSlot || timeSlot}`;
+  const key12h = `${counselorId}_${dayOfWeek}_${slot12h || timeSlot}`;
+  const record = {
+    counselorId,
+    dayOfWeek,
+    timeSlot: normSlot || timeSlot,
+    timeSlot12h: slot12h,
+    isBlocked: !!isBlocked,
+    updatedAt: nowIso
+  };
+
+  const state = getLocalState();
+  if (!state.counselorSchedules) state.counselorSchedules = {};
+
+  // Clean and synchronize all matching keys in local state
+  Object.keys(state.counselorSchedules).forEach(k => {
+    const s = state.counselorSchedules[k];
+    if (s && s.counselorId === counselorId && s.dayOfWeek === dayOfWeek) {
+      const sNorm = normalizeTimeSlot(s.timeSlot || '');
+      const s12 = formatTimeSlot12h(s.timeSlot || '');
+      if (sNorm === normSlot || s12 === slot12h || slotVariants.includes(s.timeSlot)) {
+        s.isBlocked = !!isBlocked;
+        s.updatedAt = nowIso;
+      }
+    }
+  });
+
+  state.counselorSchedules[canonicalKey] = record;
+  state.counselorSchedules[key12h] = { ...record, timeSlot: slot12h };
+  saveLocalState(state);
 
   try {
     if (db) {
-      const schedRef = doc(db, 'counselorSchedules', key);
+      const schedRef = doc(db, 'counselorSchedules', canonicalKey);
       await setDoc(schedRef, record, { merge: true });
+
+      if (key12h !== canonicalKey) {
+        const sched12Ref = doc(db, 'counselorSchedules', key12h);
+        await setDoc(sched12Ref, { ...record, timeSlot: slot12h }, { merge: true });
+      }
+
+      // Synchronize any existing Firestore variant documents for this counselor & day
+      try {
+        const q = query(
+          collection(db, 'counselorSchedules'),
+          where('counselorId', '==', counselorId),
+          where('dayOfWeek', '==', dayOfWeek)
+        );
+        const snap = await getDocs(q);
+        const updates = [];
+        snap.forEach(d => {
+          const dData = d.data();
+          const dNorm = normalizeTimeSlot(dData.timeSlot || '');
+          const d12 = formatTimeSlot12h(dData.timeSlot || '');
+          if (dNorm === normSlot || d12 === slot12h || slotVariants.includes(dData.timeSlot)) {
+            if (d.id !== canonicalKey && d.id !== key12h) {
+              updates.push(
+                setDoc(doc(db, 'counselorSchedules', d.id), {
+                  isBlocked: !!isBlocked,
+                  updatedAt: nowIso
+                }, { merge: true })
+              );
+            }
+          }
+        });
+        if (updates.length > 0) {
+          await Promise.allSettled(updates);
+        }
+      } catch (scanErr) {
+        console.warn('Firestore variant sync warning:', scanErr.message);
+      }
     }
   } catch (err) {
     console.warn('Firestore toggleCounselorBlockedSlot fallback:', err.message);
   }
 
-  const state = getLocalState();
-  state.counselorSchedules[key] = record;
-  saveLocalState(state);
   return record;
 }
 
@@ -1375,7 +1462,17 @@ export function subscribeAllCounselorSchedules(callback) {
   const deliver = () => {
     const state = getLocalState();
     const merged = { ...(state.counselorSchedules || {}), ...firestoreMap };
-    callback(Object.values(merged));
+    const slotMap = new Map();
+    Object.values(merged).forEach(rec => {
+      if (!rec || !rec.counselorId || !rec.dayOfWeek || !rec.timeSlot) return;
+      const norm = normalizeTimeSlot(rec.timeSlot);
+      const key = `${rec.counselorId}_${rec.dayOfWeek}_${norm}`;
+      const existing = slotMap.get(key);
+      if (!existing || new Date(rec.updatedAt || 0) >= new Date(existing.updatedAt || 0)) {
+        slotMap.set(key, rec);
+      }
+    });
+    callback(Array.from(slotMap.values()));
   };
 
   try {

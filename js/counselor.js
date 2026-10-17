@@ -67,6 +67,10 @@ document.addEventListener('DOMContentLoaded', () => {
       }
     });
 
+    if (targetTab === 'availability') {
+      renderAvailabilityGrid();
+    }
+
     if (window.lucide) window.lucide.createIcons();
   }
 
@@ -1840,14 +1844,21 @@ document.addEventListener('DOMContentLoaded', () => {
     const newBlockedState = !currentlyBlocked;
 
     btn.disabled = true;
+    // Optimistic UI state toggle
+    btn.setAttribute('data-blocked', String(newBlockedState));
+    btn.className = `btn-toggle-slot p-2 rounded border text-xs text-center transition ${newBlockedState ? 'bg-rose-50 border-rose-200 text-rose-700 font-semibold' : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50'}`;
+    const statusTextEl = btn.querySelector('.text-xs');
+    if (statusTextEl) statusTextEl.textContent = newBlockedState ? 'BLOCKED' : 'AVAILABLE';
+
     try {
       await toggleCounselorBlockedSlot(currentUser.uid, day, slot, newBlockedState);
       await renderAvailabilityGrid();
       renderAgenda();
-      showToast(`${day} ${slot} marked as ${newBlockedState ? 'Blocked' : 'Available'}.`, 'info');
+      showToast(`${day} ${formatTimeSlot12h(slot)} marked as ${newBlockedState ? 'Blocked' : 'Available'}.`, 'info');
     } catch (err) {
       console.warn('Toggle slot error:', err);
       showToast('Failed to update slot availability.', 'error');
+      await renderAvailabilityGrid();
     } finally {
       btn.disabled = false;
     }

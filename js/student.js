@@ -111,6 +111,7 @@ document.addEventListener('DOMContentLoaded', () => {
       const dateInput = document.getElementById('wiz-schedule-date');
       if (dateInput && activeFollowUpData.date) {
         dateInput.value = activeFollowUpData.date;
+        validateDateAndLoadSlots();
       }
 
       if (counselorSelect && activeFollowUpData.counselorId) {
