@@ -1,4 +1,4 @@
-import { requireRole, initNavbar, showToast } from './auth.js';
+import { requireRole, initNavbar, showToast, showConfirmDialog } from './auth.js';
 import { db, doc, setDoc, updateDoc, collection, query, where, getDocs } from './firebase-config.js';
 import {
   subscribeAllAppointments,
@@ -1058,7 +1058,14 @@ document.addEventListener('DOMContentLoaded', () => {
       e.preventDefault();
       if (closeBtn.disabled) return;
       const id = closeBtn.getAttribute('data-close-ref-id');
-      if (confirm('Mark referral as Closed? It will be archived from the active inbox.')) {
+      const confirmed = await showConfirmDialog({
+        title: 'I-close ang Referral?',
+        message: 'Sigurado ka bang nais mong i-mark bilang Closed ang referral na ito? Ito ay mai-archive na mula sa active inbox.',
+        confirmText: 'Oo, I-close',
+        cancelText: 'Bumalik',
+        type: 'warning'
+      });
+      if (confirmed) {
         closeBtn.disabled = true;
         const targetRef = allReferrals.find(r => r.id === id);
         if (targetRef) targetRef.status = 'Closed';
@@ -1877,11 +1884,14 @@ document.addEventListener('DOMContentLoaded', () => {
   const leaveStartDate = document.getElementById('leave-start-date');
   const leaveDaysCount = document.getElementById('leave-days-count');
   const btnSubmitLeave = document.getElementById('btn-submit-leave');
-  const activeLeaveIndicator = document.getElementById('active-leave-indicator');
-  const activeLeaveText = document.getElementById('active-leave-text');
-  const btnUnblockActiveLeave = document.getElementById('btn-unblock-active-leave');
+  const previewDateRange = document.getElementById('preview-date-range');
+  const previewSlotsTotal = document.getElementById('preview-slots-total');
+  const previewDateChips = document.getElementById('preview-date-chips');
+  const activeLeavesCount = document.getElementById('active-leaves-count');
+  const activeLeavesContainer = document.getElementById('active-leaves-container');
 
-  let currentActiveLeaves = [];
+  const DAY_SHORT = ['Lin', 'Lun', 'Mar', 'Miy', 'Huw', 'Biy', 'Sab'];
+  const MONTH_SHORT = ['Ene', 'Peb', 'Mar', 'Abr', 'May', 'Hun', 'Hul', 'Ago', 'Set', 'Okt', 'Nob', 'Dis'];
 
   function toYmd(d) {
     const y = d.getFullYear();
@@ -1890,38 +1900,95 @@ document.addEventListener('DOMContentLoaded', () => {
     return `${y}-${m}-${day}`;
   }
 
+  function calculateLeaveDates(startStr, daysCount) {
+    let curr = new Date(startStr + 'T00:00:00');
+    if (isNaN(curr.getTime())) curr = new Date();
+    // If starting on a weekend, automatically shift forward to Monday
+    if (curr.getDay() === 0) curr.setDate(curr.getDate() + 1);
+    if (curr.getDay() === 6) curr.setDate(curr.getDate() + 2);
+
+    let added = 0;
+    const dates = [];
+    let endCurr = new Date(curr);
+
+    while (added < daysCount) {
+      const d = endCurr.getDay();
+      if (d !== 0 && d !== 6) {
+        added++;
+        const ymd = toYmd(endCurr);
+        const dayLabel = DAY_SHORT[d] || 'Araw';
+        const mLabel = MONTH_SHORT[endCurr.getMonth()] || '';
+        const dateNum = endCurr.getDate();
+        dates.push({
+          dateStr: ymd,
+          dayName: DAYS[d - 1] || 'Weekday',
+          label: `${dayLabel}, ${mLabel} ${dateNum}`
+        });
+        if (added === daysCount) break;
+      }
+      endCurr.setDate(endCurr.getDate() + 1);
+    }
+
+    return {
+      startDate: dates.length > 0 ? dates[0].dateStr : toYmd(curr),
+      endDate: dates.length > 0 ? dates[dates.length - 1].dateStr : toYmd(endCurr),
+      dates
+    };
+  }
+
+  function updateLeavePreview() {
+    if (!previewDateRange || !previewSlotsTotal || !previewDateChips) return;
+    const startVal = leaveStartDate?.value || toYmd(new Date());
+    const count = Math.max(1, parseInt(leaveDaysCount?.value || '1', 10));
+
+    const calc = calculateLeaveDates(startVal, count);
+    const rangeText = calc.startDate === calc.endDate ? calc.startDate : `${calc.startDate} hanggang ${calc.endDate}`;
+    previewDateRange.textContent = rangeText;
+    previewSlotsTotal.textContent = `${calc.dates.length} Araw (${calc.dates.length * 8} slots blocked)`;
+
+    previewDateChips.innerHTML = calc.dates
+      .map(
+        d =>
+          `<span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-semibold bg-blue-50 text-[#00205B] border border-blue-200 shadow-2xs">
+            <i data-lucide="calendar" class="w-3 h-3 text-blue-600"></i>
+            <span>${d.label}</span>
+          </span>`
+      )
+      .join('');
+
+    if (window.lucide) window.lucide.createIcons();
+  }
+
   if (leaveStartDate) {
     const today = toYmd(new Date());
     if (!leaveStartDate.value) leaveStartDate.value = today;
     leaveStartDate.min = today;
+    updateLeavePreview();
   }
+
+  leaveStartDate?.addEventListener('change', updateLeavePreview);
+  leaveDaysCount?.addEventListener('input', updateLeavePreview);
+
+  document.querySelectorAll('.btn-leave-quick-preset').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const days = btn.getAttribute('data-days');
+      if (leaveDaysCount && days) {
+        leaveDaysCount.value = days;
+        updateLeavePreview();
+      }
+    });
+  });
 
   formCounselorLeave?.addEventListener('submit', async e => {
     e.preventDefault();
     const startVal = leaveStartDate?.value || toYmd(new Date());
     const daysCount = parseInt(leaveDaysCount?.value || '1', 10);
     if (!daysCount || daysCount < 1) {
-      showToast('Ilagay kung ilang araw aabsent (minimum 1 araw).', 'warning');
+      showToast('Ilagay kung ilang araw aabsent (minimum 1 araw).', 'warning', 'Kulang na Datos');
       return;
     }
 
-    let curr = new Date(startVal + 'T00:00:00');
-    if (isNaN(curr.getTime())) curr = new Date();
-    if (curr.getDay() === 0) curr.setDate(curr.getDate() + 1);
-    if (curr.getDay() === 6) curr.setDate(curr.getDate() + 2);
-
-    let addedCount = 0;
-    let endCurr = new Date(curr);
-    while (addedCount < daysCount) {
-      const d = endCurr.getDay();
-      if (d !== 0 && d !== 6) {
-        addedCount++;
-        if (addedCount === daysCount) break;
-      }
-      endCurr.setDate(endCurr.getDate() + 1);
-    }
-    const startDateFormatted = toYmd(curr);
-    const endDateFormatted = toYmd(endCurr);
+    const calc = calculateLeaveDates(startVal, daysCount);
 
     if (btnSubmitLeave) {
       btnSubmitLeave.disabled = true;
@@ -1930,8 +1997,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
     try {
       const leaveRec = await blockCounselorLeave(currentUser.uid, currentUser.fullName, {
-        startDate: startDateFormatted,
-        endDate: endDateFormatted,
+        startDate: calc.startDate,
+        endDate: calc.endDate,
         leaveType: 'Leave / Absent'
       });
 
@@ -1940,67 +2007,125 @@ document.addEventListener('DOMContentLoaded', () => {
         currentUser.fullName,
         currentUser.role,
         'COUNSELOR_LEAVE_FILED',
-        `Blocked schedule for ${daysCount} day(s) from ${startDateFormatted} to ${endDateFormatted}`
+        `Blocked schedule for ${daysCount} day(s) from ${calc.startDate} to ${calc.endDate}`
       );
 
-      showToast(`Naka-block na ang schedule mo para sa ${daysCount} araw (${startDateFormatted} hanggang ${endDateFormatted}).`, 'success');
+      showToast(
+        `Naka-block na ang schedule mo para sa ${daysCount} araw (${calc.startDate} hanggang ${calc.endDate}).`,
+        'success',
+        'Schedule Blocked'
+      );
       await renderAvailabilityGrid();
       renderAgenda();
     } catch (err) {
       console.error('Leave filing error:', err);
-      showToast(err.message || 'Failed to block schedule.', 'error');
+      showToast(err.message || 'Failed to block schedule.', 'error', 'Error');
     } finally {
       if (btnSubmitLeave) {
         btnSubmitLeave.disabled = false;
         btnSubmitLeave.innerHTML =
-          '<i data-lucide="calendar-off" class="w-3.5 h-3.5 text-[#F5B800]"></i><span>Block Schedule</span>';
+          '<i data-lucide="calendar-off" class="w-4 h-4 text-[#F5B800]"></i><span>Block Schedule</span>';
         if (window.lucide) window.lucide.createIcons();
       }
     }
   });
 
-  subscribeCounselorLeaves(currentUser.uid, leaves => {
-    currentActiveLeaves = (leaves || []).filter(l => l.status === 'Active');
-    if (!activeLeaveIndicator || !activeLeaveText) return;
+  function renderActiveLeaves(leaves = []) {
+    if (!activeLeavesContainer) return;
+    const active = (leaves || []).filter(l => l.status === 'Active');
+    if (activeLeavesCount) activeLeavesCount.textContent = `${active.length} active`;
 
-    if (currentActiveLeaves.length > 0) {
-      const active = currentActiveLeaves[0];
-      const countExtra = currentActiveLeaves.length > 1 ? ` (+${currentActiveLeaves.length - 1} pa)` : '';
-      activeLeaveText.textContent = `Naka-block: ${active.startDate} hanggang ${active.endDate} (${active.totalDays || 1} araw)${countExtra}`;
-      activeLeaveIndicator.classList.remove('hidden');
-    } else {
-      activeLeaveIndicator.classList.add('hidden');
-    }
-  });
-
-  btnUnblockActiveLeave?.addEventListener('click', async () => {
-    if (!currentActiveLeaves || currentActiveLeaves.length === 0) return;
-    const active = currentActiveLeaves[0];
-    if (
-      !confirm(
-        `I-unblock at ibalik sa Available ang schedule para sa ${active.startDate} hanggang ${active.endDate}?`
-      )
-    )
+    if (active.length === 0) {
+      activeLeavesContainer.innerHTML = `
+        <div class="p-4 text-center text-xs text-slate-400 bg-white rounded-xl border border-slate-200">
+          Walang naka-block na leave sa kasalukuyan. Regular ang iyong konsultasyon.
+        </div>
+      `;
       return;
-
-    btnUnblockActiveLeave.disabled = true;
-    try {
-      await unblockCounselorLeave(currentUser.uid, active.id, currentUser.fullName);
-      await logAuditEvent(
-        currentUser.uid,
-        currentUser.fullName,
-        currentUser.role,
-        'COUNSELOR_LEAVE_CANCELLED',
-        `Unblocked leave ${active.id} (${active.startDate} to ${active.endDate})`
-      );
-      showToast('Na-unblock na ang schedule mo.', 'success');
-      await renderAvailabilityGrid();
-      renderAgenda();
-    } catch (err) {
-      console.error('Unblock leave error:', err);
-      showToast(err.message || 'Failed to unblock leave.', 'error');
-    } finally {
-      btnUnblockActiveLeave.disabled = false;
     }
+
+    activeLeavesContainer.innerHTML = active
+      .map(l => {
+        const datesLabel = l.startDate === l.endDate ? l.startDate : `${l.startDate} hanggang ${l.endDate}`;
+        const total = l.totalDays || (l.dates ? l.dates.length : 1);
+        const chips = (l.dates || [])
+          .map(d => `<span class="px-2 py-0.5 rounded text-[10px] font-medium bg-slate-100 text-slate-700 font-mono">${escapeHtml(d)}</span>`)
+          .join(' ');
+
+        return `
+          <div class="p-4 bg-white rounded-xl border-2 border-blue-100 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
+            <div class="space-y-1.5">
+              <div class="flex items-center gap-2 flex-wrap">
+                <span class="font-bold text-slate-900 flex items-center gap-1.5">
+                  <span class="w-2 h-2 rounded-full bg-rose-500 animate-pulse"></span>
+                  <span class="text-[#00205B]">Naka-block na Petsa ng Leave</span>
+                </span>
+                <span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-900 border border-amber-300">
+                  ${total} Araw (${total * 8} slots blocked)
+                </span>
+              </div>
+              <div class="text-xs text-slate-700 flex items-center gap-2">
+                <strong class="font-mono text-[#00205B] text-sm">${escapeHtml(datesLabel)}</strong>
+              </div>
+              ${chips ? `<div class="flex flex-wrap gap-1 pt-0.5">${chips}</div>` : ''}
+            </div>
+            <button
+              type="button"
+              data-leave-id="${escapeHtml(l.id)}"
+              data-start="${escapeHtml(l.startDate)}"
+              data-end="${escapeHtml(l.endDate)}"
+              class="btn-unblock-leave inline-flex items-center justify-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold text-rose-700 bg-rose-50 hover:bg-rose-100 border border-rose-200 transition shrink-0 shadow-2xs active:scale-95"
+            >
+              <i data-lucide="rotate-ccw" class="w-3.5 h-3.5 text-rose-600"></i>
+              <span>I-unblock / Ibalik sa Pasok</span>
+            </button>
+          </div>
+        `;
+      })
+      .join('');
+
+    if (window.lucide) window.lucide.createIcons();
+
+    activeLeavesContainer.querySelectorAll('.btn-unblock-leave').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        const leaveId = btn.getAttribute('data-leave-id');
+        const start = btn.getAttribute('data-start');
+        const end = btn.getAttribute('data-end');
+        if (!leaveId) return;
+
+        const confirmed = await showConfirmDialog({
+          title: 'I-unblock ang Schedule?',
+          message: `Ibalik sa Available ang lahat ng consultation slots para sa petsang ${start} hanggang ${end}? Maaari na muling magpa-book ang mga estudyante.`,
+          confirmText: 'Oo, I-unblock',
+          cancelText: 'Bumalik',
+          type: 'danger'
+        });
+
+        if (!confirmed) return;
+
+        btn.disabled = true;
+        try {
+          await unblockCounselorLeave(currentUser.uid, leaveId, currentUser.fullName);
+          await logAuditEvent(
+            currentUser.uid,
+            currentUser.fullName,
+            currentUser.role,
+            'COUNSELOR_LEAVE_CANCELLED',
+            `Unblocked leave ${leaveId} (${start} to ${end})`
+          );
+          showToast('Na-unblock na ang schedule mo at maari nang mag-book ang mga estudyante.', 'success', 'Schedule Restored');
+          await renderAvailabilityGrid();
+          renderAgenda();
+        } catch (err) {
+          showToast(err.message || 'Failed to unblock leave.', 'error', 'Error');
+        } finally {
+          btn.disabled = false;
+        }
+      });
+    });
+  }
+
+  subscribeCounselorLeaves(currentUser.uid, leaves => {
+    renderActiveLeaves(leaves);
   });
 });

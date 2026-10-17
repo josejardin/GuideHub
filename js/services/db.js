@@ -1360,6 +1360,7 @@ export async function getCounselorBlockedSlots(counselorId) {
   const slotMap = new Map();
   combined.forEach(rec => {
     if (!rec || !rec.dayOfWeek || !rec.timeSlot) return;
+    if (rec.leaveId || (rec.date && !rec.isRoutine)) return;
     const norm = normalizeTimeSlot(rec.timeSlot);
     const key = `${rec.dayOfWeek}_${norm}`;
     const existing = slotMap.get(key);

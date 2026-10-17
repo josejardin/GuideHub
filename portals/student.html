@@ -61,33 +61,36 @@
 
       <div id="followup-alert-container" class="hidden"></div>
 
-      <div id="active-queue-card" class="hidden bg-white border border-slate-200 rounded-xl p-5 shadow-sm">
+      <div id="active-queue-card" class="hidden mb-6 bg-gradient-to-r from-blue-50/90 via-indigo-50/50 to-white border-2 border-blue-200/90 rounded-2xl p-5 shadow-xs transition-all">
         <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
           <div class="flex items-center gap-4">
             <div
-              class="w-14 h-14 rounded-lg bg-[#00205B] text-white flex items-center justify-center text-xl font-bold tracking-wider font-mono flex-shrink-0"
+              class="w-14 h-14 rounded-2xl bg-[#00205B] text-[#F5B800] flex items-center justify-center text-xl font-bold tracking-wider font-mono flex-shrink-0 shadow-xs border border-[#F5B800]/40"
               id="queue-ticket-num"
             >
               W-100
             </div>
             <div>
               <div class="flex items-center gap-2">
-                <span class="w-2 h-2 rounded-full bg-emerald-500"></span>
-                <span class="text-[11px] font-bold uppercase tracking-wider text-slate-500">Digital Queue Status</span>
+                <span class="flex h-2.5 w-2.5 relative">
+                  <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                  <span class="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500"></span>
+                </span>
+                <span class="text-[11px] font-bold uppercase tracking-wider text-emerald-800 bg-emerald-100/80 px-2 py-0.5 rounded-md border border-emerald-200">Digital Queue Status</span>
               </div>
-              <h3 class="text-sm font-bold text-slate-900 mt-0.5" id="queue-status-text">
-                You're in good hands. We'll be with you shortly.
+              <h3 class="text-sm font-bold text-slate-900 mt-1" id="queue-status-text">
+                Nasa mabuting kamay ka. Sandali lamang at tatawagin ka na.
               </h3>
-              <p class="text-xs text-slate-500 mt-0.5" id="queue-detail-text">
-                Feel free to relax in the Guidance lobby—your counselor is preparing a quiet space for you.
+              <p class="text-xs text-slate-600 mt-0.5" id="queue-detail-text">
+                Maaari kang magpahinga sa Guidance lobby habang inihahanda ng counselor ang isang maayos na lugar para sa iyo.
               </p>
             </div>
           </div>
           <button
             id="btn-cancel-ticket"
-            class="px-3 py-1.5 rounded text-xs font-medium text-slate-600 hover:text-slate-900 bg-slate-100 hover:bg-slate-200 transition"
+            class="px-3.5 py-2 rounded-xl text-xs font-semibold text-rose-700 hover:text-rose-800 bg-rose-50 hover:bg-rose-100 border border-rose-200 transition shadow-2xs shrink-0 self-end sm:self-auto"
           >
-            Cancel Ticket
+            Kanselahin ang Ticket
           </button>
         </div>
       </div>

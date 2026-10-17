@@ -138,7 +138,17 @@ export function validateInstitutionalEmail(email = '', role = 'student', extraDe
   return cleanEmail;
 }
 
-export function showToast(message, type = 'info') {
+function escapeToastHtml(str) {
+  if (!str) return '';
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+export function showToast(message, type = 'info', customTitle = null) {
   let container = document.getElementById('toast-container');
   if (!container) {
     container = document.createElement('div');
@@ -149,26 +159,117 @@ export function showToast(message, type = 'info') {
   const toast = document.createElement('div');
   toast.className = `toast toast-${type}`;
 
-  const iconMap = {
-    success: '<i data-lucide="check-circle-2" class="w-4 h-4 text-emerald-600 flex-shrink-0"></i>',
-    error: '<i data-lucide="alert-circle" class="w-4 h-4 text-rose-600 flex-shrink-0"></i>',
-    warning: '<i data-lucide="alert-triangle" class="w-4 h-4 text-amber-600 flex-shrink-0"></i>',
-    info: '<i data-lucide="info" class="w-4 h-4 text-[#00205B] flex-shrink-0"></i>'
+  const defaultTitles = {
+    success: 'Tagumpay • Success',
+    error: 'Pansin • Notice',
+    warning: 'Paalala • Reminder',
+    info: 'GuideHub • Update'
   };
 
+  const iconMap = {
+    success: '<i data-lucide="check-circle-2" class="w-4 h-4"></i>',
+    error: '<i data-lucide="alert-circle" class="w-4 h-4"></i>',
+    warning: '<i data-lucide="alert-triangle" class="w-4 h-4"></i>',
+    info: '<i data-lucide="info" class="w-4 h-4"></i>'
+  };
+
+  const title = customTitle || defaultTitles[type] || 'GuideHub';
+
   toast.innerHTML = `
- ${iconMap[type] || iconMap.info}
- <span class="flex-1">${message}</span>
- `;
+    <div class="toast-icon-box">
+      ${iconMap[type] || iconMap.info}
+    </div>
+    <div class="toast-content">
+      <div class="toast-title">${title}</div>
+      <div class="toast-message">${escapeToastHtml(message)}</div>
+    </div>
+    <button type="button" class="toast-close-btn" aria-label="Close notification">
+      <i data-lucide="x" class="w-3.5 h-3.5"></i>
+    </button>
+    <div class="toast-progress-bar"></div>
+  `;
+
+  function dismiss() {
+    if (toast.classList.contains('toast-closing')) return;
+    toast.classList.add('toast-closing');
+    setTimeout(() => {
+      toast.remove();
+    }, 250);
+  }
+
+  const closeBtn = toast.querySelector('.toast-close-btn');
+  closeBtn?.addEventListener('click', e => {
+    e.stopPropagation();
+    dismiss();
+  });
 
   container.appendChild(toast);
   if (window.lucide) window.lucide.createIcons();
 
-  setTimeout(() => {
-    toast.style.opacity = '0';
-    toast.style.transform = 'translateX(1rem) scale(0.95)';
-    setTimeout(() => toast.remove(), 200);
-  }, 4000);
+  setTimeout(dismiss, 4500);
+}
+
+export function showConfirmDialog({
+  title = 'Kumpirmahin',
+  message = 'Sigurado ka ba sa iyong gagawin?',
+  confirmText = 'Ituloy',
+  cancelText = 'Bumalik',
+  type = 'warning'
+} = {}) {
+  return new Promise(resolve => {
+    let backdrop = document.getElementById('guidehub-confirm-modal');
+    if (!backdrop) {
+      backdrop = document.createElement('div');
+      backdrop.id = 'guidehub-confirm-modal';
+      backdrop.className =
+        'fixed inset-0 z-[100000] flex items-center justify-center p-4 modal-backdrop animate-in fade-in duration-200';
+      document.body.appendChild(backdrop);
+    }
+
+    const typeIcons = {
+      warning:
+        '<div class="w-12 h-12 rounded-2xl bg-amber-50 text-amber-600 border border-amber-200 flex items-center justify-center mb-3"><i data-lucide="alert-triangle" class="w-6 h-6"></i></div>',
+      danger:
+        '<div class="w-12 h-12 rounded-2xl bg-rose-50 text-rose-600 border border-rose-200 flex items-center justify-center mb-3"><i data-lucide="alert-octagon" class="w-6 h-6"></i></div>',
+      info:
+        '<div class="w-12 h-12 rounded-2xl bg-blue-50 text-[#00205B] border border-blue-200 flex items-center justify-center mb-3"><i data-lucide="help-circle" class="w-6 h-6"></i></div>'
+    };
+
+    const confirmBtnClasses = {
+      danger: 'bg-rose-600 hover:bg-rose-700 text-white',
+      warning: 'bg-[#00205B] hover:bg-[#0A192F] text-white',
+      info: 'bg-[#00205B] hover:bg-[#0A192F] text-white'
+    };
+
+    backdrop.innerHTML = `
+      <div class="bg-white rounded-2xl max-w-sm w-full p-6 shadow-2xl border border-slate-200 text-center animate-in zoom-in-95 duration-150">
+        <div class="flex justify-center">
+          ${typeIcons[type] || typeIcons.warning}
+        </div>
+        <h3 class="text-base font-bold text-slate-900">${escapeToastHtml(title)}</h3>
+        <p class="text-xs text-slate-600 mt-2 leading-relaxed">${escapeToastHtml(message)}</p>
+        <div class="grid grid-cols-2 gap-2.5 mt-5">
+          <button type="button" id="btn-guidehub-confirm-cancel" class="px-4 py-2.5 rounded-xl text-xs font-semibold text-slate-700 bg-slate-100 hover:bg-slate-200 transition">
+            ${escapeToastHtml(cancelText)}
+          </button>
+          <button type="button" id="btn-guidehub-confirm-ok" class="px-4 py-2.5 rounded-xl text-xs font-semibold ${confirmBtnClasses[type] || confirmBtnClasses.warning} shadow-sm transition">
+            ${escapeToastHtml(confirmText)}
+          </button>
+        </div>
+      </div>
+    `;
+
+    backdrop.classList.remove('hidden');
+    if (window.lucide) window.lucide.createIcons();
+
+    function cleanUp(result) {
+      backdrop.classList.add('hidden');
+      resolve(result);
+    }
+
+    backdrop.querySelector('#btn-guidehub-confirm-ok')?.addEventListener('click', () => cleanUp(true));
+    backdrop.querySelector('#btn-guidehub-confirm-cancel')?.addEventListener('click', () => cleanUp(false));
+  });
 }
 
 export function getRolePortalPath(role) {

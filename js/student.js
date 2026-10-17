@@ -1,4 +1,4 @@
-import { requireRole, initNavbar, showToast } from './auth.js';
+import { requireRole, initNavbar, showToast, showConfirmDialog } from './auth.js';
 import { db, doc, updateDoc, collection, query, where, onSnapshot } from './firebase-config.js';
 import {
   createAppointment,
@@ -485,9 +485,17 @@ document.addEventListener('DOMContentLoaded', () => {
   });
 
   btnCancelTicket?.addEventListener('click', async () => {
-    if (activeUserTicket && confirm('Cancel your active walk-in ticket?')) {
+    if (!activeUserTicket) return;
+    const confirmed = await showConfirmDialog({
+      title: 'Kanselahin ang Walk-In Ticket?',
+      message: 'Sigurado ka bang nais mong kanselahin ang iyong numero sa pila? Maaari ka namang kumuha muli kung kinakailangan.',
+      confirmText: 'Oo, Kanselahin',
+      cancelText: 'Huwag Muna',
+      type: 'danger'
+    });
+    if (confirmed) {
       await updateWalkInStatus(activeUserTicket.id, 'Cancelled');
-      showToast('Ticket cancelled.', 'info');
+      showToast('Nakansela na ang iyong walk-in ticket.', 'info', 'Pila / Queue');
     }
   });
 
