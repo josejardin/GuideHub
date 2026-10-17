@@ -113,9 +113,34 @@ document.addEventListener('DOMContentLoaded', () => {
     referralModal?.classList.remove('hidden');
   });
 
+  const refReasonCategory = document.getElementById('ref-reason-category');
+  const refReasonOtherContainer = document.getElementById('ref-reason-other-container');
+  const refReasonOther = document.getElementById('ref-reason-other');
+
+  refReasonCategory?.addEventListener('change', () => {
+    if (refReasonCategory.value === 'Others') {
+      refReasonOtherContainer?.classList.remove('hidden');
+      if (refReasonOther) {
+        refReasonOther.required = true;
+        refReasonOther.focus();
+      }
+    } else {
+      refReasonOtherContainer?.classList.add('hidden');
+      if (refReasonOther) {
+        refReasonOther.required = false;
+        refReasonOther.value = '';
+      }
+    }
+  });
+
   const closeReferralModal = () => {
     referralModal?.classList.add('hidden');
     referralForm?.reset();
+    refReasonOtherContainer?.classList.add('hidden');
+    if (refReasonOther) {
+      refReasonOther.required = false;
+      refReasonOther.value = '';
+    }
   };
 
   const refStudentNumberInput = document.getElementById('ref-student-number');
@@ -141,8 +166,18 @@ document.addEventListener('DOMContentLoaded', () => {
     const studentNumber = document.getElementById('ref-student-number')?.value.trim();
     const program = document.getElementById('ref-student-program')?.value.trim();
     const subjectCourse = document.getElementById('ref-subject-course')?.value.trim();
-    const reasonCategory = document.getElementById('ref-reason-category')?.value;
+    let reasonCategory = document.getElementById('ref-reason-category')?.value;
+    const otherReason = document.getElementById('ref-reason-other')?.value.trim();
     const specificObservations = document.getElementById('ref-observations')?.value.trim();
+
+    if (reasonCategory === 'Others') {
+      if (!otherReason) {
+        showToast('Please specify the other reason/concern.', 'error');
+        document.getElementById('ref-reason-other')?.focus();
+        return;
+      }
+      reasonCategory = `Other: ${otherReason}`;
+    }
 
     try {
       await createReferral({

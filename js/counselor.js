@@ -706,6 +706,12 @@ document.addEventListener('DOMContentLoaded', () => {
       return;
     }
 
+    const referralCountsByStudent = {};
+    allReferrals.forEach(ref => {
+      const num = (ref.studentNumber || '').trim().toLowerCase();
+      if (num) referralCountsByStudent[num] = (referralCountsByStudent[num] || 0) + 1;
+    });
+
     referralsTbody.innerHTML = filteredReferrals
       .map(r => {
         const stageStyles = {
@@ -715,11 +721,19 @@ document.addEventListener('DOMContentLoaded', () => {
           Closed: 'bg-emerald-50 text-emerald-700 border-emerald-200/80'
         };
 
+        const studentKey = (r.studentNumber || '').trim().toLowerCase();
+        const repeatCount = referralCountsByStudent[studentKey] || 1;
+        const hasExistingCase = allCases.some(c => (c.studentNumber || '').trim().toLowerCase() === studentKey);
+
         return `
         <tr class="hover:bg-slate-50/60 transition">
           <td class="py-2.5 px-4 text-slate-500 font-mono text-[11px] whitespace-nowrap">${escapeHtml(formatDateIso(r.createdAt) || 'Recent')}</td>
           <td class="py-2.5 px-4">
-            <div class="font-bold text-slate-900">${escapeHtml(r.studentName)}</div>
+            <div class="font-bold text-slate-900 flex items-center gap-1.5 flex-wrap">
+              <span>${escapeHtml(r.studentName)}</span>
+              ${repeatCount > 1 ? `<span class="inline-flex items-center gap-1 px-1.5 py-0.2 rounded text-[9px] font-bold bg-amber-100 text-amber-800 border border-amber-300" title="This student has ${repeatCount} referral endorsements on record."><i data-lucide="repeat" class="w-3 h-3 text-amber-700"></i> ${repeatCount}x Referral</span>` : ''}
+              ${hasExistingCase ? `<span class="inline-flex items-center gap-1 px-1.5 py-0.2 rounded text-[9px] font-semibold bg-blue-50 text-[#00205B] border border-blue-200" title="Central clinical case folder exists for this student"><i data-lucide="folder-check" class="w-3 h-3 text-blue-600"></i> Case Exists</span>` : ''}
+            </div>
             <div class="text-[11px] text-slate-500">${escapeHtml(r.studentNumber)} • ${escapeHtml(r.program)}</div>
           </td>
           <td class="py-2.5 px-4">
@@ -735,24 +749,28 @@ document.addEventListener('DOMContentLoaded', () => {
             </span>
           </td>
           <td class="py-2.5 px-4 text-right space-x-1 whitespace-nowrap">
-            <button data-cs-id="${escapeHtml(r.id)}" class="btn-issue-callslip px-2 py-1 rounded bg-slate-900 hover:bg-slate-800 text-white text-xs font-medium transition">
+            <button data-cs-id="${escapeHtml(r.id)}" class="btn-issue-callslip px-2 py-1 rounded bg-slate-900 hover:bg-slate-800 text-white text-xs font-medium transition" title="Generate guidance call slip">
               Call Slip
             </button>
             
             ${
               r.status === 'Call Slip Issued'
                 ? `
-            <button data-intake-id="${escapeHtml(r.id)}" data-snum="${escapeHtml(r.studentNumber)}" data-sname="${escapeHtml(r.studentName)}" data-sprog="${escapeHtml(r.program)}" class="btn-intake-conducted px-2 py-1 rounded bg-purple-700 hover:bg-purple-800 text-white text-xs font-medium transition">
+            <button data-intake-id="${escapeHtml(r.id)}" data-snum="${escapeHtml(r.studentNumber)}" data-sname="${escapeHtml(r.studentName)}" data-sprog="${escapeHtml(r.program)}" class="btn-intake-conducted px-2 py-1 rounded bg-purple-700 hover:bg-purple-800 text-white text-xs font-medium transition" title="Start clinical intake and open case folder">
               Intake
             </button>
             `
                 : ''
             }
 
+            <button data-snum="${escapeHtml(r.studentNumber)}" data-sname="${escapeHtml(r.studentName)}" data-sprog="${escapeHtml(r.program)}" class="btn-open-case-from-ref px-2 py-1 rounded bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-medium transition" title="Open central clinical case folder">
+              Case Folder
+            </button>
+
             ${
               r.status !== 'Closed'
                 ? `
-            <button data-close-ref-id="${escapeHtml(r.id)}" class="btn-close-referral px-2 py-1 rounded border border-slate-200 hover:bg-slate-100 text-slate-700 text-xs font-medium transition">
+            <button data-close-ref-id="${escapeHtml(r.id)}" class="btn-close-referral px-2 py-1 rounded border border-slate-200 hover:bg-slate-100 text-slate-700 text-xs font-medium transition" title="Archive referral">
               Close
             </button>
             `
@@ -763,9 +781,27 @@ document.addEventListener('DOMContentLoaded', () => {
       `;
       })
       .join('');
+    if (window.lucide) window.lucide.createIcons();
   }
 
   referralsTbody?.addEventListener('click', async e => {
+    const openCaseBtn = e.target.closest('.btn-open-case-from-ref');
+    if (openCaseBtn) {
+      e.preventDefault();
+      const snum = openCaseBtn.getAttribute('data-snum');
+      const sname = openCaseBtn.getAttribute('data-sname');
+      const sprog = openCaseBtn.getAttribute('data-sprog');
+      const caseRecord = await getOrCreateCase(snum, sname, sprog, currentUser.uid);
+      if (caseRecord.status === 'Closed') {
+        await updateCaseStatus(caseRecord.id, 'Active');
+        caseRecord.status = 'Active';
+        showToast(`Retrieved past clinical records for ${sname}. Case reopened as Active.`, 'info');
+      }
+      switchTab('cases');
+      selectCaseFolder(caseRecord.id);
+      return;
+    }
+
     const csBtn = e.target.closest('.btn-issue-callslip');
     if (csBtn) {
       e.preventDefault();
