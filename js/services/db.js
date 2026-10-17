@@ -789,18 +789,24 @@ export async function updateReferralStatus(referralId, status, extraFields = {})
 }
 
 export async function getOrCreateCase(studentNumber, studentName, program, counselorId) {
-  let id = 'case_' + (studentNumber || 'unknown').replace(/[^a-zA-Z0-9]/g, '_');
+  const cleanNum = (studentNumber || 'unknown').trim();
+  const normalizedId = 'case_' + cleanNum.replace(/[^a-zA-Z0-9]/g, '_');
 
   try {
     if (db) {
-      // 1. Check direct case ID in Firestore
-      const directSnap = await getDoc(doc(db, 'cases', id));
+      // 1. Check direct case ID in Firestore (deterministic key prevents duplication)
+      const directSnap = await getDoc(doc(db, 'cases', normalizedId));
       if (directSnap.exists()) {
-        return { id: directSnap.id, ...directSnap.data() };
+        const existingData = directSnap.data();
+        if (program && program !== existingData.program && program !== 'Student' && program !== 'N/A') {
+          await setDoc(doc(db, 'cases', normalizedId), { program, updatedAt: new Date().toISOString() }, { merge: true });
+          existingData.program = program;
+        }
+        return { id: directSnap.id, ...existingData };
       }
 
       // 2. Query Firestore cases by studentNumber
-      const qCase = query(collection(db, 'cases'), where('studentNumber', '==', studentNumber));
+      const qCase = query(collection(db, 'cases'), where('studentNumber', '==', cleanNum));
       const querySnap = await getDocs(qCase);
       if (!querySnap.empty) {
         const docSnap = querySnap.docs[0];
@@ -812,16 +818,23 @@ export async function getOrCreateCase(studentNumber, studentName, program, couns
   }
 
   const state = getLocalState();
-  let existingCase = Object.values(state.cases).find(c => c.studentNumber === studentNumber);
+  let existingCase = Object.values(state.cases).find(
+    c => (c.studentNumber || '').trim().toLowerCase() === cleanNum.toLowerCase() || c.id === normalizedId
+  );
 
   if (existingCase) {
+    if (program && program !== existingCase.program && program !== 'Student' && program !== 'N/A') {
+      existingCase.program = program;
+      existingCase.updatedAt = new Date().toISOString();
+      saveLocalState(state);
+    }
     return existingCase;
   }
 
   const newCase = {
-    studentNumber,
-    studentName,
-    program,
+    studentNumber: cleanNum,
+    studentName: studentName || 'Student',
+    program: program || 'General',
     assignedCounselorId: counselorId,
     status: 'Active',
     riskFlags: {
@@ -836,16 +849,16 @@ export async function getOrCreateCase(studentNumber, studentName, program, couns
 
   try {
     if (db) {
-      const caseRef = doc(db, 'cases', id);
+      const caseRef = doc(db, 'cases', normalizedId);
       await setDoc(caseRef, newCase, { merge: true });
     }
   } catch (err) {
     console.warn('Firestore getOrCreateCase fallback:', err.message);
   }
 
-  state.cases[id] = { id, ...newCase };
+  state.cases[normalizedId] = { id: normalizedId, ...newCase };
   saveLocalState(state);
-  return { id, ...newCase };
+  return { id: normalizedId, ...newCase };
 }
 
 export function subscribeAllCases(callback) {
