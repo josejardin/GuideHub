@@ -147,6 +147,14 @@
 
             <div id="agenda-blocked-banner" class="hidden mb-3 p-3 rounded-lg bg-amber-50 border border-amber-200 text-xs text-amber-900"></div>
 
+            <div id="agenda-pending-alert" class="hidden mb-3 p-3 rounded-lg bg-blue-50 border border-blue-200 text-xs text-[#00205B] flex items-center justify-between">
+              <div class="flex items-center gap-2">
+                <i data-lucide="bell" class="w-4 h-4 text-blue-600 shrink-0"></i>
+                <span>You have <strong id="pending-alert-count">0</strong> pending consultation request(s) waiting for confirmation.</span>
+              </div>
+              <button type="button" id="btn-jump-pending" class="px-2.5 py-1 bg-[#00205B] text-white rounded text-[11px] font-semibold hover:bg-blue-900 transition shrink-0 ml-2">Review Requests</button>
+            </div>
+
             <div
               id="agenda-list"
               class="divide-y divide-slate-100 border border-slate-200 rounded-lg overflow-hidden"

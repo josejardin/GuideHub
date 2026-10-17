@@ -4,6 +4,7 @@ import {
   createAppointment,
   subscribeStudentAppointments,
   checkSlotAvailable,
+  getAvailableCounselorsForSlot,
   getCounselors,
   updateAppointmentStatus,
   generateWalkInTicket,
@@ -26,41 +27,17 @@ document.addEventListener('DOMContentLoaded', () => {
 
   const counselorSelect = document.getElementById('counselorSelect');
 
-  async function populateCounselorSelect() {
-    if (!counselorSelect) return;
-    const counselors = await getCounselors();
-    counselorSelect.innerHTML = '<option value="any">Any Available Counselor (Fastest Matching)</option>';
-    counselors.forEach(c => {
-      const option = document.createElement('option');
-      option.value = c.id || c.uid;
-      const genderTag = c.gender ? `${c.gender} • ` : '';
-      option.textContent = `${c.fullName} (${genderTag}${c.department || 'Guidance Center'})`;
-      option.dataset.name = c.fullName;
-      option.dataset.gender = c.gender || 'Any';
-      counselorSelect.appendChild(option);
-    });
-  }
-
-  populateCounselorSelect();
-
-  if (counselorSelect && db) {
-    try {
-      onSnapshot(doc(db, 'users', 'counselors'), () => {
-        populateCounselorSelect();
-      });
-    } catch (e) {}
-  }
-
-  counselorSelect?.addEventListener('change', () => {
-    selectedSlot = null;
-    validateDateAndLoadSlots();
-  });
-
   document.querySelectorAll('input[name="counselor_pref"]').forEach(radio => {
     radio.addEventListener('change', () => {
-      selectedSlot = null;
-      validateDateAndLoadSlots();
+      if (currentStep === 3) {
+        updateCounselorsForChosenSlot();
+      }
     });
+  });
+
+  document.getElementById('btn-edit-schedule')?.addEventListener('click', () => {
+    currentStep = 2;
+    renderStep();
   });
 
   const followUpBanner = document.getElementById('followUpBanner');
@@ -147,7 +124,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const appointmentsListEl = document.getElementById('appointments-list');
   const statusFilterEl = document.getElementById('appointment-status-filter');
 
-  subscribeStudentAppointments(currentUser.uid, appointments => {
+  subscribeStudentAppointments(currentUser, appointments => {
     cachedAppointments = appointments;
     renderAppointments();
   });
@@ -450,14 +427,11 @@ document.addEventListener('DOMContentLoaded', () => {
       return;
     }
 
-    slotContainer.innerHTML = `<div class="col-span-4 text-[11px] text-slate-400 py-2">Checking availability...</div>`;
-
-    const chosenCounselorId = counselorSelect?.value || 'any';
-    const chosenPref = document.querySelector('input[name="counselor_pref"]:checked')?.value || 'Any';
+    slotContainer.innerHTML = `<div class="col-span-4 text-[11px] text-slate-400 py-2">Checking schedule availability...</div>`;
 
     let html = '';
     for (const slot of TIME_SLOTS) {
-      const isAvailable = await checkSlotAvailable(dateInput.value, slot, chosenCounselorId, chosenPref);
+      const isAvailable = await checkSlotAvailable(dateInput.value, slot, 'any', 'Any');
       const isSelected = selectedSlot === slot;
 
       if (isAvailable) {
@@ -468,7 +442,7 @@ document.addEventListener('DOMContentLoaded', () => {
         `;
       } else {
         html += `
-          <button type="button" disabled class="p-2 rounded text-xs font-medium bg-rose-50/60 text-rose-400 border border-rose-100 cursor-not-allowed line-through" title="Schedule Blocked / Unavailable">
+          <button type="button" disabled class="p-2 rounded text-xs font-medium bg-rose-50/60 text-rose-400 border border-rose-100 cursor-not-allowed line-through" title="All counselors blocked / unavailable at this time">
             ${slot}
           </button>
         `;
@@ -483,6 +457,52 @@ document.addEventListener('DOMContentLoaded', () => {
         validateDateAndLoadSlots();
       });
     });
+  }
+
+  async function updateCounselorsForChosenSlot() {
+    const dateInput = document.getElementById('wiz-schedule-date');
+    const summaryDateTime = document.getElementById('wiz-summary-datetime');
+    const noticeEl = document.getElementById('counselor-availability-notice');
+    if (!counselorSelect || !dateInput) return;
+
+    if (summaryDateTime) {
+      summaryDateTime.textContent = `${dateInput.value} (${selectedSlot || 'No slot selected'})`;
+    }
+
+    if (!selectedSlot) {
+      counselorSelect.innerHTML = '<option value="" disabled selected>Please select a time slot first</option>';
+      return;
+    }
+
+    const chosenPref = document.querySelector('input[name="counselor_pref"]:checked')?.value || 'Any';
+    counselorSelect.innerHTML = '<option value="" disabled selected>Loading available counselors...</option>';
+    if (noticeEl) noticeEl.classList.add('hidden');
+
+    try {
+      const availableCounselors = await getAvailableCounselorsForSlot(dateInput.value, selectedSlot, chosenPref);
+
+      if (availableCounselors.length === 0) {
+        counselorSelect.innerHTML = '<option value="" disabled selected>No counselors available for this selection</option>';
+        if (noticeEl) {
+          const prefDesc = chosenPref !== 'Any' ? `${chosenPref} ` : '';
+          noticeEl.textContent = `No ${prefDesc}guidance counselors are available at ${selectedSlot} on ${dateInput.value}. Please choose another schedule or select another gender preference.`;
+          noticeEl.classList.remove('hidden');
+        }
+        return;
+      }
+
+      let html = `<option value="any">Any Available Counselor (${availableCounselors.length} available)</option>`;
+      availableCounselors.forEach(c => {
+        const genderTag = c.gender ? `${c.gender} • ` : '';
+        html += `<option value="${c.id || c.uid}" data-name="${escapeHtml(c.fullName)}" data-gender="${c.gender || 'Any'}">${escapeHtml(c.fullName)} (${genderTag}${escapeHtml(c.department || 'Guidance Center')})</option>`;
+      });
+
+      counselorSelect.innerHTML = html;
+      counselorSelect.value = 'any';
+    } catch (err) {
+      console.warn('Error loading counselors for slot:', err);
+      counselorSelect.innerHTML = '<option value="any">Any Available Counselor (Fastest Matching)</option>';
+    }
   }
 
   function renderStep() {
@@ -512,9 +532,32 @@ document.addEventListener('DOMContentLoaded', () => {
       btnNext.textContent = currentStep === 4 ? 'Submit Booking' : 'Next Step';
     }
 
-    if (currentStep === 3) {
+    if (currentStep === 2) {
       validateDateAndLoadSlots();
     }
+
+    if (currentStep === 3) {
+      updateCounselorsForChosenSlot();
+    }
+
+    if (currentStep === 4) {
+      const dateInput = document.getElementById('wiz-schedule-date');
+      const rDate = document.getElementById('wiz-review-date');
+      const rSlot = document.getElementById('wiz-review-slot');
+      const rCounselor = document.getElementById('wiz-review-counselor');
+
+      const chosenOption = counselorSelect?.selectedOptions[0];
+      const counselorLabel =
+        counselorSelect?.value === 'any'
+          ? 'Any Available Counselor (Auto-assigned)'
+          : chosenOption?.dataset?.name || chosenOption?.text || 'Guidance Counselor';
+
+      if (rDate && dateInput) rDate.textContent = dateInput.value;
+      if (rSlot) rSlot.textContent = selectedSlot || 'N/A';
+      if (rCounselor) rCounselor.textContent = counselorLabel;
+    }
+
+    if (window.lucide) window.lucide.createIcons();
   }
 
   document.getElementById('btn-wiz-prev')?.addEventListener('click', () => {
@@ -538,14 +581,18 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     if (currentStep === 2) {
+      if (!selectedSlot) {
+        showToast('Please choose an available 1-hour time slot.', 'warning');
+        return;
+      }
       currentStep++;
       renderStep();
       return;
     }
 
     if (currentStep === 3) {
-      if (!selectedSlot) {
-        showToast('Please choose an available 1-hour time slot.', 'warning');
+      if (!counselorSelect || !counselorSelect.value) {
+        showToast('Please select an available guidance counselor or choose another slot.', 'warning');
         return;
       }
       currentStep++;
@@ -571,21 +618,18 @@ document.addEventListener('DOMContentLoaded', () => {
           : chosenCounselorOption?.dataset?.name || chosenCounselorOption?.text || 'Assigned Counselor';
 
       if (chosenCounselorId === 'any') {
-        const counselors = await getCounselors();
-        const availableCounselors = [];
-        for (const c of counselors) {
-          const isFree = await checkSlotAvailable(date, selectedSlot, c.id || c.uid, counselorPref);
-          if (isFree) availableCounselors.push(c);
-        }
-        if (availableCounselors.length === 1) {
-          chosenCounselorId = availableCounselors[0].id || availableCounselors[0].uid;
-          chosenCounselorName = availableCounselors[0].fullName;
+        const available = await getAvailableCounselorsForSlot(date, selectedSlot, counselorPref);
+        if (available.length > 0) {
+          chosenCounselorId = available[0].id || available[0].uid;
+          chosenCounselorName = available[0].fullName;
         }
       }
 
       try {
         await createAppointment({
           studentId: currentUser.uid,
+          studentAuthUid: currentUser.authUid || currentUser.uid,
+          studentEmail: currentUser.email || '',
           studentName: currentUser.fullName,
           studentNumber: currentUser.studentOrEmpId || 'N/A',
           program: studentProgram,

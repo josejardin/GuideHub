@@ -212,8 +212,10 @@ export async function updateUserRole(uid, newRole) {
 export async function createAppointment(data) {
   const appointment = {
     studentId: data.studentId,
+    studentAuthUid: data.studentAuthUid || data.authUid || data.studentId || '',
+    studentEmail: (data.studentEmail || data.email || '').toLowerCase(),
     studentName: data.studentName,
-    studentNumber: data.studentNumber,
+    studentNumber: data.studentNumber || '',
     program: data.program,
     gender: data.gender || 'Not Specified',
     contactNumber: data.contactNumber || '',
@@ -250,92 +252,125 @@ export async function createAppointment(data) {
   return { id, ...appointment };
 }
 
-export function subscribeStudentAppointments(studentId, callback) {
+export function subscribeStudentAppointments(studentUserOrId, callback) {
+  const targetUid = typeof studentUserOrId === 'object' ? studentUserOrId.uid : studentUserOrId;
+  const targetAuthUid = typeof studentUserOrId === 'object' ? studentUserOrId.authUid : null;
+  const targetStudentNumber = typeof studentUserOrId === 'object' ? studentUserOrId.studentOrEmpId : null;
+  const targetEmail = typeof studentUserOrId === 'object' ? (studentUserOrId.email || '').toLowerCase() : null;
+
+  const matchesStudent = a => {
+    if (!a) return false;
+    if (a.studentId && (a.studentId === targetUid || (targetAuthUid && a.studentId === targetAuthUid))) return true;
+    if (targetStudentNumber && (a.studentNumber === targetStudentNumber || a.studentId === targetStudentNumber)) return true;
+    if (targetEmail && (a.studentEmail || '').toLowerCase() === targetEmail) return true;
+    return false;
+  };
+
+  const deliver = list => {
+    const matched = (list || []).filter(matchesStudent);
+    matched.sort(
+      (a, b) =>
+        new Date(b.date + ' ' + (b.timeSlot || '00:00')) - new Date(a.date + ' ' + (a.timeSlot || '00:00'))
+    );
+    callback(matched);
+  };
+
+  let firestoreList = [];
+  let unsubFirestore = null;
+
   try {
     if (db) {
-      const q = query(collection(db, 'appointments'), where('studentId', '==', studentId));
-      const unsubscribe = onSnapshot(
+      const q = query(collection(db, 'appointments'));
+      unsubFirestore = onSnapshot(
         q,
         snap => {
-          if (!snap.empty) {
-            const list = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-            list.sort(
-              (a, b) =>
-                new Date(b.date + ' ' + (b.timeSlot || '00:00')) - new Date(a.date + ' ' + (a.timeSlot || '00:00'))
-            );
-            callback(list);
-          } else {
-            const state = getLocalState();
-            const list = Object.values(state.appointments).filter(a => a.studentId === studentId);
-            list.sort(
-              (a, b) =>
-                new Date(b.date + ' ' + (b.timeSlot || '00:00')) - new Date(a.date + ' ' + (a.timeSlot || '00:00'))
-            );
-            callback(list);
-          }
+          firestoreList = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+          const state = getLocalState();
+          const localList = Object.values(state.appointments || {});
+          const mergedMap = new Map();
+          firestoreList.forEach(item => mergedMap.set(item.id, item));
+          localList.forEach(item => {
+            if (!mergedMap.has(item.id)) mergedMap.set(item.id, item);
+          });
+          deliver(Array.from(mergedMap.values()));
         },
         err => {
           console.warn('Snapshot error student appointments:', err);
+          const state = getLocalState();
+          deliver(Object.values(state.appointments || {}));
         }
       );
-      return unsubscribe;
     }
   } catch (e) {
     console.warn('subscribeStudentAppointments firestore exception', e);
   }
 
-  const handler = () => {
+  const localHandler = () => {
     const state = getLocalState();
-    const list = Object.values(state.appointments).filter(a => a.studentId === studentId);
-    list.sort(
-      (a, b) => new Date(b.date + ' ' + (b.timeSlot || '00:00')) - new Date(a.date + ' ' + (a.timeSlot || '00:00'))
-    );
-    callback(list);
+    const localList = Object.values(state.appointments || {});
+    const mergedMap = new Map();
+    firestoreList.forEach(item => mergedMap.set(item.id, item));
+    localList.forEach(item => {
+      if (!mergedMap.has(item.id)) mergedMap.set(item.id, item);
+    });
+    deliver(Array.from(mergedMap.values()));
   };
-  window.addEventListener('guidehub_data_changed', handler);
-  handler();
-  return () => window.removeEventListener('guidehub_data_changed', handler);
+
+  window.addEventListener('guidehub_data_changed', localHandler);
+  localHandler();
+
+  return () => {
+    if (unsubFirestore) unsubFirestore();
+    window.removeEventListener('guidehub_data_changed', localHandler);
+  };
 }
 
 export function subscribeAllAppointments(callback) {
+  let firestoreList = [];
+  let unsubFirestore = null;
+
+  const deliver = () => {
+    const state = getLocalState();
+    const localList = Object.values(state.appointments || {});
+    const mergedMap = new Map();
+    firestoreList.forEach(item => mergedMap.set(item.id, item));
+    localList.forEach(item => {
+      if (!mergedMap.has(item.id)) mergedMap.set(item.id, item);
+    });
+    const list = Array.from(mergedMap.values());
+    list.sort(
+      (a, b) =>
+        new Date(b.date + ' ' + (b.timeSlot || '00:00')) - new Date(a.date + ' ' + (a.timeSlot || '00:00'))
+    );
+    callback(list);
+  };
+
   try {
     if (db) {
       const q = query(collection(db, 'appointments'));
-      const unsubscribe = onSnapshot(q, snap => {
-        if (!snap.empty) {
-          const list = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-          list.sort(
-            (a, b) =>
-              new Date(b.date + ' ' + (b.timeSlot || '00:00')) - new Date(a.date + ' ' + (a.timeSlot || '00:00'))
-          );
-          callback(list);
-        } else {
-          const state = getLocalState();
-          const list = Object.values(state.appointments);
-          list.sort(
-            (a, b) =>
-              new Date(b.date + ' ' + (b.timeSlot || '00:00')) - new Date(a.date + ' ' + (a.timeSlot || '00:00'))
-          );
-          callback(list);
+      unsubFirestore = onSnapshot(
+        q,
+        snap => {
+          firestoreList = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+          deliver();
+        },
+        err => {
+          console.warn('Snapshot error all appointments:', err);
+          deliver();
         }
-      });
-      return unsubscribe;
+      );
     }
   } catch (e) {
     console.warn('subscribeAllAppointments firestore exception', e);
   }
 
-  const handler = () => {
-    const state = getLocalState();
-    const list = Object.values(state.appointments);
-    list.sort(
-      (a, b) => new Date(b.date + ' ' + (b.timeSlot || '00:00')) - new Date(a.date + ' ' + (a.timeSlot || '00:00'))
-    );
-    callback(list);
+  window.addEventListener('guidehub_data_changed', deliver);
+  deliver();
+
+  return () => {
+    if (unsubFirestore) unsubFirestore();
+    window.removeEventListener('guidehub_data_changed', deliver);
   };
-  window.addEventListener('guidehub_data_changed', handler);
-  handler();
-  return () => window.removeEventListener('guidehub_data_changed', handler);
 }
 
 export async function updateAppointmentStatus(appointmentId, status, extraFields = {}) {
@@ -408,7 +443,7 @@ export async function getCounselors() {
   return counselors;
 }
 
-export async function checkSlotAvailable(date, timeSlot, counselorId = 'any', genderPreference = 'Any') {
+export async function getAvailableCounselorsForSlot(date, timeSlot, genderPreference = 'Any') {
   const state = getLocalState();
   const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
   const dayOfWeek = date ? dayNames[new Date(`${date}T00:00:00`).getDay()] : '';
@@ -472,35 +507,41 @@ export async function checkSlotAvailable(date, timeSlot, counselorId = 'any', ge
     return false;
   }
 
-  // A. Specific Counselor Selected
+  const available = [];
+  const prefLower = (genderPreference || 'Any').toLowerCase();
+
+  for (const c of allCounselors) {
+    if (prefLower !== 'any' && (c.gender || '').toLowerCase() !== prefLower) {
+      continue;
+    }
+    const blocked = await isCounselorBlockedOrBooked(c);
+    if (!blocked) {
+      available.push(c);
+    }
+  }
+
+  return available;
+}
+
+export async function checkSlotAvailable(date, timeSlot, counselorId = 'any', genderPreference = 'Any') {
   if (counselorId && counselorId !== 'any') {
+    const allCounselors = await getCounselors();
     const targetCounselor =
       allCounselors.find(c => c.id === counselorId || c.uid === counselorId || c.email === counselorId) || {
         id: counselorId,
         uid: counselorId
       };
-    const blockedOrBooked = await isCounselorBlockedOrBooked(targetCounselor);
-    return !blockedOrBooked;
+    const available = await getAvailableCounselorsForSlot(date, timeSlot, 'Any');
+    return available.some(
+      c =>
+        c.id === targetCounselor.id ||
+        c.uid === targetCounselor.uid ||
+        (targetCounselor.email && c.email === targetCounselor.email)
+    );
   }
 
-  // B. "Any Available Counselor" Selected
-  let eligibleCounselors = allCounselors;
-  if (genderPreference && genderPreference !== 'Any') {
-    const prefLower = genderPreference.toLowerCase();
-    const genderFiltered = allCounselors.filter(c => (c.gender || '').toLowerCase() === prefLower);
-    if (genderFiltered.length > 0) {
-      eligibleCounselors = genderFiltered;
-    }
-  }
-
-  for (const c of eligibleCounselors) {
-    const blockedOrBooked = await isCounselorBlockedOrBooked(c);
-    if (!blockedOrBooked) {
-      return true; // At least one eligible counselor is open
-    }
-  }
-
-  return false;
+  const available = await getAvailableCounselorsForSlot(date, timeSlot, genderPreference);
+  return available.length > 0;
 }
 
 export async function generateWalkInTicket(studentData) {

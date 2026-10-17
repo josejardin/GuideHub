@@ -98,6 +98,12 @@ document.addEventListener('DOMContentLoaded', () => {
     renderAgenda();
   });
 
+  document.getElementById('btn-jump-pending')?.addEventListener('click', () => {
+    activeViewFilter = 'all_pending';
+    updateFilterUI();
+    renderAgenda();
+  });
+
   function updateFilterUI() {
     if (activeViewFilter === 'selected_date') {
       btnViewDate?.classList.add('bg-white', 'text-[#00205B]', 'font-bold', 'shadow-sm');
@@ -187,6 +193,18 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const pendingCount = accessibleAppointments.filter(a => (a.status || '').toLowerCase() === 'pending').length;
     if (badgeAllPendingCount) badgeAllPendingCount.textContent = pendingCount;
+
+    const agendaPendingAlert = document.getElementById('agenda-pending-alert');
+    const pendingAlertCount = document.getElementById('pending-alert-count');
+    if (agendaPendingAlert) {
+      if (pendingCount > 0 && activeViewFilter === 'selected_date') {
+        if (pendingAlertCount) pendingAlertCount.textContent = pendingCount;
+        agendaPendingAlert.classList.remove('hidden');
+        if (window.lucide) window.lucide.createIcons();
+      } else {
+        agendaPendingAlert.classList.add('hidden');
+      }
+    }
 
     const selectedDate = agendaDatePicker?.value || todayIso;
 
