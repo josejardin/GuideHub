@@ -1545,6 +1545,30 @@ export async function blockCounselorLeave(counselorId, counselorName, leaveData)
     throw new Error('Please select valid dates that include regular weekdays (Monday to Friday).');
   }
 
+  const state = getLocalState();
+  if (!state.counselorLeaves) state.counselorLeaves = {};
+  if (!state.counselorSchedules) state.counselorSchedules = {};
+
+  // Conflict validation: Disallow overriding an existing active blocked schedule
+  const activeLeaves = Object.values(state.counselorLeaves).filter(
+    l => l && l.counselorId === counselorId && l.status === 'Active'
+  );
+  const conflictLeave = activeLeaves.find(l => {
+    const existingDates =
+      l.dates && Array.isArray(l.dates) ? l.dates : getBusinessDatesInRange(l.startDate, l.endDate);
+    return dates.some(d => existingDates.includes(d));
+  });
+
+  if (conflictLeave) {
+    const conflictRange =
+      conflictLeave.startDate === conflictLeave.endDate
+        ? conflictLeave.startDate
+        : `${conflictLeave.startDate} to ${conflictLeave.endDate}`;
+    throw new Error(
+      `Schedule conflict: One or more dates are already blocked under an active leave (${conflictRange}). You cannot override an existing blocked schedule.`
+    );
+  }
+
   const leaveId = 'leave_' + Date.now() + '_' + Math.random().toString(36).substr(2, 4);
   const nowIso = new Date().toISOString();
 
@@ -1562,10 +1586,6 @@ export async function blockCounselorLeave(counselorId, counselorName, leaveData)
     createdAt: nowIso,
     updatedAt: nowIso
   };
-
-  const state = getLocalState();
-  if (!state.counselorLeaves) state.counselorLeaves = {};
-  if (!state.counselorSchedules) state.counselorSchedules = {};
 
   state.counselorLeaves[leaveId] = leaveRecord;
 

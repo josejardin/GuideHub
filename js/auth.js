@@ -160,10 +160,10 @@ export function showToast(message, type = 'info', customTitle = null) {
   toast.className = `toast toast-${type}`;
 
   const defaultTitles = {
-    success: 'Tagumpay • Success',
-    error: 'Pansin • Notice',
-    warning: 'Paalala • Reminder',
-    info: 'GuideHub • Update'
+    success: 'Success',
+    error: 'Notice',
+    warning: 'Reminder',
+    info: 'GuideHub Update'
   };
 
   const iconMap = {
@@ -210,10 +210,10 @@ export function showToast(message, type = 'info', customTitle = null) {
 }
 
 export function showConfirmDialog({
-  title = 'Kumpirmahin',
-  message = 'Sigurado ka ba sa iyong gagawin?',
-  confirmText = 'Ituloy',
-  cancelText = 'Bumalik',
+  title = 'Confirm Action',
+  message = 'Are you sure you want to proceed?',
+  confirmText = 'Proceed',
+  cancelText = 'Cancel',
   type = 'warning'
 } = {}) {
   return new Promise(resolve => {

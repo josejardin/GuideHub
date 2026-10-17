@@ -196,9 +196,9 @@
                   </span>
                 </div>
                 <div>
-                  <h4 class="text-xs font-bold text-[#00205B] uppercase tracking-wide">Mga Bagong Kahilingan sa Konsultasyon</h4>
+                  <h4 class="text-xs font-bold text-[#00205B] uppercase tracking-wide">Pending Consultation Requests</h4>
                   <p class="text-xs text-slate-700 mt-0.5">
-                    May <strong id="pending-alert-count" class="font-bold text-[#00205B] bg-blue-100 px-2 py-0.5 rounded-md border border-blue-200">0</strong> pending consultation request(s) na naghihintay ng iyong kumpirmasyon.
+                    You have <strong id="pending-alert-count" class="font-bold text-[#00205B] bg-blue-100 px-2 py-0.5 rounded-md border border-blue-200">0</strong> pending consultation request(s) waiting for confirmation.
                   </p>
                 </div>
               </div>
@@ -214,9 +214,9 @@
                   <i data-lucide="calendar-x" class="w-5 h-5 text-white"></i>
                 </div>
                 <div>
-                  <h4 class="text-xs font-bold text-rose-900 uppercase tracking-wide">Mga Kinanselang Appointment</h4>
+                  <h4 class="text-xs font-bold text-rose-900 uppercase tracking-wide">Cancelled Appointments</h4>
                   <p class="text-xs text-slate-700 mt-0.5">
-                    May <strong id="cancelled-alert-count" class="font-bold text-rose-900 bg-rose-100 px-2 py-0.5 rounded-md border border-rose-200">0</strong> cancelled appointment(s) kung saan nag-iwan ng paliwanag ang estudyante.
+                    You have <strong id="cancelled-alert-count" class="font-bold text-rose-900 bg-rose-100 px-2 py-0.5 rounded-md border border-rose-200">0</strong> cancelled appointment(s) with student reasons on record.
                   </p>
                 </div>
               </div>
@@ -420,7 +420,7 @@
                   <div>
                     <h3 class="text-xs font-bold uppercase tracking-wider text-[#00205B]">1. Temporary Leave / Absence Blocker</h3>
                     <p class="text-[11px] text-slate-600">
-                      Ilagay kung kailan at ilang araw kang mawawala. Awtomatikong maba-block ang lahat ng 8 slots bawat regular na araw para hindi mabo-book ng estudyante.
+                      Specify your leave start date and number of days. All 8 daily consultation slots will be automatically blocked to prevent student bookings.
                     </p>
                   </div>
                 </div>
@@ -433,7 +433,7 @@
                   <div class="sm:col-span-4">
                     <label class="block font-semibold text-slate-700 text-xs mb-1.5 flex items-center gap-1.5">
                       <i data-lucide="calendar" class="w-3.5 h-3.5 text-blue-600"></i>
-                      <span>Simulang Petsa (Start Date)</span>
+                      <span>Start Date</span>
                     </label>
                     <input
                       type="date"
@@ -447,7 +447,7 @@
                   <div class="sm:col-span-4">
                     <label class="block font-semibold text-slate-700 text-xs mb-1.5 flex items-center gap-1.5">
                       <i data-lucide="clock" class="w-3.5 h-3.5 text-blue-600"></i>
-                      <span>Ilang araw aabsent / leave?</span>
+                      <span>Number of days absent / on leave?</span>
                     </label>
                     <div class="flex items-center gap-2">
                       <input
@@ -459,7 +459,7 @@
                         required
                         class="w-full px-3 py-2 text-xs border border-slate-300 rounded-xl bg-white font-bold text-slate-900 focus:border-[#00205B] focus:ring-2 focus:ring-blue-100 focus:outline-none shadow-2xs"
                       />
-                      <span class="text-xs text-slate-500 font-medium shrink-0">araw (days)</span>
+                      <span class="text-xs text-slate-500 font-medium shrink-0">day(s)</span>
                     </div>
                   </div>
 
@@ -478,11 +478,11 @@
 
                 <!-- Quick Preset Day Buttons -->
                 <div class="flex flex-wrap items-center gap-2 pt-1">
-                  <span class="text-[11px] font-semibold text-slate-500">Mabilisang Piliin:</span>
-                  <button type="button" data-days="1" class="btn-leave-quick-preset px-2.5 py-1 rounded-lg text-[11px] font-semibold bg-white border border-slate-200 text-slate-700 hover:border-[#00205B] hover:text-[#00205B] transition shadow-2xs">1 Araw</button>
-                  <button type="button" data-days="2" class="btn-leave-quick-preset px-2.5 py-1 rounded-lg text-[11px] font-semibold bg-white border border-slate-200 text-slate-700 hover:border-[#00205B] hover:text-[#00205B] transition shadow-2xs">2 Araw</button>
-                  <button type="button" data-days="3" class="btn-leave-quick-preset px-2.5 py-1 rounded-lg text-[11px] font-semibold bg-white border border-slate-200 text-slate-700 hover:border-[#00205B] hover:text-[#00205B] transition shadow-2xs">3 Araw</button>
-                  <button type="button" data-days="5" class="btn-leave-quick-preset px-2.5 py-1 rounded-lg text-[11px] font-semibold bg-white border border-slate-200 text-slate-700 hover:border-[#00205B] hover:text-[#00205B] transition shadow-2xs">1 Linggo (5 Weekdays)</button>
+                  <span class="text-[11px] font-semibold text-slate-500">Quick Select:</span>
+                  <button type="button" data-days="1" class="btn-leave-quick-preset px-2.5 py-1 rounded-lg text-[11px] font-semibold bg-white border border-slate-200 text-slate-700 hover:border-[#00205B] hover:text-[#00205B] transition shadow-2xs">1 Day</button>
+                  <button type="button" data-days="2" class="btn-leave-quick-preset px-2.5 py-1 rounded-lg text-[11px] font-semibold bg-white border border-slate-200 text-slate-700 hover:border-[#00205B] hover:text-[#00205B] transition shadow-2xs">2 Days</button>
+                  <button type="button" data-days="3" class="btn-leave-quick-preset px-2.5 py-1 rounded-lg text-[11px] font-semibold bg-white border border-slate-200 text-slate-700 hover:border-[#00205B] hover:text-[#00205B] transition shadow-2xs">3 Days</button>
+                  <button type="button" data-days="5" class="btn-leave-quick-preset px-2.5 py-1 rounded-lg text-[11px] font-semibold bg-white border border-slate-200 text-slate-700 hover:border-[#00205B] hover:text-[#00205B] transition shadow-2xs">1 Week (5 Weekdays)</button>
                 </div>
 
                 <!-- Live Dynamic Calculation & Date Preview Box -->
@@ -490,7 +490,7 @@
                   <div class="flex items-center justify-between flex-wrap gap-2">
                     <div class="flex items-center gap-2">
                       <span class="w-2 h-2 rounded-full bg-blue-600 animate-pulse"></span>
-                      <span class="font-bold text-slate-800">Iskedyul na Mabablock:</span>
+                      <span class="font-bold text-slate-800">Scheduled Period to Block:</span>
                       <span id="preview-date-range" class="font-bold text-[#00205B] font-mono"></span>
                     </div>
                     <span id="preview-slots-total" class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-900 border border-amber-300">
@@ -499,7 +499,7 @@
                   </div>
                   <div id="preview-date-chips" class="flex flex-wrap gap-1.5 pt-1"></div>
                   <p class="text-[11px] text-slate-500 pt-0.5">
-                    *Paalala: Awtomatikong nilalaktawan ang Sabado at Linggo. Ang regular na weekdays lamang ang maba-block.
+                    *Note: Weekends (Saturday and Sunday) are automatically excluded. Only regular weekdays are blocked.
                   </p>
                 </div>
               </form>
@@ -509,13 +509,13 @@
                 <div class="flex items-center justify-between">
                   <h4 class="text-xs font-bold text-slate-700 uppercase tracking-wide flex items-center gap-1.5">
                     <i data-lucide="history" class="w-3.5 h-3.5 text-blue-600"></i>
-                    <span>Kasalukuyang Naka-block na mga Petsa (Active Leaves)</span>
+                    <span>Currently Blocked Leaves &amp; Absences</span>
                   </h4>
                   <span id="active-leaves-count" class="text-[11px] font-semibold text-slate-500">0 active</span>
                 </div>
                 <div id="active-leaves-container" class="space-y-2">
                   <div class="p-3.5 text-center text-xs text-slate-400 bg-white rounded-xl border border-slate-200">
-                    Walang naka-block na leave sa kasalukuyan. Regular ang iyong konsultasyon.
+                    No active leaves currently logged. Your consultation slots remain available.
                   </div>
                 </div>
               </div>
@@ -526,10 +526,10 @@
               <div>
                 <h3 class="text-xs font-bold uppercase tracking-wider text-slate-900 flex items-center gap-1.5">
                   <i data-lucide="calendar-days" class="w-3.5 h-3.5 text-slate-600"></i>
-                  <span>2. Regular na Lingguhang Routine (Standard Weekly Template)</span>
+                  <span>2. Recurring Weekly Template (Standard Availability Routine)</span>
                 </h3>
                 <p class="text-[11px] text-slate-500">
-                  I-click ang bawat time slot kung may permanente kang iskedyul bawat linggo (hal. Regular Faculty Meeting tuwing Biyernes 3:00 PM - 5:00 PM). Hindi ito nakakaapekto sa pansamantalang leave.
+                  Click any individual recurring slot to customize standard weekly availability (Mon - Fri, 8:00 AM - 5:00 PM). This is independent of temporary date leaves.
                 </p>
               </div>
               <div class="grid grid-cols-2 sm:grid-cols-4 gap-2" id="availability-slots-grid"></div>

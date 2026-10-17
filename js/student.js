@@ -487,15 +487,15 @@ document.addEventListener('DOMContentLoaded', () => {
   btnCancelTicket?.addEventListener('click', async () => {
     if (!activeUserTicket) return;
     const confirmed = await showConfirmDialog({
-      title: 'Kanselahin ang Walk-In Ticket?',
-      message: 'Sigurado ka bang nais mong kanselahin ang iyong numero sa pila? Maaari ka namang kumuha muli kung kinakailangan.',
-      confirmText: 'Oo, Kanselahin',
-      cancelText: 'Huwag Muna',
+      title: 'Cancel Walk-In Ticket?',
+      message: 'Are you sure you want to cancel your place in the digital queue? You can request a new ticket anytime.',
+      confirmText: 'Yes, Cancel Ticket',
+      cancelText: 'Keep Ticket',
       type: 'danger'
     });
     if (confirmed) {
       await updateWalkInStatus(activeUserTicket.id, 'Cancelled');
-      showToast('Nakansela na ang iyong walk-in ticket.', 'info', 'Pila / Queue');
+      showToast('Your walk-in ticket has been cancelled.', 'info', 'Queue Notice');
     }
   });
 
