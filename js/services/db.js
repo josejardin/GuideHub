@@ -374,25 +374,31 @@ export function subscribeAllAppointments(callback) {
 }
 
 export async function updateAppointmentStatus(appointmentId, status, extraFields = {}) {
+  const cleanExtra = {};
+  for (const [k, v] of Object.entries(extraFields || {})) {
+    if (v !== undefined) cleanExtra[k] = v;
+  }
+  const updatedAt = new Date().toISOString();
+
   try {
     if (db) {
       const aptRef = doc(db, 'appointments', appointmentId);
-      await updateDoc(aptRef, { status, ...extraFields, updatedAt: new Date().toISOString() });
+      await updateDoc(aptRef, { status, ...cleanExtra, updatedAt });
     }
   } catch (err) {
     console.warn('Firestore updateAppointmentStatus fallback:', err.message);
   }
 
   const state = getLocalState();
-  if (state.appointments[appointmentId]) {
-    state.appointments[appointmentId] = {
-      ...state.appointments[appointmentId],
-      status,
-      ...extraFields,
-      updatedAt: new Date().toISOString()
-    };
-    saveLocalState(state);
-  }
+  const existing = state.appointments[appointmentId] || {};
+  state.appointments[appointmentId] = {
+    ...existing,
+    id: appointmentId,
+    status,
+    ...cleanExtra,
+    updatedAt
+  };
+  saveLocalState(state);
 }
 
 export async function getCounselors() {
@@ -1011,6 +1017,51 @@ export async function toggleCounselorBlockedSlot(counselorId, dayOfWeek, timeSlo
   state.counselorSchedules[key] = record;
   saveLocalState(state);
   return record;
+}
+
+export function subscribeAllCounselorSchedules(callback) {
+  let firestoreMap = {};
+  let unsubFirestore = null;
+
+  const deliver = () => {
+    const state = getLocalState();
+    const merged = { ...(state.counselorSchedules || {}), ...firestoreMap };
+    callback(Object.values(merged));
+  };
+
+  try {
+    if (db) {
+      const q = query(collection(db, 'counselorSchedules'));
+      unsubFirestore = onSnapshot(
+        q,
+        snap => {
+          firestoreMap = {};
+          const state = getLocalState();
+          snap.docs.forEach(d => {
+            const data = d.data();
+            firestoreMap[d.id] = data;
+            state.counselorSchedules[d.id] = data;
+          });
+          saveLocalState(state);
+          deliver();
+        },
+        err => {
+          console.warn('subscribeAllCounselorSchedules onSnapshot err:', err);
+          deliver();
+        }
+      );
+    }
+  } catch (e) {
+    console.warn('subscribeAllCounselorSchedules exception:', e);
+  }
+
+  window.addEventListener('guidehub_data_changed', deliver);
+  deliver();
+
+  return () => {
+    if (unsubFirestore) unsubFirestore();
+    window.removeEventListener('guidehub_data_changed', deliver);
+  };
 }
 
 export async function logAuditEvent(actorId, actorName, actorRole, action, details = '') {

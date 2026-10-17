@@ -10,6 +10,8 @@ import {
   generateWalkInTicket,
   subscribeLiveWalkInQueue,
   updateWalkInStatus,
+  subscribeAllCounselorSchedules,
+  subscribeAllAppointments,
   logAuditEvent
 } from './db.js';
 import { escapeHtml } from './utils/validation.js';
@@ -625,6 +627,15 @@ document.addEventListener('DOMContentLoaded', () => {
         }
       }
 
+      // Final real-time check to prevent booking an emergency-blocked slot
+      const isStillAvailable = await checkSlotAvailable(date, selectedSlot, chosenCounselorId, counselorPref);
+      if (!isStillAvailable) {
+        showToast('Sorry! This time slot was just blocked by the guidance counselor due to an emergency. Please choose another slot.', 'error');
+        currentStep = 2;
+        renderStep();
+        return;
+      }
+
       try {
         await createAppointment({
           studentId: currentUser.uid,
@@ -659,6 +670,46 @@ document.addEventListener('DOMContentLoaded', () => {
       } catch (err) {
         showToast(err.message || 'Failed to submit booking', 'error');
       }
+    }
+  });
+
+  // Real-time synchronization of counselor schedules & emergency blocks
+  subscribeAllCounselorSchedules(async () => {
+    if (!wizardModal || wizardModal.classList.contains('hidden')) return;
+    const dateInput = document.getElementById('wiz-schedule-date');
+    if (!dateInput || !dateInput.value) return;
+
+    if (currentStep === 2) {
+      if (selectedSlot) {
+        const stillFree = await checkSlotAvailable(dateInput.value, selectedSlot, 'any', 'Any');
+        if (!stillFree) {
+          selectedSlot = null;
+          showToast('A counselor just blocked or updated your selected slot. Please select an available slot.', 'warning');
+        }
+      }
+      validateDateAndLoadSlots();
+    } else if (currentStep === 3) {
+      updateCounselorsForChosenSlot();
+    }
+  });
+
+  // Real-time synchronization when other appointments are booked
+  subscribeAllAppointments(async () => {
+    if (!wizardModal || wizardModal.classList.contains('hidden')) return;
+    const dateInput = document.getElementById('wiz-schedule-date');
+    if (!dateInput || !dateInput.value) return;
+
+    if (currentStep === 2) {
+      if (selectedSlot) {
+        const stillFree = await checkSlotAvailable(dateInput.value, selectedSlot, 'any', 'Any');
+        if (!stillFree) {
+          selectedSlot = null;
+          showToast('The selected time slot was just booked. Please select an available slot.', 'warning');
+        }
+      }
+      validateDateAndLoadSlots();
+    } else if (currentStep === 3) {
+      updateCounselorsForChosenSlot();
     }
   });
 });

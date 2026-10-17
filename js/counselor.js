@@ -15,6 +15,7 @@ import {
   updateCaseRiskFlags,
   getCounselorBlockedSlots,
   toggleCounselorBlockedSlot,
+  subscribeAllCounselorSchedules,
   logAuditEvent
 } from './db.js';
 import { escapeHtml, formatDateIso } from './utils/validation.js';
@@ -353,16 +354,42 @@ document.addEventListener('DOMContentLoaded', () => {
       })
       .join('');
 
-    document.querySelectorAll('.btn-apt-status').forEach(btn => {
-      btn.addEventListener('click', async () => {
-        const id = btn.getAttribute('data-id');
-        const status = btn.getAttribute('data-action');
+    if (window.lucide) window.lucide.createIcons();
+  }
+
+  agendaList?.addEventListener('click', async e => {
+    const statusBtn = e.target.closest('.btn-apt-status');
+    if (statusBtn) {
+      e.preventDefault();
+      e.stopPropagation();
+      const id = statusBtn.getAttribute('data-id');
+      const status = statusBtn.getAttribute('data-action');
+      if (!id || !status || statusBtn.disabled) return;
+
+      statusBtn.disabled = true;
+      statusBtn.classList.add('opacity-70', 'cursor-wait');
+      statusBtn.innerHTML = `<span>Updating...</span>`;
+
+      try {
         const extra = {};
         if (status === 'Confirmed') {
           extra.counselorId = currentUser.uid;
-          extra.counselorName = currentUser.fullName;
+          extra.counselorName = currentUser.fullName || 'Guidance Counselor';
         }
+
+        // Optimistic UI update for instant response
+        const targetApt = allAppointments.find(a => a.id === id);
+        if (targetApt) {
+          targetApt.status = status;
+          if (status === 'Confirmed') {
+            targetApt.counselorId = currentUser.uid;
+            targetApt.counselorName = currentUser.fullName || 'Guidance Counselor';
+          }
+        }
+        renderAgenda();
+
         await updateAppointmentStatus(id, status, extra);
+
         await logAuditEvent(
           currentUser.uid,
           currentUser.fullName,
@@ -370,24 +397,29 @@ document.addEventListener('DOMContentLoaded', () => {
           `APPOINTMENT_${status.toUpperCase()}`,
           `Updated appointment ${id} to ${status}`
         );
+
         showToast(`Appointment status updated to ${status}.`, 'success');
-      });
-    });
+      } catch (err) {
+        console.error('Error updating appointment:', err);
+        showToast(err.message || 'Failed to update appointment.', 'error');
+        renderAgenda();
+      }
+      return;
+    }
 
-    document.querySelectorAll('.btn-open-case-direct').forEach(btn => {
-      btn.addEventListener('click', async () => {
-        const sNum = btn.getAttribute('data-student-num');
-        const sName = btn.getAttribute('data-student-name');
-        const sProg = btn.getAttribute('data-program');
+    const caseBtn = e.target.closest('.btn-open-case-direct');
+    if (caseBtn) {
+      e.preventDefault();
+      e.stopPropagation();
+      const sNum = caseBtn.getAttribute('data-student-num');
+      const sName = caseBtn.getAttribute('data-student-name');
+      const sProg = caseBtn.getAttribute('data-program');
 
-        const caseRecord = await getOrCreateCase(sNum, sName, sProg, currentUser.uid);
-        switchTab('cases');
-        selectCaseFolder(caseRecord.id);
-      });
-    });
-
-    if (window.lucide) window.lucide.createIcons();
-  }
+      const caseRecord = await getOrCreateCase(sNum, sName, sProg, currentUser.uid);
+      switchTab('cases');
+      selectCaseFolder(caseRecord.id);
+    }
+  });
 
   let allWalkinQueue = [];
   const listWaiting = document.getElementById('queue-list-waiting');
@@ -1256,20 +1288,35 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     availabilityGrid.innerHTML = html;
-
-    document.querySelectorAll('.btn-toggle-slot').forEach(btn => {
-      btn.addEventListener('click', async () => {
-        const day = btn.getAttribute('data-day');
-        const slot = btn.getAttribute('data-slot');
-        const currentlyBlocked = btn.getAttribute('data-blocked') === 'true';
-        const newBlockedState = !currentlyBlocked;
-
-        await toggleCounselorBlockedSlot(currentUser.uid, day, slot, newBlockedState);
-        await renderAvailabilityGrid();
-        renderAgenda();
-      });
-    });
   }
 
+  availabilityGrid?.addEventListener('click', async e => {
+    const btn = e.target.closest('.btn-toggle-slot');
+    if (!btn || btn.disabled) return;
+    e.preventDefault();
+    const day = btn.getAttribute('data-day');
+    const slot = btn.getAttribute('data-slot');
+    const currentlyBlocked = btn.getAttribute('data-blocked') === 'true';
+    const newBlockedState = !currentlyBlocked;
+
+    btn.disabled = true;
+    try {
+      await toggleCounselorBlockedSlot(currentUser.uid, day, slot, newBlockedState);
+      await renderAvailabilityGrid();
+      renderAgenda();
+      showToast(`${day} ${slot} marked as ${newBlockedState ? 'Blocked' : 'Available'}.`, 'info');
+    } catch (err) {
+      console.warn('Toggle slot error:', err);
+      showToast('Failed to update slot availability.', 'error');
+    } finally {
+      btn.disabled = false;
+    }
+  });
+
   renderAvailabilityGrid();
+
+  subscribeAllCounselorSchedules(() => {
+    renderAgenda();
+    renderAvailabilityGrid();
+  });
 });
