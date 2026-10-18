@@ -681,7 +681,17 @@ document.addEventListener('DOMContentLoaded', () => {
 
               ${
                 isPending
-                  ? `
+                  ? isConflict
+                    ? `
+              <button disabled class="px-3 py-1.5 rounded-lg bg-rose-50 border border-rose-200 text-rose-700 text-xs font-semibold cursor-not-allowed flex items-center gap-1 shadow-2xs opacity-80" title="Cannot accept: You have marked this time slot (${escapeHtml(apt.timeSlot)}) as BLOCKED in your Availability Schedule. Unblock the slot first in 'Availability Schedule' tab if you wish to accept this consultation.">
+                <i data-lucide="ban" class="w-3.5 h-3.5 text-rose-600"></i>
+                <span>Slot Blocked</span>
+              </button>
+              <button data-action="Cancelled" data-id="${escapeHtml(apt.id)}" class="btn-apt-status px-2.5 py-1.5 rounded-lg border border-rose-200 hover:bg-rose-50 text-rose-700 text-xs font-medium transition" title="Decline this appointment due to schedule conflict">
+                Decline
+              </button>
+              `
+                    : `
               <button data-action="Confirmed" data-id="${escapeHtml(apt.id)}" class="btn-apt-status px-3 py-1.5 rounded-lg bg-[#00205B] hover:bg-[#0A192F] text-white text-xs font-semibold shadow-sm transition flex items-center gap-1" title="Accept consultation and dispatch confirmation email to student">
                 <i data-lucide="check" class="w-3.5 h-3.5 text-emerald-400"></i>
                 <span>Accept</span>
@@ -773,6 +783,34 @@ document.addEventListener('DOMContentLoaded', () => {
       try {
         const extra = {};
         if (status === 'Confirmed') {
+          const targetApt = allAppointments.find(a => a.id === id);
+          if (targetApt) {
+            const aptDay = targetApt.date ? DAY_NAMES[new Date(`${targetApt.date}T00:00:00`).getDay()] : '';
+            const normAptSlot = normalizeTimeSlot(targetApt.timeSlot);
+            const slot12h = formatTimeSlot12h(targetApt.timeSlot);
+            const hasBlockedConflict =
+              blockedSet.has(`${aptDay}_${targetApt.timeSlot}`) ||
+              blockedSet.has(`${aptDay}_${normAptSlot}`) ||
+              blockedSet.has(`${aptDay}_${slot12h}`) ||
+              blockedSet.has(`${targetApt.date}_${targetApt.timeSlot}`) ||
+              blockedSet.has(`${targetApt.date}_${normAptSlot}`) ||
+              blockedSet.has(`${targetApt.date}_${slot12h}`);
+
+            if (hasBlockedConflict) {
+              statusBtn.disabled = false;
+              statusBtn.classList.remove('opacity-70', 'cursor-wait');
+              statusBtn.innerHTML = `<i data-lucide="check" class="w-3.5 h-3.5 text-emerald-400"></i><span>Accept</span>`;
+              if (window.lucide) window.lucide.createIcons();
+              showToast(
+                `Cannot accept consultation: You have marked ${formatTimeSlot12h(targetApt.timeSlot)} on ${targetApt.date} (${aptDay}) as BLOCKED in your schedule. Unblock this slot first in "Availability Schedule" tab if you wish to accept this booking.`,
+                'error',
+                'Blocked Slot Conflict'
+              );
+              renderAgenda();
+              return;
+            }
+          }
+
           extra.counselorId = currentUser.uid;
           extra.counselorName = currentUser.fullName || 'Guidance Counselor';
         }
@@ -2470,6 +2508,28 @@ document.addEventListener('DOMContentLoaded', () => {
     const slot = btn.getAttribute('data-slot');
     const currentlyBlocked = btn.getAttribute('data-blocked') === 'true';
     const newBlockedState = !currentlyBlocked;
+    if (newBlockedState) {
+      const normSlot = normalizeTimeSlot(slot);
+      const slot12 = formatTimeSlot12h(slot);
+      const activeConflicts = allAppointments.filter(apt => {
+        if (apt.status === 'Cancelled' || apt.status === 'Completed' || apt.status === 'No-Show') return false;
+        const aptDay = apt.date ? DAY_NAMES[new Date(`${apt.date}T00:00:00`).getDay()] : '';
+        const aptNorm = normalizeTimeSlot(apt.timeSlot);
+        const apt12 = formatTimeSlot12h(apt.timeSlot);
+        const isTimeMatch = aptNorm === normSlot || apt12 === slot12 || apt.timeSlot === slot;
+        return aptDay === day && isTimeMatch;
+      });
+
+      if (activeConflicts.length > 0) {
+        const studentNames = activeConflicts.map(a => a.studentName || 'Student').slice(0, 2).join(', ');
+        const proceed = confirm(
+          `Schedule Warning:\n\nYou currently have ${activeConflicts.length} active consultation(s) booked on ${day} at ${formatTimeSlot12h(slot)} (${studentNames}${activeConflicts.length > 2 ? '...' : ''}).\n\nBlocking this slot will create a schedule conflict and prevent pending requests from being accepted unless unblocked.\n\nDo you still wish to block this slot?`
+        );
+        if (!proceed) {
+          return;
+        }
+      }
+    }
 
     btn.disabled = true;
     // Optimistic UI state toggle
