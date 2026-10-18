@@ -2,7 +2,7 @@ import nodemailer from 'nodemailer';
 import path from 'path';
 import fs from 'fs';
 import dotenv from 'dotenv';
-import { findAccountByEmail, findAccountById, findAccountByFullName, escapeHtml } from './db.js';
+import { findAccountByEmail, findAccountById, findAccountByFullName, escapeHtml, saveServerOtp } from './db.js';
 dotenv.config();
 
 const transporter = nodemailer.createTransport({
@@ -146,9 +146,19 @@ export default async function handler(req, res) {
     try {
       const existingAccount = await findAccountByEmail(cleanTo);
       if (!existingAccount) {
-        return res.status(404).json({
-          error: 'No registered GuideHub account was found for this institutional email address.'
-        });
+        // Also check Google Identity Toolkit REST API as fallback in case account is only in Firebase Auth
+        const apiKey = process.env.FIREBASE_API_KEY || 'AIzaSyAqPNF4SRiyF8nZbFPLraUHldNoxvHQiQk';
+        const lookupRes = await fetch(`https://identitytoolkit.googleapis.com/v1/accounts:lookup?key=${apiKey}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email: [cleanTo] })
+        }).catch(() => null);
+        const lookupData = lookupRes ? await lookupRes.json().catch(() => ({})) : {};
+        if (!lookupData.users || lookupData.users.length === 0) {
+          return res.status(404).json({
+            error: 'No registered GuideHub account was found for this institutional email address.'
+          });
+        }
       }
     } catch (lookupErr) {
       console.warn('Password reset account lookup notice:', lookupErr.message);
@@ -285,6 +295,13 @@ export default async function handler(req, res) {
       Importance: 'high'
     }
   };
+
+  // Save OTP verification record directly to Firestore on the server
+  try {
+    await saveServerOtp(cleanTo, otp, purpose, recipientName);
+  } catch (saveErr) {
+    console.warn('Server OTP save notice:', saveErr.message);
+  }
 
   try {
     const info = await transporter.sendMail(mailOptions);

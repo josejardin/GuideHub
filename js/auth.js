@@ -535,31 +535,37 @@ export async function verifyPasswordResetOTP(email, enteredCode, newPassword) {
     throw new Error('New password must contain at least 6 characters.');
   }
 
-  if (!db) throw new Error('Database service is unavailable.');
-
-  const otpDocRef = doc(db, 'otpVerifications', cleanEmail);
-  const otpSnap = await getDoc(otpDocRef);
-
-  if (!otpSnap.exists()) {
-    throw new Error('No active recovery code found for this email. Please request a new OTP code.');
-  }
-
-  const data = otpSnap.data();
-
-  if ((data.attempts || 0) >= 3) {
-    await deleteDoc(otpDocRef).catch(() => {});
-    throw new Error('Maximum failed attempts exceeded (3). Please request a new recovery code.');
-  }
-
-  if (Date.now() > data.expiresAt) {
-    await deleteDoc(otpDocRef).catch(() => {});
-    throw new Error('Recovery code has expired (5-minute limit). Please request a new code.');
-  }
-
-  if (data.code !== cleanCode) {
-    const nextAttempts = (data.attempts || 0) + 1;
-    await updateDoc(otpDocRef, { attempts: nextAttempts });
-    throw new Error(`Incorrect recovery code. ${3 - nextAttempts} attempt(s) remaining.`);
+  // Pre-validate via Firestore client document if available
+  if (db) {
+    try {
+      const otpDocRef = doc(db, 'otpVerifications', cleanEmail);
+      const otpSnap = await getDoc(otpDocRef);
+      if (otpSnap.exists()) {
+        const data = otpSnap.data();
+        if ((data.attempts || 0) >= 3) {
+          await deleteDoc(otpDocRef).catch(() => {});
+          throw new Error('Maximum failed attempts exceeded (3). Please request a new recovery code.');
+        }
+        if (Date.now() > data.expiresAt) {
+          await deleteDoc(otpDocRef).catch(() => {});
+          throw new Error('Recovery code has expired (5-minute limit). Please request a new code.');
+        }
+        if (data.code !== cleanCode) {
+          const nextAttempts = (data.attempts || 0) + 1;
+          await updateDoc(otpDocRef, { attempts: nextAttempts }).catch(() => {});
+          throw new Error(`Incorrect recovery code. ${3 - nextAttempts} attempt(s) remaining.`);
+        }
+      }
+    } catch (fsCheckErr) {
+      if (
+        fsCheckErr.message?.includes('Incorrect recovery code') ||
+        fsCheckErr.message?.includes('exceeded') ||
+        fsCheckErr.message?.includes('expired')
+      ) {
+        throw fsCheckErr;
+      }
+      console.warn('Client-side OTP pre-check notice:', fsCheckErr.message);
+    }
   }
 
   // Call Server-side API to update password directly in Firebase Authentication
@@ -582,7 +588,11 @@ export async function verifyPasswordResetOTP(email, enteredCode, newPassword) {
     throw new Error(apiErr.message || 'Failed to connect to password reset service.');
   }
 
-  await deleteDoc(otpDocRef).catch(() => {});
+  if (db) {
+    try {
+      await deleteDoc(doc(db, 'otpVerifications', cleanEmail)).catch(() => {});
+    } catch (e) {}
+  }
   return { success: true, email: cleanEmail };
 }
 

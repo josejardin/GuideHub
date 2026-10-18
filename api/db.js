@@ -3,6 +3,7 @@ import {
   getFirestore,
   doc,
   getDoc,
+  setDoc,
   deleteDoc,
   updateDoc
 } from 'firebase/firestore';
@@ -155,5 +156,28 @@ export async function verifyServerOtp(rawEmail, rawOtp) {
   } catch (err) {
     console.warn('[WARNING] Server OTP verification notice:', err.message);
     return { valid: true };
+  }
+}
+
+export async function saveServerOtp(rawEmail, rawOtp, purpose = 'registration', recipientName = '') {
+  const cleanEmail = (rawEmail || '').trim().toLowerCase();
+  const cleanCode = String(rawOtp || '').trim();
+  const now = Date.now();
+  const expiresAt = now + 5 * 60 * 1000;
+  try {
+    const otpRef = doc(clientDb, 'otpVerifications', cleanEmail);
+    await setDoc(otpRef, {
+      code: cleanCode,
+      createdAt: now,
+      expiresAt: expiresAt,
+      attempts: 0,
+      purpose: purpose,
+      recipientName: recipientName || 'Nationalian'
+    });
+    console.log(`[SERVER OTP SAVED] Firestore record set for: ${cleanEmail}`);
+    return { success: true, email: cleanEmail, expiresAt };
+  } catch (err) {
+    console.warn('[WARNING] Failed to save server OTP to Firestore:', err.message);
+    return { success: false, error: err.message };
   }
 }
