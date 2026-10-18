@@ -1462,9 +1462,21 @@ document.addEventListener('DOMContentLoaded', () => {
             </span>
           </td>
           <td class="py-2.5 px-4 text-right space-x-1 whitespace-nowrap">
+            ${
+              r.status === 'Referred'
+                ? `
             <button data-cs-id="${escapeHtml(r.id)}" class="btn-issue-callslip px-2 py-1 rounded bg-slate-900 hover:bg-slate-800 text-white text-xs font-medium transition" title="Generate guidance call slip">
               Call Slip
             </button>
+            `
+                : r.status === 'Call Slip Issued'
+                  ? `
+            <button data-cs-id="${escapeHtml(r.id)}" class="btn-issue-callslip px-2 py-1 rounded border border-slate-300 bg-white hover:bg-slate-100 text-slate-700 text-xs font-medium transition" title="View or re-issue guidance call slip">
+              Call Slip
+            </button>
+            `
+                  : ''
+            }
             
             ${
               r.status === 'Call Slip Issued'
@@ -1532,7 +1544,13 @@ document.addEventListener('DOMContentLoaded', () => {
       e.preventDefault();
       const id = csBtn.getAttribute('data-cs-id');
       const ref = allReferrals.find(r => r.id === id);
-      if (ref) openCallSlipModal(ref);
+      if (ref) {
+        if (ref.status === 'Intake Conducted' || ref.status === 'Closed') {
+          showToast('Intake has already been conducted for this referral.', 'info');
+          return;
+        }
+        openCallSlipModal(ref);
+      }
       return;
     }
 

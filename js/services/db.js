@@ -258,6 +258,7 @@ export async function createAppointment(data) {
   const state = getLocalState();
   state.appointments[id] = { id, ...appointment };
   saveLocalState(state);
+  clearAvailabilityCaches();
   return { id, ...appointment };
 }
 
@@ -408,9 +409,29 @@ export async function updateAppointmentStatus(appointmentId, status, extraFields
     updatedAt
   };
   saveLocalState(state);
+  clearAvailabilityCaches();
 }
 
-export async function getCounselors() {
+let _cachedCounselors = null;
+let _cachedCounselorsTime = 0;
+const _dateAptsCache = new Map();
+const _dateAptsCacheTime = new Map();
+const _blockedSlotsCache = new Map();
+const _blockedSlotsCacheTime = new Map();
+
+export function clearAvailabilityCaches() {
+  _dateAptsCache.clear();
+  _dateAptsCacheTime.clear();
+  _blockedSlotsCache.clear();
+  _blockedSlotsCacheTime.clear();
+  _cachedCounselors = null;
+  _cachedCounselorsTime = 0;
+}
+
+export async function getCounselors(forceRefresh = false) {
+  if (!forceRefresh && _cachedCounselors && (Date.now() - _cachedCounselorsTime < 60000)) {
+    return _cachedCounselors;
+  }
   const counselors = [];
   try {
     if (db) {
@@ -433,9 +454,13 @@ export async function getCounselors() {
     const fallbackList = Object.entries(state.users || {})
       .filter(([_, u]) => (u.role || '').toLowerCase() === 'counselor')
       .map(([id, u]) => ({ id, uid: id, ...u }));
-    if (fallbackList.length > 0) return fallbackList;
+    if (fallbackList.length > 0) {
+      _cachedCounselors = fallbackList;
+      _cachedCounselorsTime = Date.now();
+      return fallbackList;
+    }
 
-    return [
+    _cachedCounselors = [
       {
         id: 'usr_counselor_mark_d',
         uid: 'usr_counselor_mark_d',
@@ -453,8 +478,12 @@ export async function getCounselors() {
         department: 'Guidance and Counseling Center'
       }
     ];
+    _cachedCounselorsTime = Date.now();
+    return _cachedCounselors;
   }
 
+  _cachedCounselors = counselors;
+  _cachedCounselorsTime = Date.now();
   return counselors;
 }
 
@@ -463,24 +492,38 @@ export async function getAvailableCounselorsForSlot(date, timeSlot, genderPrefer
   const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
   const dayOfWeek = date ? dayNames[new Date(`${date}T00:00:00`).getDay()] : '';
 
-  let activeApts = Object.values(state.appointments || {}).filter(
-    apt => apt.date === date && apt.timeSlot === timeSlot && apt.status !== 'Cancelled' && apt.status !== 'No-Show'
-  );
-
-  try {
-    if (db) {
-      const qApts = query(collection(db, 'appointments'), where('date', '==', date));
-      const snap = await getDocs(qApts);
-      if (!snap.empty) {
-        const normTargetSlot = normalizeTimeSlot(timeSlot);
-        activeApts = snap.docs
-          .map(d => ({ id: d.id, ...d.data() }))
-          .filter(apt => normalizeTimeSlot(apt.timeSlot) === normTargetSlot && apt.status !== 'Cancelled' && apt.status !== 'No-Show');
+  let allDateApts = [];
+  const now = Date.now();
+  if (_dateAptsCache.has(date) && (now - (_dateAptsCacheTime.get(date) || 0) < 15000)) {
+    allDateApts = _dateAptsCache.get(date);
+  } else {
+    allDateApts = Object.values(state.appointments || {}).filter(
+      apt => apt.date === date && apt.status !== 'Cancelled' && apt.status !== 'No-Show'
+    );
+    try {
+      if (db) {
+        const qApts = query(collection(db, 'appointments'), where('date', '==', date));
+        const snap = await getDocs(qApts);
+        if (!snap.empty) {
+          allDateApts = snap.docs
+            .map(d => ({ id: d.id, ...d.data() }))
+            .filter(apt => apt.status !== 'Cancelled' && apt.status !== 'No-Show');
+        }
       }
+    } catch (err) {
+      console.warn('Firestore active appointments fetch warning:', err.message);
     }
-  } catch (err) {
-    console.warn('Firestore active appointments fetch warning:', err.message);
+    _dateAptsCache.set(date, allDateApts);
+    _dateAptsCacheTime.set(date, now);
   }
+
+  const normTargetSlot = normalizeTimeSlot(timeSlot);
+  const slot12h = formatTimeSlot12h(timeSlot);
+  const activeApts = allDateApts.filter(apt => {
+    const aptNorm = normalizeTimeSlot(apt.timeSlot);
+    const apt12 = formatTimeSlot12h(apt.timeSlot);
+    return aptNorm === normTargetSlot || apt12 === slot12h || apt.timeSlot === timeSlot;
+  });
 
   const allCounselors = await getCounselors();
 
@@ -1331,6 +1374,11 @@ export async function updateCaseStatus(caseId, status, extra = {}) {
 
 export async function getCounselorBlockedSlots(counselorId, fallbackIds = []) {
   const ids = Array.from(new Set([counselorId, ...(Array.isArray(fallbackIds) ? fallbackIds : [fallbackIds])].filter(Boolean)));
+  const cacheKey = ids.slice().sort().join('_');
+  const now = Date.now();
+  if (_blockedSlotsCache.has(cacheKey) && (now - (_blockedSlotsCacheTime.get(cacheKey) || 0) < 30000)) {
+    return _blockedSlotsCache.get(cacheKey);
+  }
   let allRecords = [];
   try {
     if (db && ids.length > 0) {
@@ -1370,10 +1418,14 @@ export async function getCounselorBlockedSlots(counselorId, fallbackIds = []) {
     }
   });
 
-  return Array.from(slotMap.values()).filter(s => s.isBlocked === true);
+  const result = Array.from(slotMap.values()).filter(s => s.isBlocked === true);
+  _blockedSlotsCache.set(cacheKey, result);
+  _blockedSlotsCacheTime.set(cacheKey, now);
+  return result;
 }
 
 export async function toggleCounselorBlockedSlot(counselorId, dayOfWeek, timeSlot, isBlocked) {
+  clearAvailabilityCaches();
   const normSlot = normalizeTimeSlot(timeSlot);
   const slot12h = formatTimeSlot12h(timeSlot);
   const nowIso = new Date().toISOString();

@@ -739,15 +739,19 @@ document.addEventListener('DOMContentLoaded', () => {
     wizardModal?.classList.add('hidden');
   });
 
+  let lastLoadedDate = null;
+
   const dateInputInit = document.getElementById('wiz-schedule-date');
   dateInputInit?.addEventListener('change', () => {
     selectedSlot = null;
-    validateDateAndLoadSlots();
+    lastLoadedDate = null;
+    validateDateAndLoadSlots(true);
   });
 
   function openWizard() {
     currentStep = 1;
     selectedSlot = null;
+    lastLoadedDate = null;
     wizardModal?.classList.remove('hidden');
 
     const displayName = document.getElementById('wiz-display-name');
@@ -784,7 +788,7 @@ document.addEventListener('DOMContentLoaded', () => {
     '4:00 PM - 5:00 PM'
   ];
 
-  async function validateDateAndLoadSlots() {
+  async function validateDateAndLoadSlots(forceRefresh = false) {
     const dateInput = document.getElementById('wiz-schedule-date');
     const slotContainer = document.getElementById('slot-container');
     if (!dateInput || !slotContainer) return;
@@ -796,40 +800,78 @@ document.addEventListener('DOMContentLoaded', () => {
       showToast('Guidance Office is closed on weekends. Select Mon-Fri.', 'warning');
       slotContainer.innerHTML = `<p class="col-span-4 text-[11px] text-rose-500 py-1.5">Office is closed on weekends.</p>`;
       selectedSlot = null;
+      lastLoadedDate = null;
+      return;
+    }
+
+    // High-speed re-render: if date hasn't changed, instantly sync visual state with 0ms delay
+    if (!forceRefresh && lastLoadedDate === dateInput.value && slotContainer.querySelectorAll('.btn-slot').length > 0) {
+      document.querySelectorAll('.btn-slot').forEach(b => {
+        const isSelected = b.getAttribute('data-slot') === selectedSlot;
+        b.className = `btn-slot p-2 rounded text-xs border transition ${
+          isSelected
+            ? 'bg-[#00205B] text-[#F5B800] border-[#00205B] font-bold shadow-xs'
+            : 'bg-white hover:bg-slate-50 text-slate-700 border-slate-200 font-medium'
+        }`;
+      });
       return;
     }
 
     slotContainer.innerHTML = `<div class="col-span-4 text-[11px] text-slate-400 py-2">Checking schedule availability...</div>`;
 
-    let html = '';
-    for (const slot of TIME_SLOTS) {
-      const isAvailable = await checkSlotAvailable(dateInput.value, slot, 'any', 'Any');
-      const isSelected = selectedSlot === slot;
-      const slotDisplay = formatTimeSlot12h(slot);
+    try {
+      const slotChecks = await Promise.all(
+        TIME_SLOTS.map(async slot => {
+          const isAvailable = await checkSlotAvailable(dateInput.value, slot, 'any', 'Any');
+          return { slot, isAvailable };
+        })
+      );
 
-      if (isAvailable) {
-        html += `
-          <button type="button" data-slot="${slot}" class="btn-slot p-2 rounded text-xs font-medium border transition ${isSelected ? 'bg-[#00205B] text-[#F5B800] border-[#00205B] font-bold shadow-xs' : 'bg-white hover:bg-slate-50 text-slate-700 border-slate-200'}">
-            ${slotDisplay}
-          </button>
-        `;
-      } else {
-        html += `
-          <button type="button" disabled class="p-2 rounded text-xs font-medium bg-rose-50/60 text-rose-400 border border-rose-100 cursor-not-allowed line-through" title="All counselors blocked / unavailable at this time">
-            ${slotDisplay}
-          </button>
-        `;
+      let html = '';
+      for (const { slot, isAvailable } of slotChecks) {
+        const isSelected = selectedSlot === slot;
+        const slotDisplay = formatTimeSlot12h(slot);
+
+        if (isAvailable) {
+          html += `
+            <button type="button" data-slot="${slot}" class="btn-slot p-2 rounded text-xs font-medium border transition ${
+            isSelected
+              ? 'bg-[#00205B] text-[#F5B800] border-[#00205B] font-bold shadow-xs'
+              : 'bg-white hover:bg-slate-50 text-slate-700 border-slate-200'
+          }">
+              ${slotDisplay}
+            </button>
+          `;
+        } else {
+          html += `
+            <button type="button" disabled class="p-2 rounded text-xs font-medium bg-rose-50/60 text-rose-400 border border-rose-100 cursor-not-allowed line-through" title="All counselors blocked / unavailable at this time">
+              ${slotDisplay}
+            </button>
+          `;
+        }
       }
-    }
 
-    slotContainer.innerHTML = html;
+      slotContainer.innerHTML = html;
+      lastLoadedDate = dateInput.value;
 
-    document.querySelectorAll('.btn-slot').forEach(btn => {
-      btn.addEventListener('click', () => {
-        selectedSlot = btn.getAttribute('data-slot');
-        validateDateAndLoadSlots();
+      document.querySelectorAll('.btn-slot').forEach(btn => {
+        btn.addEventListener('click', () => {
+          selectedSlot = btn.getAttribute('data-slot');
+          // Instantly highlight selected slot button with zero lag and zero network re-fetch
+          document.querySelectorAll('.btn-slot').forEach(b => {
+            const isSelected = b.getAttribute('data-slot') === selectedSlot;
+            b.className = `btn-slot p-2 rounded text-xs border transition ${
+              isSelected
+                ? 'bg-[#00205B] text-[#F5B800] border-[#00205B] font-bold shadow-xs'
+                : 'bg-white hover:bg-slate-50 text-slate-700 border-slate-200 font-medium'
+            }`;
+          });
+        });
       });
-    });
+    } catch (err) {
+      console.error('Error checking availability:', err);
+      slotContainer.innerHTML = `<div class="col-span-4 text-[11px] text-rose-500 py-2">Could not check schedule availability. Please retry.</div>`;
+    }
   }
 
   async function updateCounselorsForChosenSlot() {
@@ -1040,7 +1082,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const dateInput = document.getElementById('wiz-schedule-date');
     if (!dateInput || !dateInput.value) return;
 
-    if (currentStep === 2) {
+    if (currentStep === 1) {
       if (selectedSlot) {
         const stillFree = await checkSlotAvailable(dateInput.value, selectedSlot, 'any', 'Any');
         if (!stillFree) {
@@ -1048,8 +1090,8 @@ document.addEventListener('DOMContentLoaded', () => {
           showToast('A counselor just blocked or updated your selected slot. Please select an available slot.', 'warning');
         }
       }
-      validateDateAndLoadSlots();
-    } else if (currentStep === 3) {
+      validateDateAndLoadSlots(true);
+    } else if (currentStep === 2) {
       updateCounselorsForChosenSlot();
     }
   });
@@ -1060,7 +1102,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const dateInput = document.getElementById('wiz-schedule-date');
     if (!dateInput || !dateInput.value) return;
 
-    if (currentStep === 2) {
+    if (currentStep === 1) {
       if (selectedSlot) {
         const stillFree = await checkSlotAvailable(dateInput.value, selectedSlot, 'any', 'Any');
         if (!stillFree) {
@@ -1068,8 +1110,8 @@ document.addEventListener('DOMContentLoaded', () => {
           showToast('The selected time slot was just booked. Please select an available slot.', 'warning');
         }
       }
-      validateDateAndLoadSlots();
-    } else if (currentStep === 3) {
+      validateDateAndLoadSlots(true);
+    } else if (currentStep === 2) {
       updateCounselorsForChosenSlot();
     }
   });
