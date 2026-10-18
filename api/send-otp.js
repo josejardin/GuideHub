@@ -183,39 +183,7 @@ export default async function handler(req, res) {
           console.log(`[PASSWORD RESET] Auto-resolved cross-domain email: ${altEmail}`);
         }
       }
-
-      if (!existingAccount) {
-        // Also check Google Identity Toolkit REST API as fallback in case account is only in Firebase Auth
-        const apiKey = process.env.FIREBASE_API_KEY || 'AIzaSyAqPNF4SRiyF8nZbFPLraUHldNoxvHQiQk';
-        let lookupRes = await fetch(`https://identitytoolkit.googleapis.com/v1/accounts:lookup?key=${apiKey}`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ email: [cleanTo] })
-        }).catch(() => null);
-        let lookupData = lookupRes ? await lookupRes.json().catch(() => ({})) : {};
-
-        if (!lookupData.users || lookupData.users.length === 0) {
-          const prefix = cleanTo.split('@')[0];
-          const altDomain = isStudentDomainEmail ? '@nu-fairview.edu.ph' : '@students.nu-fairview.edu.ph';
-          const altEmail = `${prefix}${altDomain}`;
-          const altLookupRes = await fetch(`https://identitytoolkit.googleapis.com/v1/accounts:lookup?key=${apiKey}`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ email: [altEmail] })
-          }).catch(() => null);
-          const altLookupData = altLookupRes ? await altLookupRes.json().catch(() => ({})) : {};
-          if (altLookupData.users && altLookupData.users.length > 0) {
-            cleanTo = altEmail;
-            lookupData = altLookupData;
-          }
-        }
-
-        if (!lookupData.users || lookupData.users.length === 0) {
-          return res.status(404).json({
-            error: 'No registered GuideHub account was found for this institutional email address.'
-          });
-        }
-      } else if (existingAccount.fullName) {
+      if (existingAccount && existingAccount.fullName) {
         recipientName = existingAccount.fullName;
       }
     } catch (lookupErr) {

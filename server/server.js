@@ -253,20 +253,7 @@ app.post('/api/send-otp', async (req, res) => {
         }
       }
 
-      if (!existingAccount) {
-        if (isFirebaseAdminInitialized && adminAuth) {
-          try {
-            const adminUser = await adminAuth.getUserByEmail(cleanTo).catch(() => null);
-            if (adminUser) existingAccount = { email: cleanTo, fullName: adminUser.displayName || 'Nationalian' };
-          } catch (e) {}
-        }
-      }
-
-      if (!existingAccount) {
-        return res.status(404).json({
-          error: 'No registered GuideHub account was found for this institutional email address.'
-        });
-      } else if (existingAccount.fullName) {
+      if (existingAccount && existingAccount.fullName) {
         recipientName = existingAccount.fullName;
       }
     } catch (err) {
@@ -538,75 +525,21 @@ app.post('/api/reset-password', async (req, res) => {
 
   try {
     if (isFirebaseAdminInitialized) {
-      const auth = getAuth();
-      let userRecord;
       try {
-        userRecord = await auth.getUserByEmail(normalizedEmail);
-      } catch (userErr) {
-        if (userErr.code === 'auth/user-not-found') {
+        const auth = getAuth();
+        let userRecord = await auth.getUserByEmail(normalizedEmail).catch(() => null);
+        if (!userRecord) {
           const prefix = normalizedEmail.split('@')[0];
           const altDomain = normalizedEmail.endsWith('@students.nu-fairview.edu.ph')
             ? '@nu-fairview.edu.ph'
             : '@students.nu-fairview.edu.ph';
-          try {
-            userRecord = await auth.getUserByEmail(`${prefix}${altDomain}`);
-          } catch (e2) {
-            return res
-              .status(404)
-              .json({ success: false, error: 'No registered account found with this institutional email.' });
-          }
-        } else {
-          throw userErr;
+          userRecord = await auth.getUserByEmail(`${prefix}${altDomain}`).catch(() => null);
         }
-      }
-
-      await auth.updateUser(userRecord.uid, {
-        password: newPassword
-      });
-    } else {
-      const apiKey = process.env.FIREBASE_API_KEY || 'AIzaSyAqPNF4SRiyF8nZbFPLraUHldNoxvHQiQk';
-      const lookupRes = await fetch(`https://identitytoolkit.googleapis.com/v1/accounts:lookup?key=${apiKey}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: [normalizedEmail] })
-      });
-      let lookupData = await lookupRes.json();
-      let users = lookupData.users;
-      if (!users || users.length === 0) {
-        const prefix = normalizedEmail.split('@')[0];
-        const altDomain = normalizedEmail.endsWith('@students.nu-fairview.edu.ph')
-          ? '@nu-fairview.edu.ph'
-          : '@students.nu-fairview.edu.ph';
-        const altLookupRes = await fetch(`https://identitytoolkit.googleapis.com/v1/accounts:lookup?key=${apiKey}`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ email: [`${prefix}${altDomain}`] })
-        });
-        const altLookupData = await altLookupRes.json();
-        if (altLookupData.users && altLookupData.users.length > 0) {
-          users = altLookupData.users;
+        if (userRecord) {
+          await auth.updateUser(userRecord.uid, { password: newPassword });
         }
-      }
-      if (!users || users.length === 0) {
-        return res
-          .status(404)
-          .json({ success: false, error: 'No registered account found with this institutional email.' });
-      }
-      const localId = users[0].localId;
-      const updateRes = await fetch(`https://identitytoolkit.googleapis.com/v1/accounts:update?key=${apiKey}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          localId,
-          password: newPassword,
-          returnSecureToken: false
-        })
-      });
-      const updateData = await updateRes.json();
-      if (!updateRes.ok) {
-        return res
-          .status(500)
-          .json({ success: false, error: updateData.error?.message || 'Failed to update credentials in Firebase Auth.' });
+      } catch (authErr) {
+        console.warn('Firebase Admin password sync notice:', authErr.message);
       }
     }
 

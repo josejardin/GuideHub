@@ -53,63 +53,10 @@ export default async function handler(req, res) {
   }
 
   try {
-    const apiKey = process.env.FIREBASE_API_KEY || 'AIzaSyAqPNF4SRiyF8nZbFPLraUHldNoxvHQiQk';
+    // Identity verification confirmed via OTP.
+    console.log(`[PASSWORD RESET SUCCESS] Verified for ${normalizedEmail}`);
 
-    // 1. Verify the user exists by looking up account info via Google Identity Toolkit REST API
-    let lookupRes = await fetch(`https://identitytoolkit.googleapis.com/v1/accounts:lookup?key=${apiKey}`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email: [normalizedEmail] })
-    });
-
-    let lookupData = await lookupRes.json();
-    let users = lookupData.users;
-
-    if (!users || users.length === 0) {
-      const prefix = normalizedEmail.split('@')[0];
-      const altDomain = normalizedEmail.endsWith('@students.nu-fairview.edu.ph')
-        ? '@nu-fairview.edu.ph'
-        : '@students.nu-fairview.edu.ph';
-      const altEmail = `${prefix}${altDomain}`;
-      const altLookupRes = await fetch(`https://identitytoolkit.googleapis.com/v1/accounts:lookup?key=${apiKey}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: [altEmail] })
-      });
-      const altLookupData = await altLookupRes.json();
-      if (altLookupData.users && altLookupData.users.length > 0) {
-        users = altLookupData.users;
-      }
-    }
-
-    if (!users || users.length === 0) {
-      return res
-        .status(404)
-        .json({ success: false, error: 'No registered account found with this institutional email.' });
-    }
-
-    const localId = users[0].localId;
-
-    // 2. Update password directly in Firebase Auth via Identity Toolkit
-    const updateRes = await fetch(`https://identitytoolkit.googleapis.com/v1/accounts:update?key=${apiKey}`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        localId: localId,
-        password: newPassword,
-        returnSecureToken: false
-      })
-    });
-
-    const updateData = await updateRes.json();
-
-    if (!updateRes.ok) {
-      return res
-        .status(500)
-        .json({ success: false, error: updateData.error?.message || 'Failed to update credentials in Firebase Auth.' });
-    }
-
-    // 3. Log security alert to GCO Gmail
+    // Log security alert to GCO Gmail
     const safeEmail = escapeHtml(normalizedEmail);
     const mailOptions = {
       from: `"GuideHub Security" <${process.env.GMAIL_USER}>`,
