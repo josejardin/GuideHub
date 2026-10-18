@@ -1255,19 +1255,19 @@ document.addEventListener('DOMContentLoaded', () => {
         listWaiting.innerHTML = waiting
           .map(
             t => `
- <div class="bg-white p-2.5 rounded border border-slate-200 shadow-sm flex items-center justify-between gap-2">
- <div>
- <div class="flex items-center gap-1.5">
- <span class="font-mono font-bold text-slate-900 text-xs">${escapeHtml(t.ticketNumber)}</span>
- <span class="text-xs font-semibold text-slate-800">${escapeHtml(t.studentName)}</span>
- </div>
- <div class="text-[10px] text-slate-500">${escapeHtml(t.program)}</div>
- </div>
- <button data-call-id="${escapeHtml(t.id)}" class="btn-call-walkin px-2.5 py-1 rounded bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold transition">
- Call
- </button>
- </div>
- `
+            <div class="bg-white p-2.5 rounded border border-slate-200 shadow-sm flex items-center justify-between gap-2">
+              <div class="min-w-0 flex-1">
+                <div class="flex items-center gap-1.5 flex-wrap">
+                  <span class="font-mono font-bold text-slate-900 text-xs">${escapeHtml(t.ticketNumber)}</span>
+                  <span class="text-xs font-semibold text-slate-800 truncate">${escapeHtml(t.studentName)}</span>
+                </div>
+                <div class="text-[10px] text-slate-500">${escapeHtml(t.program)} • <span class="text-slate-600 font-medium">${escapeHtml(t.concernCategory || 'Walk-In')}</span></div>
+              </div>
+              <button data-call-id="${escapeHtml(t.id)}" class="btn-call-walkin px-3 py-1 rounded bg-[#00205B] hover:bg-[#001845] text-white text-xs font-semibold transition shrink-0 flex items-center gap-1 shadow-xs">
+                <span>Call</span>
+              </button>
+            </div>
+            `
           )
           .join('');
       }
@@ -1278,23 +1278,51 @@ document.addEventListener('DOMContentLoaded', () => {
         listCalling.innerHTML = `<p class="text-[11px] text-slate-400 py-4 text-center">No active calls</p>`;
       } else {
         listCalling.innerHTML = calling
-          .map(
-            t => `
- <div class="bg-white p-2.5 rounded border border-emerald-200 shadow-sm space-y-1.5">
- <div class="flex items-center justify-between">
- <span class="font-mono font-bold text-emerald-800 text-xs">${escapeHtml(t.ticketNumber)}</span>
- <span class="text-[9px] font-bold uppercase text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded">Calling</span>
- </div>
- <div class="text-xs font-bold text-slate-900">${escapeHtml(t.studentName)}</div>
- <div class="text-[10px] text-slate-500">${escapeHtml(t.program)}</div>
- <div class="pt-1 flex gap-1.5">
- <button data-start-id="${escapeHtml(t.id)}" class="btn-start-walkin flex-1 py-1 rounded bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold transition">
- Start Session
- </button>
- </div>
- </div>
- `
-          )
+          .map(t => {
+            const isMyTicket = !t.assignedCounselorId || t.assignedCounselorId === currentUser.uid;
+            const counselorNameDisplay = escapeHtml(t.assignedCounselorName || 'Counselor');
+
+            if (isMyTicket) {
+              return `
+              <div class="bg-white p-2.5 rounded border-2 border-emerald-500 shadow-sm space-y-1.5">
+                <div class="flex items-center justify-between">
+                  <span class="font-mono font-bold text-emerald-800 text-xs">${escapeHtml(t.ticketNumber)}</span>
+                  <span class="text-[9px] font-bold uppercase text-emerald-700 bg-emerald-50 border border-emerald-200 px-1.5 py-0.5 rounded flex items-center gap-1">
+                    <span class="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+                    Calling (You)
+                  </span>
+                </div>
+                <div class="text-xs font-bold text-slate-900">${escapeHtml(t.studentName)}</div>
+                <div class="text-[10px] text-slate-500">${escapeHtml(t.program)} • ${escapeHtml(t.concernCategory || 'Walk-In')}</div>
+                <div class="pt-1 flex gap-1.5">
+                  <button data-start-id="${escapeHtml(t.id)}" class="btn-start-walkin flex-1 py-1 rounded bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold transition shadow-xs flex items-center justify-center gap-1">
+                    <span>Start Session</span>
+                  </button>
+                </div>
+              </div>
+              `;
+            } else {
+              return `
+              <div class="bg-slate-50/90 p-2.5 rounded border border-slate-200 shadow-2xs space-y-1.5 opacity-90">
+                <div class="flex items-center justify-between">
+                  <span class="font-mono font-bold text-slate-600 text-xs">${escapeHtml(t.ticketNumber)}</span>
+                  <span class="text-[9px] font-bold uppercase text-amber-800 bg-amber-50 border border-amber-200 px-1.5 py-0.5 rounded flex items-center gap-1">
+                    <i data-lucide="lock" class="w-2.5 h-2.5"></i>
+                    Locked
+                  </span>
+                </div>
+                <div class="text-xs font-bold text-slate-700">${escapeHtml(t.studentName)}</div>
+                <div class="text-[10px] text-slate-500">${escapeHtml(t.program)}</div>
+                <div class="pt-1">
+                  <div class="text-[10px] text-amber-800 bg-amber-50/80 rounded px-2 py-1 border border-amber-200/60 flex items-center gap-1">
+                    <i data-lucide="lock" class="w-3 h-3 shrink-0 text-amber-600"></i>
+                    <span>Locked to <strong>${counselorNameDisplay}</strong></span>
+                  </div>
+                </div>
+              </div>
+              `;
+            }
+          })
           .join('');
       }
     }
@@ -1304,40 +1332,83 @@ document.addEventListener('DOMContentLoaded', () => {
         listInSession.innerHTML = `<p class="text-[11px] text-slate-400 py-4 text-center">No active consultations</p>`;
       } else {
         listInSession.innerHTML = insession
-          .map(
-            t => `
- <div class="bg-white p-2.5 rounded border border-slate-200 shadow-sm space-y-1.5">
- <div class="flex items-center justify-between">
- <span class="font-mono font-bold text-slate-900 text-xs">${escapeHtml(t.ticketNumber)}</span>
- <span class="text-[9px] font-bold uppercase text-slate-600 bg-slate-100 px-1.5 py-0.5 rounded">In Session</span>
- </div>
- <div class="text-xs font-bold text-slate-900">${escapeHtml(t.studentName)}</div>
- <div class="text-[10px] text-slate-500">${escapeHtml(t.program)}</div>
- <div class="pt-1">
- <button data-complete-id="${escapeHtml(t.id)}" data-snum="${escapeHtml(t.studentNumber)}" data-sname="${escapeHtml(t.studentName)}" data-sprog="${escapeHtml(t.program)}" class="btn-complete-walkin w-full py-1 rounded bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-semibold transition">
- Complete & Open Case
- </button>
- </div>
- </div>
- `
-          )
+          .map(t => {
+            const isMyTicket = !t.assignedCounselorId || t.assignedCounselorId === currentUser.uid;
+            const counselorNameDisplay = escapeHtml(t.assignedCounselorName || 'Counselor');
+
+            if (isMyTicket) {
+              return `
+              <div class="bg-white p-2.5 rounded border-2 border-blue-500 shadow-sm space-y-1.5">
+                <div class="flex items-center justify-between">
+                  <span class="font-mono font-bold text-slate-900 text-xs">${escapeHtml(t.ticketNumber)}</span>
+                  <span class="text-[9px] font-bold uppercase text-blue-700 bg-blue-50 border border-blue-200 px-1.5 py-0.5 rounded flex items-center gap-1">
+                    <span class="w-1.5 h-1.5 rounded-full bg-blue-500"></span>
+                    In Session (You)
+                  </span>
+                </div>
+                <div class="text-xs font-bold text-slate-900">${escapeHtml(t.studentName)}</div>
+                <div class="text-[10px] text-slate-500">${escapeHtml(t.program)} • ${escapeHtml(t.concernCategory || 'Walk-In')}</div>
+                <div class="pt-1">
+                  <button data-complete-id="${escapeHtml(t.id)}" data-snum="${escapeHtml(t.studentNumber)}" data-sname="${escapeHtml(t.studentName)}" data-sprog="${escapeHtml(t.program)}" class="btn-complete-walkin w-full py-1.5 rounded bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-semibold transition shadow-xs flex items-center justify-center gap-1">
+                    <i data-lucide="check-circle" class="w-3.5 h-3.5"></i>
+                    <span>Complete & Open Case</span>
+                  </button>
+                </div>
+              </div>
+              `;
+            } else {
+              return `
+              <div class="bg-slate-50/90 p-2.5 rounded border border-slate-200 shadow-2xs space-y-1.5 opacity-90">
+                <div class="flex items-center justify-between">
+                  <span class="font-mono font-bold text-slate-600 text-xs">${escapeHtml(t.ticketNumber)}</span>
+                  <span class="text-[9px] font-bold uppercase text-slate-600 bg-slate-100 border border-slate-200 px-1.5 py-0.5 rounded flex items-center gap-1">
+                    <i data-lucide="lock" class="w-2.5 h-2.5"></i>
+                    Locked
+                  </span>
+                </div>
+                <div class="text-xs font-bold text-slate-700">${escapeHtml(t.studentName)}</div>
+                <div class="text-[10px] text-slate-500">${escapeHtml(t.program)}</div>
+                <div class="pt-1">
+                  <div class="text-[10px] text-slate-600 bg-slate-100 rounded px-2 py-1 border border-slate-200 flex items-center gap-1">
+                    <i data-lucide="lock" class="w-3 h-3 shrink-0 text-slate-500"></i>
+                    <span>Consulting with <strong>${counselorNameDisplay}</strong></span>
+                  </div>
+                </div>
+              </div>
+              `;
+            }
+          })
           .join('');
       }
+    }
+
+    if (window.lucide && typeof window.lucide.createIcons === 'function') {
+      window.lucide.createIcons();
     }
 
     document.querySelectorAll('.btn-call-walkin').forEach(btn => {
       btn.addEventListener('click', async () => {
         const id = btn.getAttribute('data-call-id');
-        await updateWalkInStatus(id, 'Calling', currentUser.uid);
-        showToast('Calling student to counselor room.', 'info');
+        const fresh = allWalkinQueue.find(t => t.id === id);
+        if (fresh && fresh.status !== 'Waiting') {
+          showToast(`Ticket already called by Counselor ${fresh.assignedCounselorName || 'another counselor'}.`, 'error');
+          return;
+        }
+        await updateWalkInStatus(id, 'Calling', currentUser.uid, currentUser.fullName);
+        showToast('Calling student to your consultation room. Ticket locked in to your workspace.', 'info');
       });
     });
 
     document.querySelectorAll('.btn-start-walkin').forEach(btn => {
       btn.addEventListener('click', async () => {
         const id = btn.getAttribute('data-start-id');
-        await updateWalkInStatus(id, 'In-Session', currentUser.uid);
-        showToast('Session started.', 'success');
+        const fresh = allWalkinQueue.find(t => t.id === id);
+        if (fresh && fresh.assignedCounselorId && fresh.assignedCounselorId !== currentUser.uid) {
+          showToast(`This ticket is locked to Counselor ${fresh.assignedCounselorName || 'another counselor'}.`, 'error');
+          return;
+        }
+        await updateWalkInStatus(id, 'In-Session', currentUser.uid, currentUser.fullName);
+        showToast('Consultation session started.', 'success');
       });
     });
 
@@ -1348,10 +1419,16 @@ document.addEventListener('DOMContentLoaded', () => {
         const sname = btn.getAttribute('data-sname');
         const sprog = btn.getAttribute('data-sprog');
 
-        await updateWalkInStatus(id, 'Completed', currentUser.uid);
+        const fresh = allWalkinQueue.find(t => t.id === id);
+        if (fresh && fresh.assignedCounselorId && fresh.assignedCounselorId !== currentUser.uid) {
+          showToast(`This ticket is locked to Counselor ${fresh.assignedCounselorName || 'another counselor'}.`, 'error');
+          return;
+        }
+
+        await updateWalkInStatus(id, 'Completed', currentUser.uid, currentUser.fullName);
         showToast('Walk-in completed. Opening case...', 'success');
 
-        const caseRecord = await getOrCreateCase(snum, sname, sprog, currentUser.uid);
+        const caseRecord = await getOrCreateCase(snum, sname, sprog, currentUser.uid, currentUser.fullName);
         if (caseRecord.status === 'Closed') {
           await updateCaseStatus(caseRecord.id, 'Active');
           caseRecord.status = 'Active';

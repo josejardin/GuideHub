@@ -653,6 +653,19 @@ export async function checkSlotAvailable(date, timeSlot, counselorId = 'any', ge
   return available.length > 0;
 }
 
+export function getCurrentTimeSlot(date = new Date()) {
+  const d = new Date(date);
+  const hour = d.getHours();
+  if (hour < 9) return '8:00 AM - 9:00 AM';
+  if (hour === 9) return '9:00 AM - 10:00 AM';
+  if (hour === 10) return '10:00 AM - 11:00 AM';
+  if (hour === 11) return '11:00 AM - 12:00 PM';
+  if (hour === 12 || hour === 13) return '1:00 PM - 2:00 PM';
+  if (hour === 14) return '2:00 PM - 3:00 PM';
+  if (hour === 15) return '3:00 PM - 4:00 PM';
+  return '4:00 PM - 5:00 PM';
+}
+
 export async function generateWalkInTicket(studentData) {
   const today = new Date().toISOString().split('T')[0];
   const state = getLocalState();
@@ -670,6 +683,7 @@ export async function generateWalkInTicket(studentData) {
 
   const queueSeq = existingCount + 101;
   const ticketNumber = `W-${queueSeq}`;
+  const currentSlot = getCurrentTimeSlot(new Date());
 
   const ticket = {
     studentId: studentData.studentId || 'walkin_guest',
@@ -681,8 +695,10 @@ export async function generateWalkInTicket(studentData) {
     concernCategory: studentData.concernCategory || 'Walk-In Consultation',
     ticketNumber,
     date: today,
+    timeSlot: currentSlot,
     status: 'Waiting',
     assignedCounselorId: null,
+    assignedCounselorName: null,
     calledAt: null,
     completedAt: null,
     createdAt: new Date().toISOString()
@@ -701,6 +717,53 @@ export async function generateWalkInTicket(studentData) {
 
   state.walkinQueue[id] = { id, ...ticket };
   saveLocalState(state);
+
+  // Dispatch High-Priority Walk-In Email Alert to counselors available during this duty slot
+  (async () => {
+    try {
+      let targetCounselors = [];
+      try {
+        targetCounselors = await getAvailableCounselorsForSlot(today, currentSlot, 'Any');
+      } catch (err) {
+        console.warn('[WALKIN ALERT] Could not fetch available counselors:', err.message);
+      }
+
+      // If all duty counselors are blocked or in appointments, fallback to all registered active counselors
+      if (!targetCounselors || targetCounselors.length === 0) {
+        try {
+          targetCounselors = await getCounselors();
+        } catch (e) {}
+      }
+
+      const counselorEmails = (targetCounselors || [])
+        .map(c => c.email)
+        .filter(Boolean);
+
+      if (counselorEmails.length > 0) {
+        fetch('/api/send-walkin-alert', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            ticketNumber,
+            studentName: studentData.studentName,
+            studentNumber: studentData.studentNumber,
+            program: studentData.program,
+            concernCategory: studentData.concernCategory,
+            date: today,
+            timeSlot: currentSlot,
+            counselorEmails
+          })
+        }).then(r => r.json()).then(res => {
+          console.log('[WALKIN ALERT] Notification sent:', res);
+        }).catch(err => {
+          console.warn('[WALKIN ALERT] Send error:', err.message);
+        });
+      }
+    } catch (err) {
+      console.warn('[WALKIN ALERT] Background dispatch notice:', err.message);
+    }
+  })();
+
   return { id, ...ticket };
 }
 
@@ -739,19 +802,20 @@ export function subscribeLiveWalkInQueue(callback) {
   return () => window.removeEventListener('guidehub_data_changed', handler);
 }
 
-export async function updateWalkInStatus(ticketId, status, counselorId = null) {
+export async function updateWalkInStatus(ticketId, status, counselorId = null, counselorName = null) {
   const updateData = {
     status,
     updatedAt: new Date().toISOString()
   };
   if (counselorId) updateData.assignedCounselorId = counselorId;
+  if (counselorName) updateData.assignedCounselorName = counselorName;
   if (status === 'Calling') updateData.calledAt = new Date().toISOString();
   if (status === 'Completed') updateData.completedAt = new Date().toISOString();
 
   try {
     if (db) {
       const ticketRef = doc(db, 'walkin_queue', ticketId);
-      await updateDoc(ticketRef, updateData);
+      await setDoc(ticketRef, updateData, { merge: true });
     }
   } catch (err) {
     console.warn('Firestore updateWalkInStatus fallback:', err.message);

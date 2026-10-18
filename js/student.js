@@ -673,11 +673,13 @@ document.addEventListener('DOMContentLoaded', () => {
       if (queueTicketNum) queueTicketNum.textContent = myTicket.ticketNumber;
 
       if (myTicket.status === 'Calling') {
-        if (queueStatusText) queueStatusText.textContent = 'NOW CALLING: Please proceed to Counselor Room';
-        if (queueDetailText) queueDetailText.textContent = 'Your assigned counselor is ready for consultation.';
+        const cName = myTicket.assignedCounselorName ? `Counselor ${myTicket.assignedCounselorName}` : 'Your assigned counselor';
+        if (queueStatusText) queueStatusText.textContent = `NOW CALLING: Please proceed to Counselor Room`;
+        if (queueDetailText) queueDetailText.textContent = `${cName} is ready to see you. Please proceed to the Guidance Office.`;
       } else if (myTicket.status === 'In-Session') {
+        const cName = myTicket.assignedCounselorName ? `with Counselor ${myTicket.assignedCounselorName}` : 'underway';
         if (queueStatusText) queueStatusText.textContent = 'Session In Progress';
-        if (queueDetailText) queueDetailText.textContent = 'Consultation currently underway.';
+        if (queueDetailText) queueDetailText.textContent = `Consultation currently ${cName}.`;
       } else {
         if (queueStatusText) queueStatusText.textContent = 'You are currently waiting in queue';
         const waitingAhead = queueList.filter(

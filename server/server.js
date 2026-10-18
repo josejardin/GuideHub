@@ -789,6 +789,17 @@ app.post('/api/send-appointment-confirmation', async (req, res) => {
   }
 });
 
+// Endpoint: High-Priority Walk-In Queue Alert for Available Duty Counselors
+app.post('/api/send-walkin-alert', async (req, res) => {
+  try {
+    const handler = (await import('../api/send-walkin-alert.js')).default;
+    return await handler(req, res);
+  } catch (err) {
+    console.error(' [WALKIN ALERT SERVER ERROR]:', err);
+    return res.status(500).json({ success: false, error: err.message || 'Server error sending walk-in alert.' });
+  }
+});
+
 // Admin Route: Direct Staff Account Provisioning
 app.post('/api/admin/create-staff', async (req, res) => {
   try {
