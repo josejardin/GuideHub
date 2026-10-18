@@ -670,6 +670,63 @@ export async function generateWalkInTicket(studentData) {
   const today = new Date().toISOString().split('T')[0];
   const state = getLocalState();
 
+  // 1. Validation: Disallow generating a new ticket if the student already has an active session/ticket
+  const activeStatuses = ['Waiting', 'Calling', 'In-Session'];
+  let existingActiveTicket = null;
+
+  const localTickets = Object.values(state.walkinQueue || {});
+  existingActiveTicket = localTickets.find(t => {
+    if (!t || !activeStatuses.includes(t.status)) return false;
+    if (studentData.studentId && t.studentId === studentData.studentId) return true;
+    if (
+      studentData.studentNumber &&
+      studentData.studentNumber !== 'N/A' &&
+      t.studentNumber &&
+      t.studentNumber.toLowerCase() === studentData.studentNumber.toLowerCase()
+    ) {
+      return true;
+    }
+    if (studentData.studentName && t.studentName && isSamePersonName(t.studentName, studentData.studentName)) {
+      return true;
+    }
+    return false;
+  });
+
+  if (!existingActiveTicket && db) {
+    try {
+      const qWaiting = query(collection(db, 'walkin_queue'), where('status', 'in', ['Waiting', 'Calling', 'In-Session']));
+      const snapActive = await getDocs(qWaiting);
+      if (!snapActive.empty) {
+        existingActiveTicket = snapActive.docs
+          .map(d => ({ id: d.id, ...d.data() }))
+          .find(t => {
+            if (!t || !activeStatuses.includes(t.status)) return false;
+            if (studentData.studentId && t.studentId === studentData.studentId) return true;
+            if (
+              studentData.studentNumber &&
+              studentData.studentNumber !== 'N/A' &&
+              t.studentNumber &&
+              t.studentNumber.toLowerCase() === studentData.studentNumber.toLowerCase()
+            ) {
+              return true;
+            }
+            if (studentData.studentName && t.studentName && isSamePersonName(t.studentName, studentData.studentName)) {
+              return true;
+            }
+            return false;
+          });
+      }
+    } catch (e) {
+      console.warn('Firestore active walkin check fallback:', e.message);
+    }
+  }
+
+  if (existingActiveTicket) {
+    throw new Error(
+      `You currently have an active walk-in ticket (${existingActiveTicket.ticketNumber}) with status "${existingActiveTicket.status}". You may only request a new ticket once your current session has been completed by the counselor.`
+    );
+  }
+
   let existingCount = Object.values(state.walkinQueue).filter(t => t.date === today).length;
   try {
     if (db) {
@@ -689,6 +746,7 @@ export async function generateWalkInTicket(studentData) {
     studentId: studentData.studentId || 'walkin_guest',
     studentName: studentData.studentName,
     studentNumber: studentData.studentNumber,
+    studentEmail: studentData.studentEmail || '',
     program: studentData.program,
     gender: studentData.gender || 'Not Specified',
     contactNumber: studentData.contactNumber || '',
@@ -822,12 +880,50 @@ export async function updateWalkInStatus(ticketId, status, counselorId = null, c
   }
 
   const state = getLocalState();
+  let ticketData = (state.walkinQueue && state.walkinQueue[ticketId]) ? { ...state.walkinQueue[ticketId], ...updateData } : null;
   if (state.walkinQueue[ticketId]) {
     state.walkinQueue[ticketId] = {
       ...state.walkinQueue[ticketId],
       ...updateData
     };
     saveLocalState(state);
+  }
+
+  // When ticket status is changed to 'Calling', dispatch High-Priority Email Alert to the Student
+  if (status === 'Calling') {
+    (async () => {
+      try {
+        if (!ticketData && db) {
+          try {
+            const snap = await getDoc(doc(db, 'walkin_queue', ticketId));
+            if (snap.exists()) ticketData = { id: snap.id, ...snap.data(), ...updateData };
+          } catch (_) {}
+        }
+
+        if (ticketData) {
+          fetch('/api/send-walkin-call-student', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              ticketNumber: ticketData.ticketNumber,
+              studentName: ticketData.studentName,
+              studentNumber: ticketData.studentNumber,
+              studentEmail: ticketData.studentEmail || '',
+              studentId: ticketData.studentId,
+              counselorName: counselorName || ticketData.assignedCounselorName || 'Guidance Counselor',
+              concernCategory: ticketData.concernCategory || 'Walk-In Consultation',
+              location: 'Guidance & Counseling Center (2nd Floor, Main Building)'
+            })
+          }).then(r => r.json()).then(res => {
+            console.log('[WALKIN STUDENT CALL ALERT] Sent successfully:', res);
+          }).catch(err => {
+            console.warn('[WALKIN STUDENT CALL ALERT] Send warning:', err.message);
+          });
+        }
+      } catch (e) {
+        console.warn('[WALKIN STUDENT CALL ALERT] Exception:', e.message);
+      }
+    })();
   }
 }
 

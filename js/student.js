@@ -611,6 +611,17 @@ document.addEventListener('DOMContentLoaded', () => {
   let activeUserTicket = null;
 
   openWalkinBtn?.addEventListener('click', () => {
+    if (activeUserTicket && ['Waiting', 'Calling', 'In-Session'].includes(activeUserTicket.status)) {
+      showToast(
+        `You currently have an active ticket (${activeUserTicket.ticketNumber}) with status "${activeUserTicket.status}". You may only request a new ticket once your current session is completed by the counselor.`,
+        'warning',
+        'Active Ticket in Progress'
+      );
+      const activeCard = document.getElementById('active-queue-card');
+      if (activeCard) activeCard.scrollIntoView({ behavior: 'smooth' });
+      return;
+    }
+
     walkinModal?.classList.remove('hidden');
     const sName = document.getElementById('walkin-student-name');
     const sId = document.getElementById('walkin-student-id');
@@ -629,6 +640,17 @@ document.addEventListener('DOMContentLoaded', () => {
 
   walkinForm?.addEventListener('submit', async e => {
     e.preventDefault();
+
+    if (activeUserTicket && ['Waiting', 'Calling', 'In-Session'].includes(activeUserTicket.status)) {
+      showToast(
+        `You currently have an active ticket (${activeUserTicket.ticketNumber}). Please wait for the counselor to complete your session.`,
+        'warning',
+        'Active Ticket Found'
+      );
+      walkinModal?.classList.add('hidden');
+      return;
+    }
+
     const concernCategory =
       document.getElementById('walkin-concern')?.value ||
       document.getElementById('walkin-concern-type')?.value ||
@@ -639,6 +661,7 @@ document.addEventListener('DOMContentLoaded', () => {
         studentId: currentUser.uid,
         studentName: currentUser.fullName,
         studentNumber: currentUser.studentOrEmpId || 'N/A',
+        studentEmail: currentUser.email || '',
         program: currentUser.program || 'Student',
         gender: currentUser.gender || 'Not Specified',
         contactNumber: currentUser.contactNumber || '',

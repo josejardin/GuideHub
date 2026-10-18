@@ -800,6 +800,17 @@ app.post('/api/send-walkin-alert', async (req, res) => {
   }
 });
 
+// Endpoint: High-Priority Email Alert to Student When Called by Counselor
+app.post('/api/send-walkin-call-student', async (req, res) => {
+  try {
+    const handler = (await import('../api/send-walkin-call-student.js')).default;
+    return await handler(req, res);
+  } catch (err) {
+    console.error(' [WALKIN STUDENT CALL SERVER ERROR]:', err);
+    return res.status(500).json({ success: false, error: err.message || 'Server error sending student call alert.' });
+  }
+});
+
 // Admin Route: Direct Staff Account Provisioning
 app.post('/api/admin/create-staff', async (req, res) => {
   try {

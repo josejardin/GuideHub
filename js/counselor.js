@@ -1470,7 +1470,7 @@ document.addEventListener('DOMContentLoaded', () => {
         concernCategory: concern
       });
 
-      await updateWalkInStatus(ticket.id, 'In-Session', currentUser.uid);
+      await updateWalkInStatus(ticket.id, 'In-Session', currentUser.uid, currentUser.fullName);
       await logAuditEvent(
         currentUser.uid,
         currentUser.fullName,
