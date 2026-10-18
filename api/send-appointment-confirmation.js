@@ -2,7 +2,7 @@ import nodemailer from 'nodemailer';
 import path from 'path';
 import fs from 'fs';
 import dotenv from 'dotenv';
-import { findAccountByEmail, findAccountById, findAccountByFullName, escapeHtml } from '../server/db.js';
+import { findAccountByEmail, findAccountById, findAccountByFullName, escapeHtml } from './db.js';
 
 dotenv.config();
 

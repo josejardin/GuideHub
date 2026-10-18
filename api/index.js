@@ -1,5 +1,3 @@
-import app from '../server/server.js';
-
 export default function handler(req, res) {
-  return app(req, res);
+  res.status(200).json({ status: 'healthy', project: 'GuideHub NU Fairview' });
 }

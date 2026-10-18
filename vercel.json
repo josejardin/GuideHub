@@ -1,25 +1,3 @@
 {
-  "version": 2,
-  "rewrites": [
-    {
-      "source": "/api/send-otp",
-      "destination": "/api/send-otp.js"
-    },
-    {
-      "source": "/api/admin-alert",
-      "destination": "/api/admin-alert.js"
-    },
-    {
-      "source": "/api/reset-password",
-      "destination": "/api/reset-password.js"
-    },
-    {
-      "source": "/api/send-appointment-confirmation",
-      "destination": "/api/send-appointment-confirmation.js"
-    },
-    {
-      "source": "/api/(.*)",
-      "destination": "/api/index.js"
-    }
-  ]
+  "version": 2
 }

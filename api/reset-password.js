@@ -3,7 +3,7 @@
 
 import nodemailer from 'nodemailer';
 import dotenv from 'dotenv';
-import { verifyServerOtp, escapeHtml } from '../server/db.js';
+import { verifyServerOtp, escapeHtml } from './db.js';
 dotenv.config();
 
 const transporter = nodemailer.createTransport({
