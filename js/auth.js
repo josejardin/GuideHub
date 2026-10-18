@@ -357,6 +357,7 @@ export async function sendInstitutionalOTP(
       throw new Error(result.error || `Email delivery failed for ${cleanEmail} (Status: ${res.status}).`);
     }
 
+    const finalOtp = result.otp || otp;
     const targetEmail = (result.resolvedEmail || cleanEmail).toLowerCase();
 
     // 2. Only save OTP verification record to Firestore upon confirmed successful dispatch
