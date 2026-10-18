@@ -49,14 +49,24 @@
             </p>
           </div>
 
-          <div class="relative w-full sm:w-60">
-            <i data-lucide="search" class="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-2"></i>
-            <input
-              type="text"
-              id="user-search-input"
-              placeholder="Search user..."
-              class="w-full pl-8 pr-2.5 py-1 text-xs border border-slate-200 rounded-md focus:outline-none focus:border-slate-900"
-            />
+          <div class="flex items-center gap-2.5 w-full sm:w-auto">
+            <div class="relative flex-1 sm:w-60">
+              <i data-lucide="search" class="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-2"></i>
+              <input
+                type="text"
+                id="user-search-input"
+                placeholder="Search user..."
+                class="w-full pl-8 pr-2.5 py-1 text-xs border border-slate-200 rounded-md focus:outline-none focus:border-slate-900"
+              />
+            </div>
+            <button
+              id="btn-open-create-staff-modal"
+              type="button"
+              class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#00205B] hover:bg-[#0A192F] text-white text-xs font-semibold shadow-xs transition shrink-0"
+            >
+              <i data-lucide="user-plus" class="w-3.5 h-3.5 text-[#F5B800]"></i>
+              <span>Provision Staff</span>
+            </button>
           </div>
         </div>
 
@@ -129,6 +139,106 @@
         </div>
       </div>
     </main>
+
+    <!-- Provision Staff Account Modal -->
+    <div id="create-staff-modal" class="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 hidden">
+      <div class="bg-white rounded-2xl max-w-lg w-full overflow-hidden shadow-xl border border-slate-200">
+        <div class="bg-[#00205B] p-5 text-white flex items-center justify-between">
+          <div class="flex items-center gap-3">
+            <div class="w-9 h-9 rounded-xl bg-white/10 flex items-center justify-center text-[#F5B800]">
+              <i data-lucide="user-plus" class="w-5 h-5"></i>
+            </div>
+            <div>
+              <h3 class="text-sm font-bold text-white tracking-tight">Provision New Staff Account</h3>
+              <p class="text-[11px] text-slate-300">Create an authorized institutional staff account</p>
+            </div>
+          </div>
+          <button id="btn-close-staff-modal" type="button" class="text-white/70 hover:text-white p-1 rounded-lg hover:bg-white/10 transition">
+            <i data-lucide="x" class="w-5 h-5"></i>
+          </button>
+        </div>
+
+        <form id="create-staff-form" class="p-6 space-y-4 text-xs">
+          <div>
+            <label class="block font-semibold text-slate-700 mb-1">Full Legal Name <span class="text-rose-500">*</span></label>
+            <input type="text" id="staff-fullname" required placeholder="e.g. Maria Clara Santos, RGC" class="w-full px-3 py-2 text-xs border border-slate-300 rounded-lg focus:border-[#00205B] focus:outline-none" />
+          </div>
+
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div>
+              <label class="block font-semibold text-slate-700 mb-1">Institutional Email <span class="text-rose-500">*</span></label>
+              <div class="relative flex rounded-lg border border-slate-300 focus-within:border-[#00205B] overflow-hidden bg-white">
+                <input type="text" id="staff-email-prefix" required placeholder="username" class="w-full px-2.5 py-2 text-xs border-0 focus:ring-0 focus:outline-none" />
+                <span class="inline-flex items-center px-2 bg-slate-100 border-l border-slate-200 text-[#00205B] font-semibold text-[10px] select-none whitespace-nowrap">
+                  @nu-fairview.edu.ph
+                </span>
+              </div>
+            </div>
+
+            <div>
+              <label class="block font-semibold text-slate-700 mb-1">Employee ID <span class="text-rose-500">*</span></label>
+              <input type="text" id="staff-empid" required placeholder="e.g. EMP-2024-0108" class="w-full px-3 py-2 text-xs border border-slate-300 rounded-lg focus:border-[#00205B] focus:outline-none font-mono" />
+            </div>
+          </div>
+
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div>
+              <label class="block font-semibold text-slate-700 mb-1">Staff Role <span class="text-rose-500">*</span></label>
+              <select id="staff-role" required class="w-full px-3 py-2 text-xs border border-slate-300 rounded-lg focus:border-[#00205B] focus:outline-none bg-white font-medium text-slate-700">
+                <option value="counselor" selected>Registered Guidance Counselor</option>
+                <option value="faculty">Faculty Endorser</option>
+                <option value="head">Guidance Head / Director</option>
+                <option value="admin">System Administrator</option>
+              </select>
+            </div>
+
+            <div>
+              <label class="block font-semibold text-slate-700 mb-1">Department / Office</label>
+              <select id="staff-department" class="w-full px-3 py-2 text-xs border border-slate-300 rounded-lg focus:border-[#00205B] focus:outline-none bg-white font-medium text-slate-700">
+                <option value="Guidance and Counseling Center" selected>Guidance and Counseling Center</option>
+                <option value="College of Computing and Information Technology">CCIT</option>
+                <option value="College of Engineering and Architecture">CEA</option>
+                <option value="College of Business and Accountancy">CBA</option>
+                <option value="College of Arts and Sciences">CAS</option>
+                <option value="Senior High School Department (SHS)">SHS Department</option>
+                <option value="IT Systems Administration">IT Systems Administration</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div>
+              <label class="block font-semibold text-slate-700 mb-1">Gender Identity</label>
+              <select id="staff-gender" class="w-full px-3 py-2 text-xs border border-slate-300 rounded-lg focus:border-[#00205B] focus:outline-none bg-white font-medium text-slate-700">
+                <option value="Prefer not to say">Prefer not to say</option>
+                <option value="Female">Female</option>
+                <option value="Male">Male</option>
+              </select>
+            </div>
+
+            <div>
+              <label class="block font-semibold text-slate-700 mb-1">Initial Password <span class="text-rose-500">*</span></label>
+              <input type="text" id="staff-password" required value="Password123!" class="w-full px-3 py-2 text-xs border border-slate-300 rounded-lg focus:border-[#00205B] focus:outline-none font-mono" />
+            </div>
+          </div>
+
+          <div class="p-3 rounded-lg bg-emerald-50 border border-emerald-200 text-emerald-900 text-[11px] flex items-center gap-2">
+            <i data-lucide="shield-check" class="w-4 h-4 text-emerald-600 shrink-0"></i>
+            <span>Account will be immediately verified and ready for sign-in without OTP delay.</span>
+          </div>
+
+          <div class="pt-3 flex items-center justify-end gap-2.5 border-t border-slate-200">
+            <button id="btn-cancel-staff-modal" type="button" class="px-4 py-2 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold text-xs transition">
+              Cancel
+            </button>
+            <button id="btn-submit-staff" type="submit" class="px-4 py-2 rounded-lg bg-[#00205B] hover:bg-[#0A192F] text-white font-semibold text-xs shadow-xs transition flex items-center gap-1.5">
+              <i data-lucide="check-circle" class="w-3.5 h-3.5 text-[#F5B800]"></i>
+              <span>Create Staff Account</span>
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
 
     <script type="module" src="../js/admin.js"></script>
   </body>

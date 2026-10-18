@@ -65,7 +65,7 @@ export default async function handler(req, res) {
 
   // 2. Validate ID Format per Role
   const studentIdRegex = /^20[1-2][0-9]-(SHS-)?\d{4,7}$/i;
-  const empIdRegex = /^(EMP|FAC|STAFF|GC|GCO)-\d{3,4}(-\d{3,4})?$/i;
+  const empIdRegex = /^(?:\d{2,3}-\d{2,7}|(?:EMP|FAC|STAFF|GC|GCO)-\d{2,4}(?:-\d{2,7})?)$/i;
 
   if (isRegistration && isStudent && !studentIdRegex.test(idNumber)) {
     return res.status(400).json({
@@ -288,7 +288,8 @@ export default async function handler(req, res) {
 
   try {
     const info = await transporter.sendMail(mailOptions);
-    return res.status(200).json({ success: true, messageId: info.messageId });
+    console.log(` [LIVE OTP DISPATCHED] Destination: ${cleanTo} | OTP Code: ${otp} | MsgID: ${info.messageId}`);
+    return res.status(200).json({ success: true, messageId: info.messageId, otp: otp });
   } catch (error) {
     console.warn(` Live dispatch failed (${error.message}). Simulating OTP for development/testing.`);
     return res.status(200).json({

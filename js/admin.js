@@ -157,4 +157,93 @@ document.addEventListener('DOMContentLoaded', async () => {
       })
       .join('');
   }
+
+  // --- Provision Staff Modal Logic ---
+  const staffModal = document.getElementById('create-staff-modal');
+  const btnOpenStaffModal = document.getElementById('btn-open-create-staff-modal');
+  const btnCloseStaffModal = document.getElementById('btn-close-staff-modal');
+  const btnCancelStaffModal = document.getElementById('btn-cancel-staff-modal');
+  const createStaffForm = document.getElementById('create-staff-form');
+  const btnSubmitStaff = document.getElementById('btn-submit-staff');
+
+  function openStaffModal() {
+    if (!staffModal) return;
+    createStaffForm?.reset();
+    const pwdInput = document.getElementById('staff-password');
+    if (pwdInput) pwdInput.value = 'Password123!';
+    staffModal.classList.remove('hidden');
+    if (window.lucide) window.lucide.createIcons();
+    document.getElementById('staff-fullname')?.focus();
+  }
+
+  function closeStaffModal() {
+    if (!staffModal) return;
+    staffModal.classList.add('hidden');
+  }
+
+  btnOpenStaffModal?.addEventListener('click', openStaffModal);
+  btnCloseStaffModal?.addEventListener('click', closeStaffModal);
+  btnCancelStaffModal?.addEventListener('click', closeStaffModal);
+
+  staffModal?.addEventListener('click', e => {
+    if (e.target === staffModal) closeStaffModal();
+  });
+
+  createStaffForm?.addEventListener('submit', async e => {
+    e.preventDefault();
+
+    const fullName = document.getElementById('staff-fullname')?.value.trim();
+    const emailPrefix = document.getElementById('staff-email-prefix')?.value.trim();
+    const studentOrEmpId = document.getElementById('staff-empid')?.value.trim();
+    const role = document.getElementById('staff-role')?.value;
+    const department = document.getElementById('staff-department')?.value;
+    const gender = document.getElementById('staff-gender')?.value;
+    const password = document.getElementById('staff-password')?.value.trim();
+
+    if (!fullName || !emailPrefix || !studentOrEmpId || !password) {
+      showToast('Please fill out all required fields.', 'warning');
+      return;
+    }
+
+    const cleanEmail = `${emailPrefix}@nu-fairview.edu.ph`;
+
+    try {
+      if (btnSubmitStaff) {
+        btnSubmitStaff.disabled = true;
+        btnSubmitStaff.innerHTML = `<span class="inline-block animate-spin mr-1">⌛</span> Provisioning...`;
+      }
+
+      const res = await fetch('/api/admin/create-staff', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          fullName,
+          email: cleanEmail,
+          studentOrEmpId,
+          role,
+          department,
+          gender,
+          password
+        })
+      });
+
+      const data = await res.json().catch(() => ({}));
+
+      if (!res.ok) {
+        throw new Error(data.error || 'Failed to create staff account.');
+      }
+
+      showToast(`Success! Provisioned ${role.toUpperCase()} account for ${fullName}.`, 'success');
+      closeStaffModal();
+      await loadUsers();
+    } catch (err) {
+      showToast(err.message || 'Error provisioning account', 'error');
+    } finally {
+      if (btnSubmitStaff) {
+        btnSubmitStaff.disabled = false;
+        btnSubmitStaff.innerHTML = `<i data-lucide="check-circle" class="w-3.5 h-3.5 text-[#F5B800]"></i><span>Create Staff Account</span>`;
+        if (window.lucide) window.lucide.createIcons();
+      }
+    }
+  });
 });

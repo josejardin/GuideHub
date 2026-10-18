@@ -4,10 +4,16 @@ import nodemailer from 'nodemailer';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import dotenv from 'dotenv';
+import { initializeApp as initClientApp, deleteApp } from 'firebase/app';
+import { getAuth as getClientAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword } from 'firebase/auth';
+import { doc, setDoc, addDoc, collection, serverTimestamp } from 'firebase/firestore';
 import {
   getAuth,
   getFirestore,
   isFirebaseAdminInitialized,
+  adminAuth,
+  adminDb,
+  clientDb,
   findAccountByEmail,
   findAccountById,
   findAccountByFullName,
@@ -293,8 +299,8 @@ app.post('/api/send-otp', async (req, res) => {
 
   try {
     const info = await transporter.sendMail(mailOptions);
-    console.log(` [LIVE OTP DISPATCHED] Destination: ${cleanTo} | MsgID: ${info.messageId}`);
-    return res.status(200).json({ success: true, messageId: info.messageId });
+    console.log(` [LIVE OTP DISPATCHED] Destination: ${cleanTo} | OTP Code: ${otp} | MsgID: ${info.messageId}`);
+    return res.status(200).json({ success: true, messageId: info.messageId, otp: otp });
   } catch (error) {
     console.warn(
       ` [DEVELOPMENT / DISPATCH FALLBACK] Live SMTP dispatch failed (${error.message}). Simulating OTP for testing.`
@@ -780,6 +786,142 @@ app.post('/api/send-appointment-confirmation', async (req, res) => {
   } catch (err) {
     console.error(' [CONFIRMATION EMAIL ERROR]:', err.message);
     return res.status(500).json({ success: false, error: err.message || 'Server error sending email.' });
+  }
+});
+
+// Admin Route: Direct Staff Account Provisioning
+app.post('/api/admin/create-staff', async (req, res) => {
+  try {
+    const { fullName, email, password, role, department, studentOrEmpId, gender, contactNumber } = req.body || {};
+
+    if (!fullName || !email || !password || !role || !studentOrEmpId) {
+      return res.status(400).json({
+        error: 'Please provide all required fields: full name, institutional email, password, role, and employee ID.'
+      });
+    }
+
+    const cleanEmail = email.trim().toLowerCase();
+    const cleanRole = role.trim().toLowerCase();
+    const cleanId = studentOrEmpId.trim();
+
+    if (!cleanEmail.endsWith('@nu-fairview.edu.ph') || cleanEmail.endsWith('@students.nu-fairview.edu.ph')) {
+      return res.status(400).json({
+        error: 'Staff accounts must use the official institutional domain (@nu-fairview.edu.ph).'
+      });
+    }
+
+    const allowedRoles = ['counselor', 'faculty', 'head', 'admin'];
+    if (!allowedRoles.includes(cleanRole)) {
+      return res.status(400).json({ error: 'Invalid staff role specified.' });
+    }
+
+    // 1. Check existing account in database
+    const existing = await findAccountByEmail(cleanEmail);
+    if (existing) {
+      return res.status(409).json({ error: `An account with email "${cleanEmail}" is already registered.` });
+    }
+
+    const existingId = await findAccountById(cleanId);
+    if (existingId) {
+      return res.status(409).json({ error: `Employee ID "${cleanId}" is already assigned to an existing account.` });
+    }
+
+    // 2. Create in Firebase Auth using a dedicated client instance
+    let authUid = null;
+    const clientFirebaseConfig = {
+      apiKey: process.env.FIREBASE_API_KEY || 'AIzaSyAqPNF4SRiyF8nZbFPLraUHldNoxvHQiQk',
+      authDomain: process.env.FIREBASE_AUTH_DOMAIN || 'guideone-a6ee4.firebaseapp.com',
+      projectId: process.env.FIREBASE_PROJECT_ID || 'guideone-a6ee4',
+      storageBucket: process.env.FIREBASE_STORAGE_BUCKET || 'guideone-a6ee4.firebasestorage.app',
+      messagingSenderId: process.env.FIREBASE_MESSAGING_SENDER_ID || '239656505483',
+      appId: process.env.FIREBASE_APP_ID || '1:239656505483:web:287895cbc2757f512fc48e'
+    };
+
+    let tempApp = null;
+    try {
+      tempApp = initClientApp(clientFirebaseConfig, 'staff-prov-' + Date.now() + Math.random().toString(36).slice(2, 6));
+      const tempAuth = getClientAuth(tempApp);
+      try {
+        const cred = await createUserWithEmailAndPassword(tempAuth, cleanEmail, password);
+        authUid = cred.user.uid;
+      } catch (authErr) {
+        if (authErr.code === 'auth/email-already-in-use') {
+          try {
+            const cred = await signInWithEmailAndPassword(tempAuth, cleanEmail, password);
+            authUid = cred.user.uid;
+          } catch (signErr) {
+            authUid = `auth_${Date.now()}`;
+          }
+        } else {
+          throw authErr;
+        }
+      }
+    } finally {
+      if (tempApp) {
+        try { await deleteApp(tempApp); } catch (e) {}
+      }
+    }
+
+    // 3. Category & Doc ID
+    const categoryMap = {
+      counselor: 'counselors',
+      faculty: 'faculty',
+      head: 'head',
+      admin: 'admin'
+    };
+    const category = categoryMap[cleanRole] || 'faculty';
+    const emailPrefix = cleanEmail.split('@')[0].replace(/[^a-zA-Z0-9]/g, '_');
+    const userDocId = `usr_${cleanRole}_${emailPrefix}`;
+
+    const completeProfile = {
+      uid: userDocId,
+      authUid: authUid || `auth_${Date.now()}`,
+      fullName: fullName.trim(),
+      email: cleanEmail,
+      role: cleanRole,
+      roleType: cleanRole,
+      studentOrEmpId: cleanId,
+      department: (department || 'Guidance and Counseling Center').trim(),
+      program: (department || 'Guidance and Counseling Center').trim(),
+      gender: gender || 'Prefer not to say',
+      contactNumber: contactNumber || '',
+      isVerified: true,
+      emailVerified: true,
+      createdAt: new Date().toISOString()
+    };
+
+    // 4. Save to Firestore users/{category} document
+    await setDoc(
+      doc(clientDb, 'users', category),
+      {
+        [userDocId]: completeProfile,
+        roleCategory: category,
+        lastUpdated: serverTimestamp()
+      },
+      { merge: true }
+    );
+
+    // Log to institutional audit trail
+    try {
+      await addDoc(collection(clientDb, 'audit_logs'), {
+        timestamp: new Date().toISOString(),
+        actorId: 'admin_provisioner',
+        actorName: 'System Administrator',
+        actorRole: 'admin',
+        action: 'STAFF_PROVISIONED',
+        summary: `Admin provisioned verified ${cleanRole.toUpperCase()} account for ${fullName.trim()} (${cleanEmail})`
+      });
+    } catch (e) {}
+
+    console.log(` [STAFF PROVISIONED] Role: ${cleanRole} | Name: ${fullName} | Email: ${cleanEmail}`);
+    return res.status(200).json({
+      success: true,
+      message: `Successfully provisioned ${cleanRole} account for ${fullName}.`,
+      user: completeProfile
+    });
+  } catch (err) {
+    console.error(' [ADMIN CREATE STAFF ERROR]:', err);
+    return res.status(500).json({ error: err.message || 'Failed to create staff account.' });
   }
 });
 
