@@ -289,7 +289,7 @@ export default async function handler(req, res) {
   try {
     const info = await transporter.sendMail(mailOptions);
     console.log(` [LIVE OTP DISPATCHED] Destination: ${cleanTo} | OTP Code: ${otp} | MsgID: ${info.messageId}`);
-    return res.status(200).json({ success: true, messageId: info.messageId, otp: otp });
+    return res.status(200).json({ success: true, messageId: info.messageId });
   } catch (error) {
     console.warn(` Live dispatch failed (${error.message}). Simulating OTP for development/testing.`);
     return res.status(200).json({

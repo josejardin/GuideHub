@@ -569,24 +569,6 @@
               </p>
             </div>
 
-            <!-- Testing & Demo Helper Card -->
-            <div
-              id="otp-dev-helper-card"
-              class="hidden p-3.5 rounded-xl bg-blue-50/90 border border-blue-200 text-[#00205B] text-xs space-y-1"
-            >
-              <div class="flex items-center gap-2 font-bold text-[#00205B]">
-                <i data-lucide="key" class="w-4 h-4 text-[#F5B800] flex-shrink-0"></i>
-                <span>Testing / Demo Helper</span>
-              </div>
-              <p class="text-[11px] leading-relaxed text-blue-900">
-                Dispatched verification code:
-                <strong id="otp-dev-helper-code" class="font-mono text-sm tracking-widest text-[#00205B] bg-white px-2 py-0.5 rounded border border-blue-200"></strong>
-                <span class="block text-[10px] text-blue-700 mt-1">
-                  (Automatically entered below so you can test without waiting for or logging into Outlook)
-                </span>
-              </p>
-            </div>
-
             <div class="space-y-2">
               <label class="block font-bold text-slate-700 text-center text-xs">Enter 6-Digit Code</label>
               <div id="otp-boxes-container" class="flex items-center justify-center gap-2 sm:gap-2.5">
@@ -1299,22 +1281,7 @@
             const otpResult = await sendInstitutionalOTP(email, fullName, 'registration', pendingProfileData);
 
             hideInlineError();
-            if (otpResult && otpResult.otp) {
-              const helperCard = document.getElementById('otp-dev-helper-card');
-              const helperCode = document.getElementById('otp-dev-helper-code');
-              if (helperCard && helperCode) {
-                helperCode.textContent = otpResult.otp;
-                helperCard.classList.remove('hidden');
-              }
-              showToast(`6-Digit OTP sent to ${email}! (Code: ${otpResult.otp})`, 'success');
-              console.info(`[GuideHub Verification] Target: ${email} | Code: ${otpResult.otp}`);
-              // Auto-fill digits for ease of testing in development
-              otpResult.otp.split('').forEach((digit, idx) => {
-                if (otpBoxes[idx]) otpBoxes[idx].value = digit;
-              });
-            } else {
-              showToast(`6-Digit OTP sent to ${email}! Check your inbox and spam folder.`, 'success');
-            }
+            showToast(`6-Digit verification code sent to ${email}! Please check your institutional Outlook inbox and junk/spam folder.`, 'success');
 
             // Only transition to Step 4 after verified 200 OK response
             goToStep(4);
@@ -1391,20 +1358,7 @@
               'registration',
               pendingProfileData || {}
             );
-            if (otpResult && otpResult.otp) {
-              const helperCard = document.getElementById('otp-dev-helper-card');
-              const helperCode = document.getElementById('otp-dev-helper-code');
-              if (helperCard && helperCode) {
-                helperCode.textContent = otpResult.otp;
-                helperCard.classList.remove('hidden');
-              }
-              showToast(`New 6-digit OTP sent to ${pendingEmail}! (Code: ${otpResult.otp})`, 'info');
-              otpResult.otp.split('').forEach((digit, idx) => {
-                if (otpBoxes[idx]) otpBoxes[idx].value = digit;
-              });
-            } else {
-              showToast(`New 6-digit OTP code sent to ${pendingEmail}. Please check Inbox and Junk/Spam.`, 'info');
-            }
+            showToast(`New 6-digit verification code sent to ${pendingEmail}. Please check your institutional Outlook inbox and junk/spam folder.`, 'info');
             clearOtpBoxes();
             otpBoxes[0]?.focus();
             start5MinCountdown();

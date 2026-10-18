@@ -300,7 +300,7 @@ app.post('/api/send-otp', async (req, res) => {
   try {
     const info = await transporter.sendMail(mailOptions);
     console.log(` [LIVE OTP DISPATCHED] Destination: ${cleanTo} | OTP Code: ${otp} | MsgID: ${info.messageId}`);
-    return res.status(200).json({ success: true, messageId: info.messageId, otp: otp });
+    return res.status(200).json({ success: true, messageId: info.messageId });
   } catch (error) {
     console.warn(
       ` [DEVELOPMENT / DISPATCH FALLBACK] Live SMTP dispatch failed (${error.message}). Simulating OTP for testing.`
@@ -935,6 +935,10 @@ app.get('*', (req, res) => {
   res.sendFile(path.join(ROOT_DIR, 'index.html'));
 });
 
-app.listen(PORT, '0.0.0.0', () => {
-  console.log(` GuideHub running at http://127.0.0.1:${PORT} (http://localhost:${PORT})`);
-});
+if (!process.env.VERCEL) {
+  app.listen(PORT, '0.0.0.0', () => {
+    console.log(` GuideHub running at http://127.0.0.1:${PORT} (http://localhost:${PORT})`);
+  });
+}
+
+export default app;
