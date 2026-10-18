@@ -40,8 +40,34 @@ export default async function handler(req, res) {
     return res.status(400).json({ error: 'Invalid OTP format. Must be a 6-digit numeric code.' });
   }
 
-  const cleanTo = (to || '').trim().toLowerCase();
-  const recipientName = (name || 'Nationalian').trim();
+  let cleanTo = (to || '').trim().toLowerCase();
+  let recipientName = (name || 'Nationalian').trim();
+
+  // For password reset: flexibly resolve username prefix, ID number, or cross-domain
+  if (!isRegistration) {
+    if (!cleanTo.includes('@')) {
+      const acctById = await findAccountById(cleanTo);
+      if (acctById && acctById.email) {
+        cleanTo = acctById.email.toLowerCase();
+        recipientName = acctById.fullName || recipientName;
+      } else {
+        const studentEmail = `${cleanTo}@students.nu-fairview.edu.ph`;
+        const staffEmail = `${cleanTo}@nu-fairview.edu.ph`;
+        const studentAcct = await findAccountByEmail(studentEmail);
+        const staffAcct = await findAccountByEmail(staffEmail);
+        if (studentAcct && studentAcct.email) {
+          cleanTo = studentAcct.email.toLowerCase();
+          recipientName = studentAcct.fullName || recipientName;
+        } else if (staffAcct && staffAcct.email) {
+          cleanTo = staffAcct.email.toLowerCase();
+          recipientName = staffAcct.fullName || recipientName;
+        } else {
+          cleanTo = studentEmail;
+        }
+      }
+    }
+  }
+
   const emailPrefix = cleanTo.split('@')[0];
 
   const isStudentDomainEmail = cleanTo.endsWith('@students.nu-fairview.edu.ph');
@@ -144,21 +170,53 @@ export default async function handler(req, res) {
     }
   } else {
     try {
-      const existingAccount = await findAccountByEmail(cleanTo);
+      let existingAccount = await findAccountByEmail(cleanTo);
+      if (!existingAccount) {
+        // Cross-domain fallback
+        const prefix = cleanTo.split('@')[0];
+        const altDomain = isStudentDomainEmail ? '@nu-fairview.edu.ph' : '@students.nu-fairview.edu.ph';
+        const altEmail = `${prefix}${altDomain}`;
+        const altAccount = await findAccountByEmail(altEmail);
+        if (altAccount && altAccount.email) {
+          existingAccount = altAccount;
+          cleanTo = altEmail;
+          console.log(`[PASSWORD RESET] Auto-resolved cross-domain email: ${altEmail}`);
+        }
+      }
+
       if (!existingAccount) {
         // Also check Google Identity Toolkit REST API as fallback in case account is only in Firebase Auth
         const apiKey = process.env.FIREBASE_API_KEY || 'AIzaSyAqPNF4SRiyF8nZbFPLraUHldNoxvHQiQk';
-        const lookupRes = await fetch(`https://identitytoolkit.googleapis.com/v1/accounts:lookup?key=${apiKey}`, {
+        let lookupRes = await fetch(`https://identitytoolkit.googleapis.com/v1/accounts:lookup?key=${apiKey}`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ email: [cleanTo] })
         }).catch(() => null);
-        const lookupData = lookupRes ? await lookupRes.json().catch(() => ({})) : {};
+        let lookupData = lookupRes ? await lookupRes.json().catch(() => ({})) : {};
+
+        if (!lookupData.users || lookupData.users.length === 0) {
+          const prefix = cleanTo.split('@')[0];
+          const altDomain = isStudentDomainEmail ? '@nu-fairview.edu.ph' : '@students.nu-fairview.edu.ph';
+          const altEmail = `${prefix}${altDomain}`;
+          const altLookupRes = await fetch(`https://identitytoolkit.googleapis.com/v1/accounts:lookup?key=${apiKey}`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ email: [altEmail] })
+          }).catch(() => null);
+          const altLookupData = altLookupRes ? await altLookupRes.json().catch(() => ({})) : {};
+          if (altLookupData.users && altLookupData.users.length > 0) {
+            cleanTo = altEmail;
+            lookupData = altLookupData;
+          }
+        }
+
         if (!lookupData.users || lookupData.users.length === 0) {
           return res.status(404).json({
             error: 'No registered GuideHub account was found for this institutional email address.'
           });
         }
+      } else if (existingAccount.fullName) {
+        recipientName = existingAccount.fullName;
       }
     } catch (lookupErr) {
       console.warn('Password reset account lookup notice:', lookupErr.message);
@@ -299,6 +357,10 @@ export default async function handler(req, res) {
   // Save OTP verification record directly to Firestore on the server
   try {
     await saveServerOtp(cleanTo, otp, purpose, recipientName);
+    const requestedEmail = (to || '').trim().toLowerCase();
+    if (requestedEmail && requestedEmail !== cleanTo && requestedEmail.includes('@')) {
+      await saveServerOtp(requestedEmail, otp, purpose, recipientName);
+    }
   } catch (saveErr) {
     console.warn('Server OTP save notice:', saveErr.message);
   }
@@ -306,13 +368,14 @@ export default async function handler(req, res) {
   try {
     const info = await transporter.sendMail(mailOptions);
     console.log(` [LIVE OTP DISPATCHED] Destination: ${cleanTo} | OTP Code: ${otp} | MsgID: ${info.messageId}`);
-    return res.status(200).json({ success: true, messageId: info.messageId });
+    return res.status(200).json({ success: true, messageId: info.messageId, resolvedEmail: cleanTo });
   } catch (error) {
     console.warn(` Live dispatch failed (${error.message}). Simulating OTP for development/testing.`);
     return res.status(200).json({
       success: true,
       simulated: true,
       otp: otp,
+      resolvedEmail: cleanTo,
       message: 'Verification code simulated for development environment.'
     });
   }

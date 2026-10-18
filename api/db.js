@@ -129,29 +129,40 @@ export async function verifyServerOtp(rawEmail, rawOtp) {
   }
   try {
     const otpRef = doc(clientDb, 'otpVerifications', cleanEmail);
-    const snap = await getDoc(otpRef);
+    let snap = await getDoc(otpRef);
     if (!snap.exists()) {
-      return {
-        valid: false,
-        status: 400,
-        error: 'No active verification code found for this email. Please request a new OTP code.'
-      };
+      // Check cross-domain as fallback (student vs staff domain)
+      const prefix = cleanEmail.split('@')[0];
+      const altDomain = cleanEmail.endsWith('@students.nu-fairview.edu.ph')
+        ? '@nu-fairview.edu.ph'
+        : '@students.nu-fairview.edu.ph';
+      const altRef = doc(clientDb, 'otpVerifications', `${prefix}${altDomain}`);
+      const altSnap = await getDoc(altRef);
+      if (altSnap.exists()) {
+        snap = altSnap;
+      } else {
+        return {
+          valid: false,
+          status: 400,
+          error: 'No active verification code found for this email. Please request a new OTP code.'
+        };
+      }
     }
     const data = snap.data();
     if ((data.attempts || 0) >= 3) {
-      await deleteDoc(otpRef).catch(() => {});
+      await deleteDoc(snap.ref).catch(() => {});
       return { valid: false, status: 429, error: 'Maximum failed attempts exceeded (3). Please request a new recovery code.' };
     }
     if (Date.now() > data.expiresAt) {
-      await deleteDoc(otpRef).catch(() => {});
+      await deleteDoc(snap.ref).catch(() => {});
       return { valid: false, status: 400, error: 'Verification code has expired (5-minute limit). Please request a new code.' };
     }
     if (String(data.code) !== cleanCode) {
       const nextAttempts = (data.attempts || 0) + 1;
-      await updateDoc(otpRef, { attempts: nextAttempts }).catch(() => {});
+      await updateDoc(snap.ref, { attempts: nextAttempts }).catch(() => {});
       return { valid: false, status: 400, error: `Incorrect verification code. ${Math.max(0, 3 - nextAttempts)} attempt(s) remaining.` };
     }
-    await deleteDoc(otpRef).catch(() => {});
+    await deleteDoc(snap.ref).catch(() => {});
     return { valid: true };
   } catch (err) {
     console.warn('[WARNING] Server OTP verification notice:', err.message);

@@ -18,6 +18,7 @@ import {
   findAccountById,
   findAccountByFullName,
   verifyServerOtp,
+  saveServerOtp,
   escapeHtml
 } from './db.js';
 
@@ -115,8 +116,34 @@ app.post('/api/send-otp', async (req, res) => {
     return res.status(400).json({ error: 'Invalid OTP format. Must be a 6-digit numeric code.' });
   }
 
-  const cleanTo = (to || '').trim().toLowerCase();
-  const recipientName = (name || 'Nationalian').trim();
+  let cleanTo = (to || '').trim().toLowerCase();
+  let recipientName = (name || 'Nationalian').trim();
+
+  // For password reset: flexibly resolve username prefix, ID number, or cross-domain
+  if (!isRegistration) {
+    if (!cleanTo.includes('@')) {
+      const acctById = await findAccountById(cleanTo);
+      if (acctById && acctById.email) {
+        cleanTo = acctById.email.toLowerCase();
+        recipientName = acctById.fullName || recipientName;
+      } else {
+        const studentEmail = `${cleanTo}@students.nu-fairview.edu.ph`;
+        const staffEmail = `${cleanTo}@nu-fairview.edu.ph`;
+        const studentAcct = await findAccountByEmail(studentEmail);
+        const staffAcct = await findAccountByEmail(staffEmail);
+        if (studentAcct && studentAcct.email) {
+          cleanTo = studentAcct.email.toLowerCase();
+          recipientName = studentAcct.fullName || recipientName;
+        } else if (staffAcct && staffAcct.email) {
+          cleanTo = staffAcct.email.toLowerCase();
+          recipientName = staffAcct.fullName || recipientName;
+        } else {
+          cleanTo = studentEmail;
+        }
+      }
+    }
+  }
+
   const emailPrefix = cleanTo.split('@')[0];
 
   const isStudentDomainEmail = cleanTo.endsWith('@students.nu-fairview.edu.ph');
@@ -213,11 +240,34 @@ app.post('/api/send-otp', async (req, res) => {
     }
   } else {
     try {
-      const existingAccount = await findAccountByEmail(cleanTo);
+      let existingAccount = await findAccountByEmail(cleanTo);
+      if (!existingAccount) {
+        const prefix = cleanTo.split('@')[0];
+        const altDomain = isStudentDomainEmail ? '@nu-fairview.edu.ph' : '@students.nu-fairview.edu.ph';
+        const altEmail = `${prefix}${altDomain}`;
+        const altAccount = await findAccountByEmail(altEmail);
+        if (altAccount && altAccount.email) {
+          existingAccount = altAccount;
+          cleanTo = altEmail;
+          console.log(`[PASSWORD RESET] Auto-resolved cross-domain email: ${altEmail}`);
+        }
+      }
+
+      if (!existingAccount) {
+        if (isFirebaseAdminInitialized && adminAuth) {
+          try {
+            const adminUser = await adminAuth.getUserByEmail(cleanTo).catch(() => null);
+            if (adminUser) existingAccount = { email: cleanTo, fullName: adminUser.displayName || 'Nationalian' };
+          } catch (e) {}
+        }
+      }
+
       if (!existingAccount) {
         return res.status(404).json({
           error: 'No registered GuideHub account was found for this institutional email address.'
         });
+      } else if (existingAccount.fullName) {
+        recipientName = existingAccount.fullName;
       }
     } catch (err) {
       console.warn('[WARNING] Password reset account lookup notice:', err.message);
@@ -297,10 +347,21 @@ app.post('/api/send-otp', async (req, res) => {
     }
   };
 
+  // Save OTP verification record directly to Firestore on the server
+  try {
+    await saveServerOtp(cleanTo, otp, purpose, recipientName);
+    const requestedEmail = (to || '').trim().toLowerCase();
+    if (requestedEmail && requestedEmail !== cleanTo && requestedEmail.includes('@')) {
+      await saveServerOtp(requestedEmail, otp, purpose, recipientName);
+    }
+  } catch (saveErr) {
+    console.warn('Server OTP save notice:', saveErr.message);
+  }
+
   try {
     const info = await transporter.sendMail(mailOptions);
     console.log(` [LIVE OTP DISPATCHED] Destination: ${cleanTo} | OTP Code: ${otp} | MsgID: ${info.messageId}`);
-    return res.status(200).json({ success: true, messageId: info.messageId });
+    return res.status(200).json({ success: true, messageId: info.messageId, resolvedEmail: cleanTo });
   } catch (error) {
     console.warn(
       ` [DEVELOPMENT / DISPATCH FALLBACK] Live SMTP dispatch failed (${error.message}). Simulating OTP for testing.`
@@ -312,6 +373,7 @@ app.post('/api/send-otp', async (req, res) => {
       success: true,
       simulated: true,
       otp: otp,
+      resolvedEmail: cleanTo,
       message: 'Email service notice: Verification code simulated for local environment.'
     });
   }
@@ -482,11 +544,20 @@ app.post('/api/reset-password', async (req, res) => {
         userRecord = await auth.getUserByEmail(normalizedEmail);
       } catch (userErr) {
         if (userErr.code === 'auth/user-not-found') {
-          return res
-            .status(404)
-            .json({ success: false, error: 'No registered account found with this institutional email.' });
+          const prefix = normalizedEmail.split('@')[0];
+          const altDomain = normalizedEmail.endsWith('@students.nu-fairview.edu.ph')
+            ? '@nu-fairview.edu.ph'
+            : '@students.nu-fairview.edu.ph';
+          try {
+            userRecord = await auth.getUserByEmail(`${prefix}${altDomain}`);
+          } catch (e2) {
+            return res
+              .status(404)
+              .json({ success: false, error: 'No registered account found with this institutional email.' });
+          }
+        } else {
+          throw userErr;
         }
-        throw userErr;
       }
 
       await auth.updateUser(userRecord.uid, {
@@ -499,13 +570,29 @@ app.post('/api/reset-password', async (req, res) => {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email: [normalizedEmail] })
       });
-      const lookupData = await lookupRes.json();
-      if (!lookupData.users || lookupData.users.length === 0) {
+      let lookupData = await lookupRes.json();
+      let users = lookupData.users;
+      if (!users || users.length === 0) {
+        const prefix = normalizedEmail.split('@')[0];
+        const altDomain = normalizedEmail.endsWith('@students.nu-fairview.edu.ph')
+          ? '@nu-fairview.edu.ph'
+          : '@students.nu-fairview.edu.ph';
+        const altLookupRes = await fetch(`https://identitytoolkit.googleapis.com/v1/accounts:lookup?key=${apiKey}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email: [`${prefix}${altDomain}`] })
+        });
+        const altLookupData = await altLookupRes.json();
+        if (altLookupData.users && altLookupData.users.length > 0) {
+          users = altLookupData.users;
+        }
+      }
+      if (!users || users.length === 0) {
         return res
           .status(404)
           .json({ success: false, error: 'No registered account found with this institutional email.' });
       }
-      const localId = lookupData.users[0].localId;
+      const localId = users[0].localId;
       const updateRes = await fetch(`https://identitytoolkit.googleapis.com/v1/accounts:update?key=${apiKey}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },

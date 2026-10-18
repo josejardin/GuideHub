@@ -357,13 +357,12 @@ export async function sendInstitutionalOTP(
       throw new Error(result.error || `Email delivery failed for ${cleanEmail} (Status: ${res.status}).`);
     }
 
-    const finalOtp = result.otp || otp;
+    const targetEmail = (result.resolvedEmail || cleanEmail).toLowerCase();
 
     // 2. Only save OTP verification record to Firestore upon confirmed successful dispatch
     if (db) {
       try {
-        const otpDocRef = doc(db, 'otpVerifications', cleanEmail);
-        await setDoc(otpDocRef, {
+        await setDoc(doc(db, 'otpVerifications', targetEmail), {
           code: finalOtp,
           createdAt: now,
           expiresAt: expiresAt,
@@ -372,13 +371,25 @@ export async function sendInstitutionalOTP(
           recipientName: recipientName,
           simulated: !!result.simulated
         });
+        if (cleanEmail !== targetEmail) {
+          await setDoc(doc(db, 'otpVerifications', cleanEmail), {
+            code: finalOtp,
+            createdAt: now,
+            expiresAt: expiresAt,
+            attempts: 0,
+            purpose: purpose,
+            recipientName: recipientName,
+            simulated: !!result.simulated
+          }).catch(() => {});
+        }
       } catch (fsErr) {
         console.warn('Firestore record notice:', fsErr.message);
       }
     }
 
     return {
-      email: cleanEmail,
+      email: targetEmail,
+      resolvedEmail: targetEmail,
       expiresAt: expiresAt,
       simulated: !!result.simulated,
       otp: finalOtp
@@ -539,20 +550,31 @@ export async function verifyPasswordResetOTP(email, enteredCode, newPassword) {
   if (db) {
     try {
       const otpDocRef = doc(db, 'otpVerifications', cleanEmail);
-      const otpSnap = await getDoc(otpDocRef);
+      let otpSnap = await getDoc(otpDocRef);
+      if (!otpSnap.exists()) {
+        const prefix = cleanEmail.split('@')[0];
+        const altDomain = cleanEmail.endsWith('@students.nu-fairview.edu.ph')
+          ? '@nu-fairview.edu.ph'
+          : '@students.nu-fairview.edu.ph';
+        const altRef = doc(db, 'otpVerifications', `${prefix}${altDomain}`);
+        const altSnap = await getDoc(altRef);
+        if (altSnap.exists()) {
+          otpSnap = altSnap;
+        }
+      }
       if (otpSnap.exists()) {
         const data = otpSnap.data();
         if ((data.attempts || 0) >= 3) {
-          await deleteDoc(otpDocRef).catch(() => {});
+          await deleteDoc(otpSnap.ref).catch(() => {});
           throw new Error('Maximum failed attempts exceeded (3). Please request a new recovery code.');
         }
         if (Date.now() > data.expiresAt) {
-          await deleteDoc(otpDocRef).catch(() => {});
+          await deleteDoc(otpSnap.ref).catch(() => {});
           throw new Error('Recovery code has expired (5-minute limit). Please request a new code.');
         }
         if (data.code !== cleanCode) {
           const nextAttempts = (data.attempts || 0) + 1;
-          await updateDoc(otpDocRef, { attempts: nextAttempts }).catch(() => {});
+          await updateDoc(otpSnap.ref, { attempts: nextAttempts }).catch(() => {});
           throw new Error(`Incorrect recovery code. ${3 - nextAttempts} attempt(s) remaining.`);
         }
       }
