@@ -244,6 +244,11 @@ document.addEventListener('DOMContentLoaded', () => {
     renderAgenda();
   });
 
+  subscribeAllCounselorSchedules(() => {
+    renderAgenda();
+    renderAvailabilityGrid();
+  });
+
   const DAY_NAMES = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
   const SLOTS = [
     '8:00 AM - 9:00 AM',
@@ -282,31 +287,7 @@ document.addEventListener('DOMContentLoaded', () => {
       const aptCId = apt.counselorId;
       const aptCName = (apt.counselorName || '').toLowerCase();
 
-      // 1. Explicitly assigned to ME (Mark)
-      const isAssignedToMe =
-        aptCId === currentCounselorId ||
-        aptCId === currentEmail ||
-        (aptCName && currentName && (aptCName.includes(currentName) || currentName.includes(aptCName)));
-
-      if (isAssignedToMe) {
-        return true;
-      }
-
-      // 2. Explicitly assigned to ANOTHER specific counselor (e.g. Claire)
-      const isAssignedToOther = aptCId && aptCId !== 'any' && !isAssignedToMe;
-      if (isAssignedToOther) {
-        return false; // Other counselor's scheduled consultation! Never show to Mark!
-      }
-
-      // 3. Unassigned / Pending appointment ('any'):
-      // Exclude if student's gender preference does not match my gender
-      if (apt.counselorGenderPreference && apt.counselorGenderPreference !== 'Any' && currentUser.gender) {
-        if (apt.counselorGenderPreference.toLowerCase() !== currentUser.gender.toLowerCase()) {
-          return false;
-        }
-      }
-
-      // Exclude if I have BLOCKED this day/date & time slot
+      // Exclude if I have BLOCKED this day/date & time slot (never show in my agenda)
       const aptDay = apt.date ? DAY_NAMES[new Date(`${apt.date}T00:00:00`).getDay()] : '';
       const normAptSlot = normalizeTimeSlot(apt.timeSlot);
       const slot12h = formatTimeSlot12h(apt.timeSlot);
@@ -319,8 +300,31 @@ document.addEventListener('DOMContentLoaded', () => {
         blockedSet.has(`${apt.date}_${slot12h}`);
 
       if (isMyBlockedSlot) {
-        // I have blocked this schedule, so this pending unassigned request is not for me
-        return false;
+        return false; // Slot is blocked in my schedule - never show in my agenda!
+      }
+
+      // 1. Explicitly assigned to ME (e.g. Robert / Mark)
+      const isAssignedToMe =
+        aptCId === currentCounselorId ||
+        aptCId === currentEmail ||
+        (aptCName && currentName && (aptCName.includes(currentName) || currentName.includes(aptCName)));
+
+      if (isAssignedToMe) {
+        return true;
+      }
+
+      // 2. Explicitly assigned to ANOTHER specific counselor (e.g. Claire)
+      const isAssignedToOther = aptCId && aptCId !== 'any' && !isAssignedToMe;
+      if (isAssignedToOther) {
+        return false; // Other counselor's scheduled consultation! Never show to me!
+      }
+
+      // 3. Unassigned / Pending appointment ('any'):
+      // Exclude if student's gender preference does not match my gender
+      if (apt.counselorGenderPreference && apt.counselorGenderPreference !== 'Any' && currentUser.gender) {
+        if (apt.counselorGenderPreference.toLowerCase() !== currentUser.gender.toLowerCase()) {
+          return false;
+        }
       }
 
       return true;
@@ -788,13 +792,27 @@ document.addEventListener('DOMContentLoaded', () => {
             const aptDay = targetApt.date ? DAY_NAMES[new Date(`${targetApt.date}T00:00:00`).getDay()] : '';
             const normAptSlot = normalizeTimeSlot(targetApt.timeSlot);
             const slot12h = formatTimeSlot12h(targetApt.timeSlot);
+
+            const myBlockedRecords = await getCounselorBlockedSlots(currentUser.uid, [currentUser.uid, currentUser.id, currentUser.authUid]);
+            const liveBlockedSet = new Set();
+            myBlockedRecords.forEach(b => {
+              liveBlockedSet.add(`${b.dayOfWeek}_${b.timeSlot}`);
+              liveBlockedSet.add(`${b.dayOfWeek}_${normalizeTimeSlot(b.timeSlot)}`);
+              liveBlockedSet.add(`${b.dayOfWeek}_${formatTimeSlot12h(b.timeSlot)}`);
+              if (b.date) {
+                liveBlockedSet.add(`${b.date}_${b.timeSlot}`);
+                liveBlockedSet.add(`${b.date}_${normalizeTimeSlot(b.timeSlot)}`);
+                liveBlockedSet.add(`${b.date}_${formatTimeSlot12h(b.timeSlot)}`);
+              }
+            });
+
             const hasBlockedConflict =
-              blockedSet.has(`${aptDay}_${targetApt.timeSlot}`) ||
-              blockedSet.has(`${aptDay}_${normAptSlot}`) ||
-              blockedSet.has(`${aptDay}_${slot12h}`) ||
-              blockedSet.has(`${targetApt.date}_${targetApt.timeSlot}`) ||
-              blockedSet.has(`${targetApt.date}_${normAptSlot}`) ||
-              blockedSet.has(`${targetApt.date}_${slot12h}`);
+              liveBlockedSet.has(`${aptDay}_${targetApt.timeSlot}`) ||
+              liveBlockedSet.has(`${aptDay}_${normAptSlot}`) ||
+              liveBlockedSet.has(`${aptDay}_${slot12h}`) ||
+              liveBlockedSet.has(`${targetApt.date}_${targetApt.timeSlot}`) ||
+              liveBlockedSet.has(`${targetApt.date}_${normAptSlot}`) ||
+              liveBlockedSet.has(`${targetApt.date}_${slot12h}`);
 
             if (hasBlockedConflict) {
               statusBtn.disabled = false;

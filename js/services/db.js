@@ -361,6 +361,7 @@ export function subscribeAllAppointments(callback) {
       unsubFirestore = onSnapshot(
         q,
         snap => {
+          clearAvailabilityCaches();
           firestoreList = snap.docs.map(d => ({ id: d.id, ...d.data() }));
           deliver();
         },
@@ -1376,7 +1377,7 @@ export async function getCounselorBlockedSlots(counselorId, fallbackIds = []) {
   const ids = Array.from(new Set([counselorId, ...(Array.isArray(fallbackIds) ? fallbackIds : [fallbackIds])].filter(Boolean)));
   const cacheKey = ids.slice().sort().join('_');
   const now = Date.now();
-  if (_blockedSlotsCache.has(cacheKey) && (now - (_blockedSlotsCacheTime.get(cacheKey) || 0) < 30000)) {
+  if (_blockedSlotsCache.has(cacheKey) && (now - (_blockedSlotsCacheTime.get(cacheKey) || 0) < 500)) {
     return _blockedSlotsCache.get(cacheKey);
   }
   let allRecords = [];
@@ -1405,20 +1406,20 @@ export async function getCounselorBlockedSlots(counselorId, fallbackIds = []) {
   const localList = Object.values(state.counselorSchedules || {}).filter(s => s && ids.includes(s.counselorId));
   const combined = [...localList, ...allRecords];
 
-  // Deduplicate by dayOfWeek + normalizeTimeSlot(timeSlot), taking the record with the newest updatedAt
+  // Deduplicate by (dayOfWeek or date) + normalizeTimeSlot(timeSlot), taking the record with the newest updatedAt
   const slotMap = new Map();
   combined.forEach(rec => {
-    if (!rec || !rec.dayOfWeek || !rec.timeSlot) return;
-    if (rec.leaveId || (rec.date && !rec.isRoutine)) return;
+    if (!rec || !rec.timeSlot) return;
+    if (rec.leaveId) return;
     const norm = normalizeTimeSlot(rec.timeSlot);
-    const key = `${rec.dayOfWeek}_${norm}`;
+    const key = `${rec.dayOfWeek || rec.date || 'any'}_${norm}`;
     const existing = slotMap.get(key);
     if (!existing || new Date(rec.updatedAt || 0) >= new Date(existing.updatedAt || 0)) {
       slotMap.set(key, rec);
     }
   });
 
-  const result = Array.from(slotMap.values()).filter(s => s.isBlocked === true);
+  const result = Array.from(slotMap.values()).filter(s => s.isBlocked === true || s.isBlocked === 'true');
   _blockedSlotsCache.set(cacheKey, result);
   _blockedSlotsCacheTime.set(cacheKey, now);
   return result;
@@ -1517,6 +1518,11 @@ export async function toggleCounselorBlockedSlot(counselorId, dayOfWeek, timeSlo
     console.warn('Firestore toggleCounselorBlockedSlot fallback:', err.message);
   }
 
+  try {
+    window.dispatchEvent(new CustomEvent('guidehub_data_changed'));
+    window.dispatchEvent(new CustomEvent('guidehub_schedule_changed'));
+  } catch (e) {}
+
   return record;
 }
 
@@ -1525,13 +1531,14 @@ export function subscribeAllCounselorSchedules(callback) {
   let unsubFirestore = null;
 
   const deliver = () => {
+    clearAvailabilityCaches();
     const state = getLocalState();
     const merged = { ...(state.counselorSchedules || {}), ...firestoreMap };
     const slotMap = new Map();
     Object.values(merged).forEach(rec => {
-      if (!rec || !rec.counselorId || !rec.dayOfWeek || !rec.timeSlot) return;
+      if (!rec || !rec.counselorId || !rec.timeSlot) return;
       const norm = normalizeTimeSlot(rec.timeSlot);
-      const key = `${rec.counselorId}_${rec.dayOfWeek}_${norm}`;
+      const key = `${rec.counselorId}_${rec.dayOfWeek || rec.date || 'any'}_${norm}`;
       const existing = slotMap.get(key);
       if (!existing || new Date(rec.updatedAt || 0) >= new Date(existing.updatedAt || 0)) {
         slotMap.set(key, rec);
@@ -1546,6 +1553,7 @@ export function subscribeAllCounselorSchedules(callback) {
       unsubFirestore = onSnapshot(
         q,
         snap => {
+          clearAvailabilityCaches();
           firestoreMap = {};
           snap.docs.forEach(d => {
             firestoreMap[d.id] = d.data();
@@ -1563,11 +1571,13 @@ export function subscribeAllCounselorSchedules(callback) {
   }
 
   window.addEventListener('guidehub_data_changed', deliver);
+  window.addEventListener('guidehub_schedule_changed', deliver);
   deliver();
 
   return () => {
     if (unsubFirestore) unsubFirestore();
     window.removeEventListener('guidehub_data_changed', deliver);
+    window.removeEventListener('guidehub_schedule_changed', deliver);
   };
 }
 
