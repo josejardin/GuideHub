@@ -764,7 +764,7 @@ document.addEventListener('DOMContentLoaded', () => {
         counselorSelect.innerHTML = '<option value="" disabled selected>No counselors available for this selection</option>';
         if (noticeEl) {
           const prefDesc = chosenPref !== 'Any' ? `${chosenPref} ` : '';
-          noticeEl.textContent = `No ${prefDesc}guidance counselors are available at ${formatTimeSlot12h(selectedSlot)} on ${dateInput.value}. Please choose another schedule or select another gender preference.`;
+          noticeEl.textContent = `All ${prefDesc}guidance counselors are fully booked for scheduled consultations at ${formatTimeSlot12h(selectedSlot)} on ${dateInput.value}. Please choose another time slot or select another counselor preference.`;
           noticeEl.classList.remove('hidden');
         }
         return;
