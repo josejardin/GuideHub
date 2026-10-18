@@ -1331,21 +1331,24 @@ export async function updateCaseStatus(caseId, status, extra = {}) {
   }
 }
 
-export async function getCounselorBlockedSlots(counselorId) {
+export async function getCounselorBlockedSlots(counselorId, fallbackIds = []) {
+  const ids = Array.from(new Set([counselorId, ...(Array.isArray(fallbackIds) ? fallbackIds : [fallbackIds])].filter(Boolean)));
   let allRecords = [];
   try {
-    if (db && counselorId) {
-      const q = query(collection(db, 'counselorSchedules'), where('counselorId', '==', counselorId));
-      const snap = await getDocs(q);
-      if (!snap.empty) {
-        const state = getLocalState();
-        snap.docs.forEach(d => {
-          state.counselorSchedules[d.id] = d.data();
-        });
-        try {
-          localStorage.setItem(LOCAL_STORE_KEY, JSON.stringify(state));
-        } catch (e) {}
-        allRecords = snap.docs.map(d => d.data());
+    if (db && ids.length > 0) {
+      for (const id of ids) {
+        const q = query(collection(db, 'counselorSchedules'), where('counselorId', '==', id));
+        const snap = await getDocs(q);
+        if (!snap.empty) {
+          const state = getLocalState();
+          snap.docs.forEach(d => {
+            state.counselorSchedules[d.id] = d.data();
+          });
+          try {
+            localStorage.setItem(LOCAL_STORE_KEY, JSON.stringify(state));
+          } catch (e) {}
+          allRecords.push(...snap.docs.map(d => d.data()));
+        }
       }
     }
   } catch (err) {
@@ -1353,7 +1356,7 @@ export async function getCounselorBlockedSlots(counselorId) {
   }
 
   const state = getLocalState();
-  const localList = Object.values(state.counselorSchedules || {}).filter(s => s && s.counselorId === counselorId);
+  const localList = Object.values(state.counselorSchedules || {}).filter(s => s && ids.includes(s.counselorId));
   const combined = [...localList, ...allRecords];
 
   // Deduplicate by dayOfWeek + normalizeTimeSlot(timeSlot), taking the record with the newest updatedAt

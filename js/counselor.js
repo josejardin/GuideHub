@@ -236,7 +236,8 @@ document.addEventListener('DOMContentLoaded', () => {
     const currentName = (currentUser.fullName || '').toLowerCase();
 
     // Fetch this counselor's blocked slots (support both 12h and 24h formats)
-    const blockedRecords = await getCounselorBlockedSlots(currentUser.uid);
+    const counselorAltIds = [currentUser.uid, currentUser.id, currentUser.authUid, 'usr_counselor_mark_d'].filter(Boolean);
+    const blockedRecords = await getCounselorBlockedSlots(currentUser.uid, counselorAltIds);
     const blockedSet = new Set();
     blockedRecords.forEach(b => {
       blockedSet.add(`${b.dayOfWeek}_${b.timeSlot}`);
@@ -347,7 +348,10 @@ document.addEventListener('DOMContentLoaded', () => {
     // Render Banner for Blocked Slots on the Selected Date
     const agendaBlockedBanner = document.getElementById('agenda-blocked-banner');
     if (agendaBlockedBanner) {
-      const selectedDayOfWeek = selectedDate ? DAY_NAMES[new Date(`${selectedDate}T00:00:00`).getDay()] : '';
+      const dateParts = selectedDate ? selectedDate.split('-') : [];
+      const selectedDayOfWeek = dateParts.length === 3
+        ? DAY_NAMES[new Date(parseInt(dateParts[0], 10), parseInt(dateParts[1], 10) - 1, parseInt(dateParts[2], 10)).getDay()]
+        : '';
       const blockedSlotsOnDate = SLOTS.filter(slot => {
         const norm = normalizeTimeSlot(slot);
         const slot12 = formatTimeSlot12h(slot);
@@ -523,7 +527,11 @@ document.addEventListener('DOMContentLoaded', () => {
       } else if (statusFilterVal !== 'ALL') {
         emptyMsg = `No ${statusFilterVal} consultations found for ${selectedDate}.`;
       } else {
-        emptyMsg = `No consultations found for ${selectedDate}.`;
+        if (blockedSlotsOnDate.length > 0) {
+          emptyMsg = `No student consultations booked for ${selectedDate}. (Note: You have blocked ${blockedSlotsOnDate.join(', ')} in your weekly Availability Schedule, so students cannot book those hours.)`;
+        } else {
+          emptyMsg = `No consultations found for ${selectedDate}.`;
+        }
       }
       agendaList.innerHTML = `
         <div class="p-8 text-center text-slate-400 text-xs bg-white">
@@ -1004,11 +1012,23 @@ document.addEventListener('DOMContentLoaded', () => {
 
     if (remarksInput) {
       remarksInput.value = '';
+      remarksInput.classList.remove('border-rose-500', 'ring-2', 'ring-rose-200');
     }
+    const remarksError = document.getElementById('no-show-remarks-error');
+    if (remarksError) remarksError.classList.add('hidden');
 
     modalNoShowConfirm.classList.remove('hidden');
     if (window.lucide) window.lucide.createIcons();
   }
+
+  document.getElementById('no-show-remarks-input')?.addEventListener('input', e => {
+    const el = e.target;
+    if (el.value.trim()) {
+      el.classList.remove('border-rose-500', 'ring-2', 'ring-rose-200');
+      const err = document.getElementById('no-show-remarks-error');
+      if (err) err.classList.add('hidden');
+    }
+  });
 
   document.getElementById('no-show-copy-phone')?.addEventListener('click', () => {
     const phoneText = document.getElementById('no-show-student-phone')?.textContent || '';
@@ -1029,7 +1049,17 @@ document.addEventListener('DOMContentLoaded', () => {
   btnExecuteNoShow?.addEventListener('click', async () => {
     if (!pendingNoShowAptId) return;
     const aptId = pendingNoShowAptId;
-    const remarks = document.getElementById('no-show-remarks-input')?.value.trim() || 'Student did not arrive for scheduled consultation session.';
+    const remarksInput = document.getElementById('no-show-remarks-input');
+    const remarksError = document.getElementById('no-show-remarks-error');
+    const remarks = (remarksInput?.value || '').trim();
+
+    if (!remarks) {
+      if (remarksError) remarksError.classList.remove('hidden');
+      remarksInput?.classList.add('border-rose-500', 'ring-2', 'ring-rose-200');
+      remarksInput?.focus();
+      showToast('Please state outreach remarks or contact attempt details before confirming No-Show.', 'warning', 'Remarks Required');
+      return;
+    }
 
     btnExecuteNoShow.disabled = true;
     btnExecuteNoShow.classList.add('opacity-70', 'cursor-wait');
