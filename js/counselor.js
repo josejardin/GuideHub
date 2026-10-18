@@ -108,18 +108,24 @@ document.addEventListener('DOMContentLoaded', () => {
     agendaDatePicker.value = todayIso;
   }
   const agendaStatusFilter = document.getElementById('agenda-status-filter');
-  agendaStatusFilter?.addEventListener('change', () => {
-    renderAgenda();
+  ['change', 'input'].forEach(evt => {
+    agendaStatusFilter?.addEventListener(evt, () => {
+      activeViewFilter = 'selected_date';
+      updateFilterUI();
+      renderAgenda();
+    });
   });
 
   agendaSearchInput?.addEventListener('input', () => {
     renderAgenda();
   });
 
-  agendaDatePicker?.addEventListener('change', () => {
-    activeViewFilter = 'selected_date';
-    updateFilterUI();
-    renderAgenda();
+  ['change', 'input'].forEach(evt => {
+    agendaDatePicker?.addEventListener(evt, () => {
+      activeViewFilter = 'selected_date';
+      updateFilterUI();
+      renderAgenda();
+    });
   });
 
   btnViewToday?.addEventListener('click', () => {
@@ -179,32 +185,37 @@ document.addEventListener('DOMContentLoaded', () => {
     if (activeViewFilter === 'today') {
       btnViewToday?.classList.add('bg-white', 'text-[#00205B]', 'font-bold', 'shadow-sm');
       btnViewToday?.classList.remove('text-slate-600');
-      agendaDateWrapper?.classList.add('opacity-50');
+      agendaDateWrapper?.classList.add('opacity-50', 'pointer-events-none');
       agendaStatusWrapper?.classList.add('opacity-50', 'pointer-events-none');
+      if (agendaDatePicker) agendaDatePicker.disabled = true;
       if (agendaStatusFilter) agendaStatusFilter.disabled = true;
     } else if (activeViewFilter === 'all_confirmed') {
       btnViewConfirmed?.classList.add('bg-white', 'text-[#00205B]', 'font-bold', 'shadow-sm');
       btnViewConfirmed?.classList.remove('text-slate-600');
-      agendaDateWrapper?.classList.add('opacity-50');
+      agendaDateWrapper?.classList.add('opacity-50', 'pointer-events-none');
       agendaStatusWrapper?.classList.add('opacity-50', 'pointer-events-none');
+      if (agendaDatePicker) agendaDatePicker.disabled = true;
       if (agendaStatusFilter) agendaStatusFilter.disabled = true;
     } else if (activeViewFilter === 'selected_date') {
       btnViewDate?.classList.add('bg-white', 'text-[#00205B]', 'font-bold', 'shadow-sm');
       btnViewDate?.classList.remove('text-slate-600');
-      agendaDateWrapper?.classList.remove('opacity-50');
+      agendaDateWrapper?.classList.remove('opacity-50', 'pointer-events-none');
       agendaStatusWrapper?.classList.remove('opacity-50', 'pointer-events-none');
+      if (agendaDatePicker) agendaDatePicker.disabled = false;
       if (agendaStatusFilter) agendaStatusFilter.disabled = false;
     } else if (activeViewFilter === 'all_pending') {
       btnViewPending?.classList.add('bg-white', 'text-[#00205B]', 'font-bold', 'shadow-sm');
       btnViewPending?.classList.remove('text-slate-600');
-      agendaDateWrapper?.classList.add('opacity-50');
+      agendaDateWrapper?.classList.add('opacity-50', 'pointer-events-none');
       agendaStatusWrapper?.classList.add('opacity-50', 'pointer-events-none');
+      if (agendaDatePicker) agendaDatePicker.disabled = true;
       if (agendaStatusFilter) agendaStatusFilter.disabled = true;
     } else if (activeViewFilter === 'all_cancelled') {
       btnViewCancelled?.classList.add('bg-white', 'text-[#00205B]', 'font-bold', 'shadow-sm');
       btnViewCancelled?.classList.remove('text-slate-600');
-      agendaDateWrapper?.classList.add('opacity-50');
+      agendaDateWrapper?.classList.add('opacity-50', 'pointer-events-none');
       agendaStatusWrapper?.classList.add('opacity-50', 'pointer-events-none');
+      if (agendaDatePicker) agendaDatePicker.disabled = true;
       if (agendaStatusFilter) agendaStatusFilter.disabled = true;
     }
   }
@@ -230,14 +241,19 @@ document.addEventListener('DOMContentLoaded', () => {
 
   async function renderAgenda() {
     if (!agendaList) return;
+    try {
+      const currentCounselorId = currentUser.uid;
+      const currentEmail = (currentUser.email || '').toLowerCase();
+      const currentName = (currentUser.fullName || '').toLowerCase();
 
-    const currentCounselorId = currentUser.uid;
-    const currentEmail = (currentUser.email || '').toLowerCase();
-    const currentName = (currentUser.fullName || '').toLowerCase();
-
-    // Fetch this counselor's blocked slots (support both 12h and 24h formats)
-    const counselorAltIds = [currentUser.uid, currentUser.id, currentUser.authUid, 'usr_counselor_mark_d'].filter(Boolean);
-    const blockedRecords = await getCounselorBlockedSlots(currentUser.uid, counselorAltIds);
+      // Fetch this counselor's blocked slots (support both 12h and 24h formats)
+      const counselorAltIds = [currentUser.uid, currentUser.id, currentUser.authUid, 'usr_counselor_mark_d'].filter(Boolean);
+      let blockedRecords = [];
+      try {
+        blockedRecords = await getCounselorBlockedSlots(currentUser.uid, counselorAltIds);
+      } catch (e) {
+        console.warn('Blocked slots fetch warning in renderAgenda:', e);
+      }
     const blockedSet = new Set();
     blockedRecords.forEach(b => {
       blockedSet.add(`${b.dayOfWeek}_${b.timeSlot}`);
@@ -524,14 +540,14 @@ document.addEventListener('DOMContentLoaded', () => {
         emptyMsg = 'No cancelled appointments on record.';
       } else if (statusFilterVal === 'ACTIVE') {
         emptyMsg = `No active consultations (Pending/Confirmed) for ${selectedDate}. Switch status to "All Statuses" to view completed or past consultations.`;
-      } else if (statusFilterVal !== 'ALL') {
-        emptyMsg = `No ${statusFilterVal} consultations found for ${selectedDate}.`;
-      } else {
+      } else if (statusFilterVal === 'ALL') {
         if (blockedSlotsOnDate.length > 0) {
           emptyMsg = `No student consultations booked for ${selectedDate}. (Note: You have blocked ${blockedSlotsOnDate.join(', ')} in your weekly Availability Schedule, so students cannot book those hours.)`;
         } else {
           emptyMsg = `No consultations found for ${selectedDate}.`;
         }
+      } else {
+        emptyMsg = `No ${statusFilterVal} consultations found for ${selectedDate}.`;
       }
       agendaList.innerHTML = `
         <div class="p-8 text-center text-slate-400 text-xs bg-white">
@@ -663,6 +679,9 @@ document.addEventListener('DOMContentLoaded', () => {
       .join('');
 
     if (window.lucide) window.lucide.createIcons();
+    } catch (err) {
+      console.error('renderAgenda failed:', err);
+    }
   }
 
   agendaList?.addEventListener('click', async e => {
@@ -2256,7 +2275,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
   async function renderAvailabilityGrid() {
     if (!availabilityGrid) return;
-    const blockedRecords = await getCounselorBlockedSlots(currentUser.uid);
+    const counselorAltIds = [currentUser.uid, currentUser.id, currentUser.authUid, 'usr_counselor_mark_d'].filter(Boolean);
+    const blockedRecords = await getCounselorBlockedSlots(currentUser.uid, counselorAltIds);
     const blockedSet = new Set();
     blockedRecords.forEach(b => {
       blockedSet.add(`${b.dayOfWeek}_${b.timeSlot}`);

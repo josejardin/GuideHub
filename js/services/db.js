@@ -514,39 +514,17 @@ export async function getAvailableCounselorsForSlot(date, timeSlot, genderPrefer
     const normSlot = normalizeTimeSlot(timeSlot);
     const slot12h = formatTimeSlot12h(timeSlot);
 
-    // 2. Local State Block Check using latest timestamp
-    const scheds = Object.values(state.counselorSchedules || {}).filter(
-      s => s && s.counselorId === cId && (s.dayOfWeek === dayOfWeek || s.date === date)
-    );
-    let latestSched = null;
-    scheds.forEach(s => {
-      if (normalizeTimeSlot(s.timeSlot) === normSlot || formatTimeSlot12h(s.timeSlot) === slot12h) {
-        if (!latestSched || new Date(s.updatedAt || 0) >= new Date(latestSched.updatedAt || 0)) {
-          latestSched = s;
-        }
-      }
+    // 2. Weekly Routine & Specific Schedule Block Check (Unified single source of truth)
+    const altIds = [cId, c.uid, c.id, c.authUid].filter(Boolean);
+    const blockedSlots = await getCounselorBlockedSlots(cId, altIds);
+    const isRoutineBlocked = blockedSlots.some(b => {
+      if (b.dayOfWeek && b.dayOfWeek !== dayOfWeek) return false;
+      if (b.date && b.date !== date) return false;
+      const bNorm = normalizeTimeSlot(b.timeSlot);
+      const b12 = formatTimeSlot12h(b.timeSlot);
+      return bNorm === normSlot || b12 === slot12h || b.timeSlot === timeSlot;
     });
-
-    if (latestSched !== null) {
-      if (latestSched.isBlocked === true) return true;
-    }
-
-    // 3. Firestore Block Check
-    if (db) {
-      try {
-        if (dayOfWeek) {
-          const daySnap = await getDoc(doc(db, 'counselorSchedules', `${cId}_${dayOfWeek}_${normSlot}`));
-          if (daySnap.exists()) return daySnap.data().isBlocked === true;
-
-          const daySnap12 = await getDoc(doc(db, 'counselorSchedules', `${cId}_${dayOfWeek}_${slot12h}`));
-          if (daySnap12.exists()) return daySnap12.data().isBlocked === true;
-        }
-        if (date) {
-          const dateSnap = await getDoc(doc(db, 'counselorSchedules', `${cId}_${date}_${normSlot}`));
-          if (dateSnap.exists()) return dateSnap.data().isBlocked === true;
-        }
-      } catch (e) {}
-    }
+    if (isRoutineBlocked) return true;
 
     return false;
   }
