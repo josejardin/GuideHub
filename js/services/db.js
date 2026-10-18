@@ -463,10 +463,9 @@ export async function getAvailableCounselorsForSlot(date, timeSlot, genderPrefer
   const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
   const dayOfWeek = date ? dayNames[new Date(`${date}T00:00:00`).getDay()] : '';
 
-  let activeApts = Object.values(state.appointments || {}).filter(apt => {
-    const st = (apt.status || '').toLowerCase();
-    return apt.date === date && apt.timeSlot === timeSlot && (st === 'pending' || st === 'confirmed');
-  });
+  let activeApts = Object.values(state.appointments || {}).filter(
+    apt => apt.date === date && apt.timeSlot === timeSlot && apt.status !== 'Cancelled' && apt.status !== 'No-Show'
+  );
 
   try {
     if (db) {
@@ -476,10 +475,7 @@ export async function getAvailableCounselorsForSlot(date, timeSlot, genderPrefer
         const normTargetSlot = normalizeTimeSlot(timeSlot);
         activeApts = snap.docs
           .map(d => ({ id: d.id, ...d.data() }))
-          .filter(apt => {
-            const st = (apt.status || '').toLowerCase();
-            return normalizeTimeSlot(apt.timeSlot) === normTargetSlot && (st === 'pending' || st === 'confirmed');
-          });
+          .filter(apt => normalizeTimeSlot(apt.timeSlot) === normTargetSlot && apt.status !== 'Cancelled' && apt.status !== 'No-Show');
       }
     }
   } catch (err) {

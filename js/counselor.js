@@ -3,6 +3,7 @@ import { db, doc, setDoc, updateDoc, collection, query, where, getDocs } from '.
 import {
   subscribeAllAppointments,
   updateAppointmentStatus,
+  getUserProfile,
   subscribeLiveWalkInQueue,
   updateWalkInStatus,
   generateWalkInTicket,
@@ -379,7 +380,7 @@ document.addEventListener('DOMContentLoaded', () => {
         agendaBlockedBanner.classList.add('hidden');
       }
     }
-    const statusFilterVal = agendaStatusFilter?.value || 'ACTIVE';
+    const statusFilterVal = agendaStatusFilter?.value || 'ALL';
     const searchQuery = (agendaSearchInput?.value || '').trim().toLowerCase();
 
     const filtered = accessibleAppointments.filter(item => {
@@ -518,9 +519,11 @@ document.addEventListener('DOMContentLoaded', () => {
       } else if (activeViewFilter === 'all_cancelled') {
         emptyMsg = 'No cancelled appointments on record.';
       } else if (statusFilterVal === 'ACTIVE') {
-        emptyMsg = `No active consultations (Pending/Confirmed) for ${selectedDate}. Check status filter or Cancelled tab to view other appointments.`;
+        emptyMsg = `No active consultations (Pending/Confirmed) for ${selectedDate}. Switch status to "All Statuses" to view completed or past consultations.`;
       } else if (statusFilterVal !== 'ALL') {
         emptyMsg = `No ${statusFilterVal} consultations found for ${selectedDate}.`;
+      } else {
+        emptyMsg = `No consultations found for ${selectedDate}.`;
       }
       agendaList.innerHTML = `
         <div class="p-8 text-center text-slate-400 text-xs bg-white">
@@ -688,6 +691,11 @@ document.addEventListener('DOMContentLoaded', () => {
       const id = statusBtn.getAttribute('data-id');
       const status = statusBtn.getAttribute('data-action');
       if (!id || !status || statusBtn.disabled) return;
+
+      if (status === 'No-Show') {
+        openNoShowModal(id);
+        return;
+      }
 
       statusBtn.disabled = true;
       statusBtn.classList.add('opacity-70', 'cursor-wait');
@@ -872,6 +880,21 @@ document.addEventListener('DOMContentLoaded', () => {
       }
     }
 
+    const noShowBox = document.getElementById('apt-modal-no-show-box');
+    const noShowRemarksEl = document.getElementById('apt-modal-no-show-remarks');
+    const noShowTimeEl = document.getElementById('apt-modal-no-show-time');
+    if (noShowBox) {
+      if (statusLower === 'no-show') {
+        noShowBox.classList.remove('hidden');
+        if (noShowRemarksEl) noShowRemarksEl.textContent = `"${apt.remarks || 'Student marked as No-Show by counselor.'}"`;
+        if (noShowTimeEl) {
+          noShowTimeEl.textContent = apt.markedNoShowAt ? `Recorded: ${formatDateIso(apt.markedNoShowAt)}` : '';
+        }
+      } else {
+        noShowBox.classList.add('hidden');
+      }
+    }
+
     if (aptModalOpenCase) {
       aptModalOpenCase.onclick = async () => {
         closeAppointmentDetailsModal();
@@ -889,6 +912,168 @@ document.addEventListener('DOMContentLoaded', () => {
     modalAptDetails.classList.remove('hidden');
     if (window.lucide) window.lucide.createIcons();
   }
+
+  // --- Student Outreach & No-Show Verification Modal Controller ---
+  const modalNoShowConfirm = document.getElementById('modal-no-show-confirm');
+  const btnCloseNoShowModal = document.getElementById('btn-close-no-show-modal');
+  const btnDismissNoShow = document.getElementById('btn-dismiss-no-show');
+  const btnExecuteNoShow = document.getElementById('btn-execute-no-show');
+  let pendingNoShowAptId = null;
+
+  function closeNoShowModal() {
+    if (modalNoShowConfirm) modalNoShowConfirm.classList.add('hidden');
+    pendingNoShowAptId = null;
+  }
+
+  btnCloseNoShowModal?.addEventListener('click', closeNoShowModal);
+  btnDismissNoShow?.addEventListener('click', closeNoShowModal);
+  modalNoShowConfirm?.addEventListener('click', e => {
+    if (e.target === modalNoShowConfirm) closeNoShowModal();
+  });
+
+  async function openNoShowModal(aptId) {
+    const apt = allAppointments.find(a => a.id === aptId);
+    if (!apt) return;
+    pendingNoShowAptId = aptId;
+
+    if (!modalNoShowConfirm) return;
+
+    let phone = apt.contactNumber || apt.phone || '';
+    let email = apt.studentEmail || apt.email || '';
+
+    // If phone or email is missing on appointment record, attempt fetching from user profile
+    if ((!phone || !email) && apt.studentId) {
+      try {
+        const studentProf = await getUserProfile(apt.studentId);
+        if (studentProf) {
+          if (!phone) phone = studentProf.contactNumber || studentProf.phone || '';
+          if (!email) email = studentProf.email || '';
+        }
+      } catch (_) {}
+    }
+
+    const nameEl = document.getElementById('no-show-student-name');
+    const metaEl = document.getElementById('no-show-student-meta');
+    const timeEl = document.getElementById('no-show-session-time');
+    const concernEl = document.getElementById('no-show-concern-cat');
+    const phoneEl = document.getElementById('no-show-student-phone');
+    const emailEl = document.getElementById('no-show-student-email');
+    const callBtn = document.getElementById('no-show-call-btn');
+    const emailBtn = document.getElementById('no-show-email-btn');
+    const remarksInput = document.getElementById('no-show-remarks-input');
+
+    if (nameEl) nameEl.textContent = apt.studentName || 'Student';
+    if (metaEl) metaEl.textContent = `${apt.studentNumber || 'No ID'} • ${apt.program || 'Student'}`;
+    if (timeEl) timeEl.textContent = `${apt.date || 'Scheduled Date'} (${formatTimeSlot12h(apt.timeSlot) || apt.timeSlot || 'Scheduled Time'})`;
+    if (concernEl) concernEl.textContent = apt.concernCategory || 'General Guidance Consultation';
+
+    const cleanPhone = (phone || '').trim();
+    const cleanEmail = (email || '').trim();
+
+    if (phoneEl) {
+      phoneEl.textContent = cleanPhone || 'No contact number provided';
+      phoneEl.className = cleanPhone ? 'font-mono font-bold text-slate-800 text-xs truncate' : 'font-mono text-slate-400 italic text-xs truncate';
+    }
+
+    if (callBtn) {
+      if (cleanPhone) {
+        callBtn.href = `tel:${cleanPhone.replace(/[^0-9+]/g, '')}`;
+        callBtn.classList.remove('pointer-events-none', 'opacity-50');
+      } else {
+        callBtn.href = '#';
+        callBtn.classList.add('pointer-events-none', 'opacity-50');
+      }
+    }
+
+    if (emailEl) {
+      emailEl.textContent = cleanEmail || 'No institutional email registered';
+      emailEl.className = cleanEmail ? 'font-mono font-bold text-slate-800 text-xs truncate' : 'font-mono text-slate-400 italic text-xs truncate';
+    }
+
+    if (emailBtn) {
+      if (cleanEmail) {
+        const subject = encodeURIComponent(`Regarding your Guidance Consultation (${formatTimeSlot12h(apt.timeSlot) || apt.timeSlot})`);
+        const body = encodeURIComponent(`Hi ${apt.studentName || 'Student'},\n\nWe noticed you have not arrived yet for your scheduled guidance consultation today (${apt.date} at ${formatTimeSlot12h(apt.timeSlot) || apt.timeSlot}). Please let us know if you are on your way or if you need to reschedule.\n\nWarm regards,\n${currentUser.fullName || 'Guidance Counselor'}\nGuidance & Counseling Office`);
+        emailBtn.href = `mailto:${cleanEmail}?subject=${subject}&body=${body}`;
+        emailBtn.classList.remove('pointer-events-none', 'opacity-50');
+      } else {
+        emailBtn.href = '#';
+        emailBtn.classList.add('pointer-events-none', 'opacity-50');
+      }
+    }
+
+    if (remarksInput) {
+      remarksInput.value = '';
+    }
+
+    modalNoShowConfirm.classList.remove('hidden');
+    if (window.lucide) window.lucide.createIcons();
+  }
+
+  document.getElementById('no-show-copy-phone')?.addEventListener('click', () => {
+    const phoneText = document.getElementById('no-show-student-phone')?.textContent || '';
+    if (phoneText && phoneText !== 'No contact number provided') {
+      navigator.clipboard?.writeText(phoneText);
+      showToast('Student contact number copied to clipboard.', 'info', 'Copied');
+    }
+  });
+
+  document.getElementById('no-show-copy-email')?.addEventListener('click', () => {
+    const emailText = document.getElementById('no-show-student-email')?.textContent || '';
+    if (emailText && emailText !== 'No institutional email registered') {
+      navigator.clipboard?.writeText(emailText);
+      showToast('Student institutional email copied to clipboard.', 'info', 'Copied');
+    }
+  });
+
+  btnExecuteNoShow?.addEventListener('click', async () => {
+    if (!pendingNoShowAptId) return;
+    const aptId = pendingNoShowAptId;
+    const remarks = document.getElementById('no-show-remarks-input')?.value.trim() || 'Student did not arrive for scheduled consultation session.';
+
+    btnExecuteNoShow.disabled = true;
+    btnExecuteNoShow.classList.add('opacity-70', 'cursor-wait');
+    btnExecuteNoShow.innerHTML = `<span>Recording...</span>`;
+
+    try {
+      const targetApt = allAppointments.find(a => a.id === aptId);
+      if (targetApt) {
+        targetApt.status = 'No-Show';
+        targetApt.remarks = remarks;
+        targetApt.outreachAttempted = true;
+        targetApt.markedNoShowAt = new Date().toISOString();
+        targetApt.markedNoShowBy = currentUser.uid;
+      }
+      renderAgenda();
+
+      await updateAppointmentStatus(aptId, 'No-Show', {
+        remarks,
+        outreachAttempted: true,
+        markedNoShowBy: currentUser.uid,
+        markedNoShowByName: currentUser.fullName || 'Guidance Counselor',
+        markedNoShowAt: new Date().toISOString()
+      });
+
+      await logAuditEvent(
+        currentUser.uid,
+        currentUser.fullName,
+        currentUser.role,
+        'APPOINTMENT_NO_SHOW',
+        `Marked appointment ${aptId} as No-Show. Remarks: ${remarks}`
+      );
+
+      showToast('Appointment recorded as No-Show in consultation records.', 'info', 'No-Show Recorded');
+      closeNoShowModal();
+    } catch (err) {
+      console.error('Failed to update status to No-Show:', err);
+      showToast('Failed to record No-Show status. Please try again.', 'error', 'Error');
+    } finally {
+      btnExecuteNoShow.disabled = false;
+      btnExecuteNoShow.classList.remove('opacity-70', 'cursor-wait');
+      btnExecuteNoShow.innerHTML = `<i data-lucide="user-x" class="w-3.5 h-3.5"></i><span>Confirm as No-Show</span>`;
+      if (window.lucide) window.lucide.createIcons();
+    }
+  });
 
   let allWalkinQueue = [];
   const listWaiting = document.getElementById('queue-list-waiting');
