@@ -4,6 +4,9 @@
   "description": "Integrated Guidance and Counseling Management System for National University Fairview with Gmail SMTP OTP verification",
   "main": "server/server.js",
   "type": "module",
+  "engines": {
+    "node": ">=20.0.0"
+  },
   "scripts": {
     "start": "node server/server.js",
     "dev": "node server/server.js",

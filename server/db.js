@@ -2,9 +2,6 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import fs from 'fs';
 import dotenv from 'dotenv';
-import { initializeApp as initAdminApp, cert, getApps as getAdminApps } from 'firebase-admin/app';
-import { getAuth as getAdminAuth } from 'firebase-admin/auth';
-import { getFirestore as getAdminFirestore } from 'firebase-admin/firestore';
 import { initializeApp as initClientApp, getApps as getClientApps } from 'firebase/app';
 import {
   getFirestore as getClientFirestore,
@@ -91,8 +88,10 @@ export async function verifyServerOtp(rawEmail, rawOtp) {
   }
 }
 
-// 1. Firebase Admin SDK Initialization (Optional / Guarded)
+// 1. Firebase Admin SDK Initialization (Optional / Guarded via dynamic import for serverless compatibility)
 let isFirebaseAdminInitialized = false;
+let adminAuth = null;
+let adminDb = null;
 
 const primaryKeyPath = path.join(ROOT_DIR, 'scripts', 'serviceAccountKey.json');
 const fallbackKeyPath = path.join(ROOT_DIR, 'serviceAccountKey.json');
@@ -100,26 +99,30 @@ const serviceAccountPath = fs.existsSync(primaryKeyPath) ? primaryKeyPath : fall
 
 if (fs.existsSync(serviceAccountPath)) {
   try {
+    const { initializeApp: initAdminApp, cert, getApps: getAdminApps } = await import('firebase-admin/app');
+    const { getAuth: getAdminAuth } = await import('firebase-admin/auth');
+    const { getFirestore: getAdminFirestore } = await import('firebase-admin/firestore');
+
     const serviceAccount = JSON.parse(fs.readFileSync(serviceAccountPath, 'utf8'));
     if (getAdminApps().length === 0) {
       initAdminApp({
         credential: cert(serviceAccount)
       });
-      isFirebaseAdminInitialized = true;
-      console.log(`[INFO] Firebase Admin SDK initialized successfully from ${path.basename(serviceAccountPath)}.`);
-    } else {
-      isFirebaseAdminInitialized = true;
     }
+    isFirebaseAdminInitialized = true;
+    adminAuth = getAdminAuth();
+    adminDb = getAdminFirestore();
+    console.log(`[INFO] Firebase Admin SDK initialized successfully from ${path.basename(serviceAccountPath)}.`);
   } catch (err) {
     console.warn('[WARNING] Firebase Admin SDK init skipped / invalid credential:', err.message);
   }
 } else {
-  console.warn('[WARNING] serviceAccountKey.json not found in scripts/ or root. Admin features will be unavailable.');
+  // Silent fallback: In serverless environments (e.g. Vercel), client SDK handles all Firestore queries
 }
 
-export const adminAuth = isFirebaseAdminInitialized ? getAdminAuth() : null;
-export const adminDb = isFirebaseAdminInitialized ? getAdminFirestore() : null;
-export { getAdminAuth as getAuth, getAdminFirestore as getFirestore, isFirebaseAdminInitialized };
+export { adminAuth, adminDb, isFirebaseAdminInitialized };
+export function getAuth() { return adminAuth; }
+export function getFirestore() { return adminDb; }
 
 // 2. Firebase Client SDK (Resilient queries across all environments)
 const clientFirebaseConfig = {
@@ -159,13 +162,13 @@ export async function findAccountByEmail(rawEmail) {
   }
 
   // 2. If not in Firestore, clean up any orphaned Firebase Auth record so re-registration succeeds cleanly
-  if (isFirebaseAdminInitialized) {
+  if (isFirebaseAdminInitialized && adminAuth) {
     try {
-      const adminUser = await getAdminAuth()
+      const adminUser = await adminAuth
         .getUserByEmail(cleanEmail)
         .catch(() => null);
       if (adminUser) {
-        await getAdminAuth()
+        await adminAuth
           .deleteUser(adminUser.uid)
           .catch(() => {});
         console.log(`[AUTH SYNC] Removed orphaned Firebase Auth record for ${cleanEmail} (not present in Firestore).`);
