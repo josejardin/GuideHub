@@ -486,12 +486,6 @@
                 </div>
               </div>
 
-              <!-- Staff Contact Number Exemption Banner -->
-              <div id="wizard-staff-phone-note" class="hidden p-3 rounded-xl bg-slate-50 border border-slate-200 text-slate-600 text-[11px] flex items-center gap-2">
-                <i data-lucide="info" class="w-4 h-4 text-slate-400 shrink-0"></i>
-                <span>Faculty and staff members are not required to provide a contact phone number.</span>
-              </div>
-
               <div class="grid grid-cols-2 gap-3">
                 <div>
                   <label class="block font-semibold text-slate-700 mb-1">Password</label>
@@ -888,15 +882,12 @@
         function updateRoleSpecificFieldVisibility() {
           const contactCol = document.getElementById('wizard-contact-col');
           const genderContactRow = document.getElementById('wizard-gender-contact-row');
-          const staffNote = document.getElementById('wizard-staff-phone-note');
           if (selectedRole === 'student') {
             contactCol?.classList.remove('hidden');
-            staffNote?.classList.add('hidden');
             genderContactRow?.classList.remove('sm:grid-cols-1');
             genderContactRow?.classList.add('sm:grid-cols-2');
           } else {
             contactCol?.classList.add('hidden');
-            staffNote?.classList.remove('hidden');
             genderContactRow?.classList.remove('sm:grid-cols-2');
             genderContactRow?.classList.add('sm:grid-cols-1');
           }

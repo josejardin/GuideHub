@@ -804,7 +804,7 @@ export async function updateReferralStatus(referralId, status, extraFields = {})
   }
 }
 
-export async function getOrCreateCase(studentNumber, studentName, program, counselorId) {
+export async function getOrCreateCase(studentNumber, studentName, program, counselorId, counselorName = '') {
   const cleanNum = (studentNumber || 'unknown').trim();
   const cleanName = (studentName || '').trim();
 
@@ -881,6 +881,24 @@ export async function getOrCreateCase(studentNumber, studentName, program, couns
       hasUpdates = true;
     }
 
+    if (!existingCase.counselorName && counselorName) {
+      existingCase.counselorName = counselorName;
+      updates.counselorName = counselorName;
+      hasUpdates = true;
+    }
+
+    if (!existingCase.counselorId && counselorId) {
+      existingCase.counselorId = counselorId;
+      updates.counselorId = counselorId;
+      hasUpdates = true;
+    }
+
+    if (!existingCase.assignedCounselorId && counselorId) {
+      existingCase.assignedCounselorId = counselorId;
+      updates.assignedCounselorId = counselorId;
+      hasUpdates = true;
+    }
+
     if (hasUpdates) {
       try {
         if (db) {
@@ -906,7 +924,9 @@ export async function getOrCreateCase(studentNumber, studentName, program, couns
     studentNumber: cleanNum,
     studentName: cleanName || 'Student',
     program: program || 'General',
-    assignedCounselorId: counselorId,
+    assignedCounselorId: counselorId || '',
+    counselorId: counselorId || '',
+    counselorName: counselorName || 'Guidance Counselor',
     status: 'Active',
     riskFlags: {
       selfHarm: false,

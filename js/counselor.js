@@ -1419,6 +1419,15 @@ document.addEventListener('DOMContentLoaded', () => {
         const repeatCount = referralCountsByStudent[studentKey] || 1;
         const hasExistingCase = allCases.some(c => (c.studentNumber || '').trim().toLowerCase() === studentKey);
 
+        const assignedCounselorName = r.assignedCounselor || r.intakeConductedBy || r.counselorName || '';
+        const assignedCounselorId = r.assignedCounselorId || r.intakeConductedById || '';
+        const isHandledByMe =
+          !assignedCounselorName ||
+          assignedCounselorId === currentUser.uid ||
+          assignedCounselorName.toLowerCase() === (currentUser.fullName || '').toLowerCase();
+        const isHeadOrAdmin = currentUser.role === 'head' || currentUser.role === 'admin';
+        const canManageReferral = isHandledByMe || isHeadOrAdmin;
+
         return `
         <tr class="hover:bg-slate-50/60 transition">
           <td class="py-2.5 px-4 text-slate-500 font-mono text-[11px] whitespace-nowrap">${escapeHtml(formatDateIso(r.createdAt) || 'Recent')}</td>
@@ -1429,6 +1438,16 @@ document.addEventListener('DOMContentLoaded', () => {
               ${hasExistingCase ? `<span class="inline-flex items-center gap-1 px-1.5 py-0.2 rounded text-[9px] font-semibold bg-blue-50 text-[#00205B] border border-blue-200" title="Central clinical case folder exists for this student"><i data-lucide="folder-check" class="w-3 h-3 text-blue-600"></i> Case Exists</span>` : ''}
             </div>
             <div class="text-[11px] text-slate-500">${escapeHtml(r.studentNumber)} • ${escapeHtml(r.program)}</div>
+            ${
+              assignedCounselorName
+                ? `
+              <div class="mt-1 flex items-center gap-1 text-[10px] ${isHandledByMe ? 'text-purple-700 font-semibold' : 'text-slate-600 font-medium'}">
+                <i data-lucide="user-check" class="w-3 h-3 ${isHandledByMe ? 'text-purple-600' : 'text-slate-400'}"></i>
+                <span>${isHandledByMe ? `You (${escapeHtml(currentUser.fullName)}) handling` : `Assigned: ${escapeHtml(assignedCounselorName)}`}</span>
+              </div>
+            `
+                : ''
+            }
           </td>
           <td class="py-2.5 px-4">
             <div class="font-semibold text-slate-800">${escapeHtml(r.facultyName)}</div>
@@ -1449,8 +1468,14 @@ document.addEventListener('DOMContentLoaded', () => {
             
             ${
               r.status === 'Call Slip Issued'
-                ? `
+                ? canManageReferral
+                  ? `
             <button data-intake-id="${escapeHtml(r.id)}" data-snum="${escapeHtml(r.studentNumber)}" data-sname="${escapeHtml(r.studentName)}" data-sprog="${escapeHtml(r.program)}" class="btn-intake-conducted px-2 py-1 rounded bg-purple-700 hover:bg-purple-800 text-white text-xs font-medium transition" title="Start clinical intake and open case folder">
+              Intake
+            </button>
+            `
+                  : `
+            <button disabled class="px-2 py-1 rounded bg-purple-100 text-purple-400 text-xs font-medium cursor-not-allowed opacity-70" title="Assigned to ${escapeHtml(assignedCounselorName)}">
               Intake
             </button>
             `
@@ -1463,8 +1488,14 @@ document.addEventListener('DOMContentLoaded', () => {
 
             ${
               r.status !== 'Closed'
-                ? `
+                ? canManageReferral
+                  ? `
             <button data-close-ref-id="${escapeHtml(r.id)}" class="btn-close-referral px-2 py-1 rounded border border-slate-200 hover:bg-slate-100 text-slate-700 text-xs font-medium transition" title="Archive referral">
+              Close
+            </button>
+            `
+                  : `
+            <button disabled class="px-2 py-1 rounded border border-slate-200 bg-slate-50 text-slate-400 text-xs font-medium cursor-not-allowed opacity-60" title="Only ${escapeHtml(assignedCounselorName || 'assigned counselor')} or Guidance Head can close this referral">
               Close
             </button>
             `
@@ -1517,9 +1548,21 @@ document.addEventListener('DOMContentLoaded', () => {
       const sprog = intakeBtn.getAttribute('data-sprog');
 
       try {
-        await updateReferralStatus(id, 'Intake Conducted');
+        await updateReferralStatus(id, 'Intake Conducted', {
+          assignedCounselor: currentUser.fullName,
+          assignedCounselorId: currentUser.uid,
+          intakeConductedBy: currentUser.fullName,
+          intakeConductedById: currentUser.uid,
+          intakeConductedAt: new Date().toISOString()
+        });
         const targetRef = allReferrals.find(r => r.id === id);
-        if (targetRef) targetRef.status = 'Intake Conducted';
+        if (targetRef) {
+          targetRef.status = 'Intake Conducted';
+          targetRef.assignedCounselor = currentUser.fullName;
+          targetRef.assignedCounselorId = currentUser.uid;
+          targetRef.intakeConductedBy = currentUser.fullName;
+          targetRef.intakeConductedById = currentUser.uid;
+        }
         renderReferralInbox();
 
         await logAuditEvent(
@@ -1527,11 +1570,11 @@ document.addEventListener('DOMContentLoaded', () => {
           currentUser.fullName,
           currentUser.role,
           'REFERRAL_INTAKE_CONDUCTED',
-          `Conducted intake for referral ${id}`
+          `Conducted intake for referral ${id} (${sname})`
         );
         showToast('Status updated to Intake Conducted.', 'success');
 
-        const caseRecord = await getOrCreateCase(snum, sname, sprog, currentUser.uid);
+        const caseRecord = await getOrCreateCase(snum, sname, sprog, currentUser.uid, currentUser.fullName);
         if (caseRecord.status === 'Closed') {
           await updateCaseStatus(caseRecord.id, 'Active');
           caseRecord.status = 'Active';
@@ -1551,6 +1594,24 @@ document.addEventListener('DOMContentLoaded', () => {
       e.preventDefault();
       if (closeBtn.disabled) return;
       const id = closeBtn.getAttribute('data-close-ref-id');
+      const targetRef = allReferrals.find(r => r.id === id);
+
+      const assignedName = targetRef?.assignedCounselor || targetRef?.intakeConductedBy || '';
+      const assignedId = targetRef?.assignedCounselorId || targetRef?.intakeConductedById || '';
+      const isMyRef =
+        !assignedName ||
+        assignedId === currentUser.uid ||
+        assignedName.toLowerCase() === (currentUser.fullName || '').toLowerCase();
+      const isHeadOrAdmin = currentUser.role === 'head' || currentUser.role === 'admin';
+
+      if (!isMyRef && !isHeadOrAdmin) {
+        showToast(
+          `Cannot close referral: This case is handled by ${assignedName}. Only ${assignedName} or Guidance Head can archive it.`,
+          'warning'
+        );
+        return;
+      }
+
       const confirmed = await showConfirmDialog({
         title: 'Close Referral?',
         message: 'Are you sure you want to mark this referral as Closed? It will be archived from your active inbox.',
@@ -1560,7 +1621,6 @@ document.addEventListener('DOMContentLoaded', () => {
       });
       if (confirmed) {
         closeBtn.disabled = true;
-        const targetRef = allReferrals.find(r => r.id === id);
         if (targetRef) targetRef.status = 'Closed';
         renderReferralInbox();
 
@@ -1840,6 +1900,13 @@ document.addEventListener('DOMContentLoaded', () => {
     const currentStatus = isHighRisk ? 'High Risk' : caseRecord.status || 'Active';
     const isClosed = currentStatus === 'Closed';
 
+    const assignedCounselor = caseRecord.counselorName || caseRecord.assignedCounselorName || 'Guidance Counselor';
+    const isPrimaryCounselor =
+      !caseRecord.counselorId ||
+      caseRecord.counselorId === currentUser.uid ||
+      assignedCounselor.toLowerCase() === (currentUser.fullName || '').toLowerCase();
+    const isHeadOrAdmin = currentUser.role === 'head' || currentUser.role === 'admin';
+
     const badgeStyles = {
       'High Risk': 'bg-rose-50 text-rose-700 border-rose-200 font-bold',
       Active: 'bg-emerald-50 text-emerald-700 border-emerald-200 font-semibold',
@@ -1874,14 +1941,18 @@ document.addEventListener('DOMContentLoaded', () => {
               <option value="Active" ${currentStatus === 'Active' ? 'selected' : ''}>Active</option>
               <option value="High Risk" ${currentStatus === 'High Risk' ? 'selected' : ''}>High Risk</option>
               <option value="Monitoring" ${currentStatus === 'Monitoring' ? 'selected' : ''}>Monitoring</option>
-              <option value="Closed" ${currentStatus === 'Closed' ? 'selected' : ''}>Closed</option>
+              <option value="Closed" ${currentStatus === 'Closed' ? 'selected' : ''} ${!isPrimaryCounselor && !isHeadOrAdmin ? 'disabled' : ''}>Closed${!isPrimaryCounselor && !isHeadOrAdmin ? ' (Primary Only)' : ''}</option>
             </select>
           </div>
         </div>
 
-        <!-- Row 2: Program, Category, Phone, Email -->
-        <div class="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-slate-500">
+        <!-- Row 2: Program, Category, Primary Counselor, Phone, Email -->
+        <div class="flex flex-wrap items-center gap-x-3 gap-y-1.5 text-xs text-slate-500">
           <span>${escapeHtml(caseRecord.program)} • ${escapeHtml(caseRecord.category || 'Clinical Record')}</span>
+          <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-semibold ${isPrimaryCounselor ? 'bg-purple-50 text-purple-700 border border-purple-200' : 'bg-slate-100 text-slate-700 border border-slate-200'}">
+            <i data-lucide="shield-check" class="w-3.5 h-3.5 ${isPrimaryCounselor ? 'text-purple-600' : 'text-slate-500'}"></i>
+            <span>${isPrimaryCounselor ? `Primary Counselor: You (${escapeHtml(currentUser.fullName)})` : `Primary Counselor: ${escapeHtml(assignedCounselor)}`}</span>
+          </span>
           ${studentPhone ? `<a href="tel:${escapeHtml(studentPhone)}" class="inline-flex items-center gap-1 font-semibold text-slate-700 hover:text-[#00205B] transition"><i data-lucide="phone" class="w-3.5 h-3.5 text-emerald-600"></i><span>${escapeHtml(studentPhone)}</span></a>` : ''}
           ${studentEmail ? `<a href="mailto:${escapeHtml(studentEmail)}" class="inline-flex items-center gap-1 font-semibold text-slate-700 hover:text-[#00205B] transition"><i data-lucide="mail" class="w-3.5 h-3.5 text-blue-600"></i><span>${escapeHtml(studentEmail)}</span></a>` : ''}
         </div>
@@ -2030,8 +2101,21 @@ document.addEventListener('DOMContentLoaded', () => {
       const newStatus = e.target.value;
       if (!caseRecord.id) return;
 
+      if (newStatus === 'Closed' && !isPrimaryCounselor && !isHeadOrAdmin) {
+        showToast(
+          `Action Restricted: Only the primary attending counselor (${assignedCounselor}) or the Guidance Head can close this case folder (RA 9258).`,
+          'warning'
+        );
+        e.target.value = caseRecord.status || 'Active';
+        return;
+      }
+
       const updatePayload = {
         status: newStatus,
+        counselorId: caseRecord.counselorId || currentUser.uid,
+        counselorName: caseRecord.counselorName || currentUser.fullName || 'Guidance Counselor',
+        lastUpdatedBy: currentUser.fullName,
+        lastUpdatedById: currentUser.uid,
         updatedAt: new Date().toISOString()
       };
 
@@ -2056,13 +2140,12 @@ document.addEventListener('DOMContentLoaded', () => {
               studentName: caseRecord.studentName || 'Student',
               studentNumber: caseRecord.studentNumber || 'N/A',
               program: caseRecord.program || 'N/A',
-              counselorId: currentUser.uid,
-              counselorName: currentUser.fullName || 'Guidance Counselor',
               ...updatePayload
             },
             { merge: true }
           );
         }
+        await updateCaseStatus(caseRecord.id, newStatus, updatePayload);
         caseRecord.status = newStatus;
         if (updatePayload.riskFlags) caseRecord.riskFlags = updatePayload.riskFlags;
 
@@ -2132,8 +2215,10 @@ document.addEventListener('DOMContentLoaded', () => {
               studentName: caseRecord.studentName || 'Student',
               studentNumber: caseRecord.studentNumber || 'N/A',
               program: caseRecord.program || 'N/A',
-              counselorId: currentUser.uid,
-              counselorName: currentUser.fullName || 'Guidance Counselor',
+              counselorId: caseRecord.counselorId || currentUser.uid,
+              counselorName: caseRecord.counselorName || currentUser.fullName || 'Guidance Counselor',
+              lastUpdatedBy: currentUser.fullName,
+              lastUpdatedById: currentUser.uid,
               riskFlags: newFlags,
               status: newStatus,
               updatedAt: new Date().toISOString()
@@ -2209,6 +2294,10 @@ document.addEventListener('DOMContentLoaded', () => {
               studentName: caseRecord.studentName || 'Student',
               studentNumber: caseRecord.studentNumber || 'N/A',
               program: caseRecord.program || 'N/A',
+              counselorId: caseRecord.counselorId || currentUser.uid,
+              counselorName: caseRecord.counselorName || currentUser.fullName || 'Guidance Counselor',
+              lastUpdatedBy: currentUser.fullName,
+              lastUpdatedById: currentUser.uid,
               status: currentStatusVal,
               lastSessionDate: sessionDate,
               updatedAt: new Date().toISOString()
