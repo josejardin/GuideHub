@@ -24,7 +24,24 @@ const LOCAL_STORE_KEY = 'guidehub_local_firestore_state';
 function getLocalState() {
   try {
     const raw = localStorage.getItem(LOCAL_STORE_KEY);
-    if (raw) return JSON.parse(raw);
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (parsed && parsed.appointments) {
+        let cleaned = false;
+        Object.keys(parsed.appointments).forEach(id => {
+          if (id.startsWith('apt_179')) {
+            delete parsed.appointments[id];
+            cleaned = true;
+          }
+        });
+        if (cleaned) {
+          try {
+            localStorage.setItem(LOCAL_STORE_KEY, JSON.stringify(parsed));
+          } catch (e) {}
+        }
+      }
+      return parsed;
+    }
   } catch (e) {
     console.error('Local store read error', e);
   }
@@ -342,12 +359,7 @@ export function subscribeAllAppointments(callback) {
   const deliver = () => {
     const state = getLocalState();
     const localList = Object.values(state.appointments || {});
-    const mergedMap = new Map();
-    firestoreList.forEach(item => mergedMap.set(item.id, item));
-    localList.forEach(item => {
-      if (!mergedMap.has(item.id)) mergedMap.set(item.id, item);
-    });
-    const list = Array.from(mergedMap.values());
+    const list = (db && firestoreList.length >= 0) ? firestoreList : localList;
     list.sort(
       (a, b) =>
         new Date(b.date + ' ' + (b.timeSlot || '00:00')) - new Date(a.date + ' ' + (a.timeSlot || '00:00'))
@@ -363,6 +375,14 @@ export function subscribeAllAppointments(callback) {
         snap => {
           clearAvailabilityCaches();
           firestoreList = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+          try {
+            const state = getLocalState();
+            state.appointments = {};
+            firestoreList.forEach(item => {
+              state.appointments[item.id] = item;
+            });
+            saveLocalState(state);
+          } catch (e) {}
           deliver();
         },
         err => {
@@ -514,21 +534,23 @@ export async function getAvailableCounselorsForSlot(date, timeSlot, genderPrefer
   if (_dateAptsCache.has(date) && (now - (_dateAptsCacheTime.get(date) || 0) < 2000)) {
     allDateApts = _dateAptsCache.get(date);
   } else {
-    allDateApts = Object.values(state.appointments || {}).filter(
-      apt => apt.date === date && (apt.status === 'Pending' || apt.status === 'Confirmed')
-    );
     try {
       if (db) {
         const qApts = query(collection(db, 'appointments'), where('date', '==', date));
         const snap = await getDocs(qApts);
-        if (!snap.empty) {
-          allDateApts = snap.docs
-            .map(d => ({ id: d.id, ...d.data() }))
-            .filter(apt => apt.status === 'Pending' || apt.status === 'Confirmed');
-        }
+        allDateApts = snap.docs
+          .map(d => ({ id: d.id, ...d.data() }))
+          .filter(apt => apt.status === 'Pending' || apt.status === 'Confirmed');
+      } else {
+        allDateApts = Object.values(state.appointments || {}).filter(
+          apt => apt.date === date && (apt.status === 'Pending' || apt.status === 'Confirmed')
+        );
       }
     } catch (err) {
       console.warn('Firestore active appointments fetch warning:', err.message);
+      allDateApts = Object.values(state.appointments || {}).filter(
+        apt => apt.date === date && (apt.status === 'Pending' || apt.status === 'Confirmed')
+      );
     }
     _dateAptsCache.set(date, allDateApts);
     _dateAptsCacheTime.set(date, now);
@@ -562,10 +584,15 @@ export async function getAvailableCounselorsForSlot(date, timeSlot, genderPrefer
     if (hasCollision) return true;
 
     // Check scheduled multi-day leave/absence
-    const leaves = Object.values(state.counselorLeaves || {}).filter(
-      l => l && l.counselorId === cId && l.status !== 'Cancelled'
-    );
-    const isOnLeave = leaves.some(l => {
+    let leaves = [];
+    try {
+      leaves = await getCounselorLeaves(cId);
+    } catch (e) {
+      leaves = Object.values(state.counselorLeaves || {}).filter(
+        l => l && l.counselorId === cId && l.status !== 'Cancelled'
+      );
+    }
+    const isOnLeave = (leaves || []).some(l => {
       if (l.dates && Array.isArray(l.dates)) return l.dates.includes(date);
       return l.startDate && l.endDate && date >= l.startDate && date <= l.endDate;
     });
@@ -1397,11 +1424,13 @@ export async function getCounselorBlockedSlots(counselorId, fallbackIds = []) {
     return _blockedSlotsCache.get(cacheKey);
   }
   let allRecords = [];
+  let fetchedFromDb = false;
   try {
     if (db && ids.length > 0) {
       for (const id of ids) {
         const q = query(collection(db, 'counselorSchedules'), where('counselorId', '==', id));
         const snap = await getDocs(q);
+        fetchedFromDb = true;
         if (!snap.empty) {
           const state = getLocalState();
           snap.docs.forEach(d => {
@@ -1420,7 +1449,7 @@ export async function getCounselorBlockedSlots(counselorId, fallbackIds = []) {
 
   const state = getLocalState();
   const localList = Object.values(state.counselorSchedules || {}).filter(s => s && ids.includes(s.counselorId));
-  const combined = [...localList, ...allRecords];
+  const combined = (fetchedFromDb && allRecords.length > 0) ? allRecords : (allRecords.length > 0 ? allRecords : localList);
 
   // Deduplicate by (dayOfWeek or date) + normalizeTimeSlot(timeSlot), taking the record with the newest updatedAt
   const slotMap = new Map();
@@ -1549,7 +1578,7 @@ export function subscribeAllCounselorSchedules(callback) {
   const deliver = () => {
     clearAvailabilityCaches();
     const state = getLocalState();
-    const merged = { ...(state.counselorSchedules || {}), ...firestoreMap };
+    const merged = (db && Object.keys(firestoreMap).length > 0) ? firestoreMap : { ...(state.counselorSchedules || {}), ...firestoreMap };
     const slotMap = new Map();
     Object.values(merged).forEach(rec => {
       if (!rec || !rec.counselorId || !rec.timeSlot) return;
@@ -1574,6 +1603,11 @@ export function subscribeAllCounselorSchedules(callback) {
           snap.docs.forEach(d => {
             firestoreMap[d.id] = d.data();
           });
+          try {
+            const state = getLocalState();
+            state.counselorSchedules = { ...firestoreMap };
+            saveLocalState(state);
+          } catch (e) {}
           deliver();
         },
         err => {
