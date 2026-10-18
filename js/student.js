@@ -396,8 +396,8 @@ document.addEventListener('DOMContentLoaded', () => {
             </div>
 
             <!-- Actions -->
-            <div class="flex flex-col items-end gap-1.5 self-end sm:self-center shrink-0">
-              <div class="flex items-center gap-2">
+            <div class="flex flex-col sm:items-end gap-1.5 w-full sm:w-auto shrink-0 pt-2 sm:pt-0 border-t sm:border-t-0 border-slate-100">
+              <div class="flex items-center gap-2 flex-wrap w-full sm:w-auto justify-start sm:justify-end">
                 ${
                   isConfirmed
                     ? `
@@ -405,20 +405,20 @@ document.addEventListener('DOMContentLoaded', () => {
                     href="${generateGoogleCalendarUrl(apt)}"
                     target="_blank"
                     rel="noopener noreferrer"
-                    class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-blue-50 hover:bg-blue-100 text-[#00205B] border border-blue-200 transition shadow-2xs"
+                    class="inline-flex items-center justify-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-lg text-xs font-semibold bg-blue-50 hover:bg-blue-100 text-[#00205B] border border-blue-200 transition shadow-2xs flex-1 sm:flex-initial"
                     title="Add to Google Calendar with automatic reminder"
                   >
                     <i data-lucide="calendar-plus" class="w-3.5 h-3.5 text-blue-600"></i>
-                    <span>Google Calendar</span>
+                    <span>Google Cal</span>
                   </a>
                   <button
                     type="button"
                     data-ics-id="${escapeHtml(apt.id)}"
-                    class="btn-download-ics inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-slate-100 hover:bg-slate-200 text-slate-800 border border-slate-200 transition shadow-2xs"
+                    class="btn-download-ics inline-flex items-center justify-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-lg text-xs font-semibold bg-slate-100 hover:bg-slate-200 text-slate-800 border border-slate-200 transition shadow-2xs flex-1 sm:flex-initial"
                     title="Download .ics file (Apple Calendar, Outlook, Mobile)"
                   >
                     <i data-lucide="download" class="w-3.5 h-3.5 text-slate-600"></i>
-                    <span>.ICS Calendar</span>
+                    <span>.ICS</span>
                   </button>
                   `
                     : ''
@@ -426,7 +426,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 ${
                   isPending
                     ? `
-                  <button data-cancel-id="${escapeHtml(apt.id)}" class="btn-cancel-apt px-3 py-1.5 rounded-lg text-xs font-semibold text-rose-700 hover:bg-rose-50 border border-rose-200 transition shadow-sm" title="Cancel this pending request">
+                  <button data-cancel-id="${escapeHtml(apt.id)}" class="btn-cancel-apt w-full sm:w-auto px-3 py-1.5 rounded-lg text-xs font-semibold text-rose-700 hover:bg-rose-50 border border-rose-200 transition shadow-sm text-center" title="Cancel this pending request">
                     Cancel Request
                   </button>
                   `
@@ -435,7 +435,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 ${
                   canCancelConfirmed
                     ? `
-                  <button data-cancel-id="${escapeHtml(apt.id)}" class="btn-cancel-apt px-3 py-1.5 rounded-lg text-xs font-semibold text-rose-700 hover:bg-rose-50 border border-rose-200 transition shadow-sm" title="Cancel this confirmed appointment (Requires reason)">
+                  <button data-cancel-id="${escapeHtml(apt.id)}" class="btn-cancel-apt w-full sm:w-auto px-3 py-1.5 rounded-lg text-xs font-semibold text-rose-700 hover:bg-rose-50 border border-rose-200 transition shadow-sm text-center" title="Cancel this confirmed appointment (Requires reason)">
                     Cancel Appointment
                   </button>
                   `
@@ -444,7 +444,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 ${
                   isLockedConfirmed
                     ? `
-                  <div class="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-amber-50 border border-amber-200 text-amber-800 text-[11px] font-medium" title="Cancellations are locked within 24 hours of the session.">
+                  <div class="inline-flex items-center justify-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-amber-50 border border-amber-200 text-amber-800 text-[11px] font-medium w-full sm:w-auto" title="Cancellations are locked within 24 hours of the session.">
                     <i data-lucide="lock" class="w-3.5 h-3.5 text-amber-600 shrink-0"></i>
                     <span>Locked (Within 24h)</span>
                   </div>

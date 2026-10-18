@@ -14,13 +14,13 @@
   <body class="bg-slate-50 text-slate-700 flex flex-col min-h-screen">
     <div id="navbar-container" class="no-print"></div>
 
-    <main class="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6 no-print">
+    <main class="flex-1 max-w-7xl w-full mx-auto px-3 sm:px-6 lg:px-8 py-4 sm:py-8 space-y-4 sm:space-y-6 pb-24 sm:pb-8 no-print">
       <div
-        class="bg-white rounded-xl p-6 border border-slate-200 shadow-sm flex flex-col md:flex-row items-start md:items-center justify-between gap-4"
+        class="bg-white rounded-2xl p-4 sm:p-6 border border-slate-200 shadow-sm flex flex-col md:flex-row items-start md:items-center justify-between gap-4"
       >
         <div>
           <div class="flex items-center gap-2">
-            <h1 class="text-xl font-bold text-slate-900 tracking-tight">Counselor Care Workspace</h1>
+            <h1 class="text-lg sm:text-xl font-bold text-slate-900 tracking-tight">Counselor Care Workspace</h1>
             <span
               class="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-medium bg-emerald-50 text-emerald-800 border border-emerald-200"
             >
@@ -32,27 +32,27 @@
           </p>
         </div>
 
-        <div class="flex flex-wrap items-center gap-2.5">
+        <div class="grid grid-cols-2 sm:flex sm:items-center gap-2 w-full md:w-auto">
           <button
             id="btn-open-counselor-profile"
             data-action="open-profile"
-            class="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-md bg-white hover:bg-slate-50 text-slate-800 text-xs font-semibold border border-slate-200 shadow-sm transition"
+            class="flex-1 sm:flex-initial inline-flex items-center justify-center gap-1.5 px-3.5 py-2.5 sm:py-2 rounded-xl sm:rounded-md bg-white hover:bg-slate-50 text-slate-800 text-xs font-semibold border border-slate-200 shadow-sm transition active:scale-95"
           >
             <i data-lucide="user-cog" class="w-3.5 h-3.5 text-[#00205B]"></i>
             <span>My Profile</span>
           </button>
           <button
             id="btn-open-offline-intake"
-            class="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-md bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold shadow-sm transition"
+            class="flex-1 sm:flex-initial inline-flex items-center justify-center gap-1.5 px-3.5 py-2.5 sm:py-2 rounded-xl sm:rounded-md bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold shadow-sm transition active:scale-95"
           >
             <i data-lucide="user-plus" class="w-3.5 h-3.5"></i>
-            <span>Direct Walk-In Intake</span>
+            <span>Direct Intake</span>
           </button>
         </div>
       </div>
 
-      <div class="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
-        <div class="flex border-b border-slate-200 overflow-x-auto bg-slate-50/50 px-2 pt-2">
+      <div class="bg-white rounded-xl sm:rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+        <div class="flex border-b border-slate-200 overflow-x-auto no-scrollbar scroll-smooth bg-slate-50/50 px-2 pt-2 touch-scroll-x">
           <button
             data-tab="agenda"
             class="tab-btn flex items-center gap-1.5 px-4 py-2.5 text-xs font-bold border-b-2 border-slate-900 text-slate-900 whitespace-nowrap transition"
@@ -112,143 +112,148 @@
           </button>
         </div>
 
-        <div class="p-6">
+        <div class="p-3 sm:p-6">
           <div id="tab-content-agenda" class="space-y-4">
-            <div class="flex flex-col md:flex-row md:items-center justify-between gap-3 pb-3 border-b border-slate-100">
+            <div class="flex flex-col lg:flex-row lg:items-center justify-between gap-3 pb-3 border-b border-slate-100">
               <div>
                 <h2 class="text-sm font-bold text-slate-900">Scheduled Consultations</h2>
                 <p class="text-[11px] text-slate-500">Manage student appointments and review pending requests</p>
               </div>
 
-              <div class="flex flex-wrap items-center gap-2">
-                <div class="inline-flex rounded-lg bg-slate-100 p-0.5 text-xs font-medium border border-slate-200 flex-wrap">
-                  <button
-                    type="button"
-                    id="btn-view-today"
-                    class="px-3 py-1 rounded-md text-slate-600 hover:text-slate-900 transition flex items-center gap-1.5"
-                    title="View all consultation sessions scheduled for today"
-                  >
-                    <i data-lucide="calendar" class="w-3.5 h-3.5 text-blue-600"></i>
-                    <span>Today</span>
-                    <span
-                      id="badge-today-count"
-                      class="px-1.5 py-0.2 rounded-full text-[10px] bg-blue-100 text-blue-800 font-bold"
+              <div class="flex flex-col gap-2.5 w-full lg:w-auto">
+                <!-- Horizontally scrollable pill container for the 6 filter buttons -->
+                <div class="overflow-x-auto no-scrollbar touch-scroll-x -mx-1 px-1 py-0.5">
+                  <div class="inline-flex rounded-xl bg-slate-100 p-1 text-xs font-medium border border-slate-200 whitespace-nowrap gap-1">
+                    <button
+                      type="button"
+                      id="btn-view-today"
+                      class="px-3 py-1.5 rounded-lg text-slate-600 hover:text-slate-900 transition flex items-center gap-1.5 whitespace-nowrap active:scale-95 shrink-0"
+                      title="View all consultation sessions scheduled for today"
                     >
-                      0
-                    </span>
-                  </button>
-                  <button
-                    type="button"
-                    id="btn-view-confirmed"
-                    class="px-3 py-1 rounded-md text-slate-600 hover:text-slate-900 transition flex items-center gap-1.5"
-                    title="View all confirmed sessions across all dates ready for consultation or completion"
-                  >
-                    <i data-lucide="check-circle-2" class="w-3.5 h-3.5 text-emerald-600"></i>
-                    <span>Confirmed / Action</span>
-                    <span
-                      id="badge-all-confirmed-count"
-                      class="px-1.5 py-0.2 rounded-full text-[10px] bg-emerald-100 text-emerald-800 font-bold"
+                      <i data-lucide="calendar" class="w-3.5 h-3.5 text-blue-600"></i>
+                      <span>Today</span>
+                      <span
+                        id="badge-today-count"
+                        class="px-1.5 py-0.2 rounded-full text-[10px] bg-blue-100 text-blue-800 font-bold"
+                      >
+                        0
+                      </span>
+                    </button>
+                    <button
+                      type="button"
+                      id="btn-view-confirmed"
+                      class="px-3 py-1.5 rounded-lg text-slate-600 hover:text-slate-900 transition flex items-center gap-1.5 whitespace-nowrap active:scale-95 shrink-0"
+                      title="View all confirmed sessions across all dates ready for consultation or completion"
                     >
-                      0
-                    </span>
-                  </button>
-                  <button
-                    type="button"
-                    id="btn-view-pending"
-                    class="px-3 py-1 rounded-md bg-white text-[#00205B] font-bold shadow-sm transition flex items-center gap-1.5"
-                    title="Review student consultation requests awaiting your confirmation"
-                  >
-                    <i data-lucide="clock" class="w-3.5 h-3.5 text-amber-500"></i>
-                    <span>Pending</span>
-                    <span
-                      id="badge-all-pending-count"
-                      class="px-1.5 py-0.2 rounded-full text-[10px] bg-amber-100 text-amber-800 font-bold"
+                      <i data-lucide="check-circle-2" class="w-3.5 h-3.5 text-emerald-600"></i>
+                      <span>Confirmed</span>
+                      <span
+                        id="badge-all-confirmed-count"
+                        class="px-1.5 py-0.2 rounded-full text-[10px] bg-emerald-100 text-emerald-800 font-bold"
+                      >
+                        0
+                      </span>
+                    </button>
+                    <button
+                      type="button"
+                      id="btn-view-pending"
+                      class="px-3 py-1.5 rounded-lg bg-white text-[#00205B] font-bold shadow-sm transition flex items-center gap-1.5 whitespace-nowrap active:scale-95 shrink-0"
+                      title="Review student consultation requests awaiting your confirmation"
                     >
-                      0
-                    </span>
-                  </button>
-                  <button
-                    type="button"
-                    id="btn-view-all"
-                    class="px-3 py-1 rounded-md text-slate-600 hover:text-slate-900 transition flex items-center gap-1.5"
-                    title="View all consultation sessions across all dates"
-                  >
-                    <i data-lucide="layers" class="w-3.5 h-3.5 text-slate-500"></i>
-                    <span>All</span>
-                    <span
-                      id="badge-all-consultations-count"
-                      class="px-1.5 py-0.2 rounded-full text-[10px] bg-slate-200 text-slate-800 font-bold"
+                      <i data-lucide="clock" class="w-3.5 h-3.5 text-amber-500"></i>
+                      <span>Pending</span>
+                      <span
+                        id="badge-all-pending-count"
+                        class="px-1.5 py-0.2 rounded-full text-[10px] bg-amber-100 text-amber-800 font-bold"
+                      >
+                        0
+                      </span>
+                    </button>
+                    <button
+                      type="button"
+                      id="btn-view-all"
+                      class="px-3 py-1.5 rounded-lg text-slate-600 hover:text-slate-900 transition flex items-center gap-1.5 whitespace-nowrap active:scale-95 shrink-0"
+                      title="View all consultation sessions across all dates"
                     >
-                      0
-                    </span>
-                  </button>
-                  <button
-                    type="button"
-                    id="btn-view-date"
-                    class="px-3 py-1 rounded-md text-slate-600 hover:text-slate-900 transition flex items-center gap-1.5"
-                    title="Filter consultations by specific calendar date"
-                  >
-                    <i data-lucide="calendar-range" class="w-3.5 h-3.5"></i>
-                    <span>By Date</span>
-                  </button>
-                  <button
-                    type="button"
-                    id="btn-view-cancelled"
-                    class="px-3 py-1 rounded-md text-slate-600 hover:text-slate-900 transition flex items-center gap-1.5"
-                    title="View cancelled consultation appointments and student reasons"
-                  >
-                    <span>Cancelled</span>
-                    <span
-                      id="badge-all-cancelled-count"
-                      class="px-1.5 py-0.2 rounded-full text-[10px] bg-rose-100 text-rose-800 font-bold"
+                      <i data-lucide="layers" class="w-3.5 h-3.5 text-slate-500"></i>
+                      <span>All</span>
+                      <span
+                        id="badge-all-consultations-count"
+                        class="px-1.5 py-0.2 rounded-full text-[10px] bg-slate-200 text-slate-800 font-bold"
+                      >
+                        0
+                      </span>
+                    </button>
+                    <button
+                      type="button"
+                      id="btn-view-date"
+                      class="px-3 py-1.5 rounded-lg text-slate-600 hover:text-slate-900 transition flex items-center gap-1.5 whitespace-nowrap active:scale-95 shrink-0"
+                      title="Filter consultations by specific calendar date"
                     >
-                      0
-                    </span>
-                  </button>
+                      <i data-lucide="calendar-range" class="w-3.5 h-3.5"></i>
+                      <span>By Date</span>
+                    </button>
+                    <button
+                      type="button"
+                      id="btn-view-cancelled"
+                      class="px-3 py-1.5 rounded-lg text-slate-600 hover:text-slate-900 transition flex items-center gap-1.5 whitespace-nowrap active:scale-95 shrink-0"
+                      title="View cancelled consultation appointments and student reasons"
+                    >
+                      <span>Cancelled</span>
+                      <span
+                        id="badge-all-cancelled-count"
+                        class="px-1.5 py-0.2 rounded-full text-[10px] bg-rose-100 text-rose-800 font-bold"
+                      >
+                        0
+                      </span>
+                    </button>
+                  </div>
                 </div>
 
-                <!-- Instant Search Across Consultations -->
-                <div class="relative flex items-center">
-                  <i data-lucide="search" class="w-3.5 h-3.5 text-slate-400 absolute left-2.5 pointer-events-none"></i>
-                  <input
-                    type="text"
-                    id="agenda-search-input"
-                    placeholder="Search student or ID..."
-                    class="text-xs border border-slate-200 rounded-md pl-8 pr-2.5 py-1 bg-white font-medium focus:border-[#00205B] focus:outline-none shadow-2xs w-44 transition placeholder:text-slate-400"
-                  />
-                </div>
+                <!-- Instant Search Across Consultations & Filters: responsive stack / inline -->
+                <div class="grid grid-cols-1 sm:grid-cols-3 lg:flex items-center gap-2 w-full">
+                  <div class="relative flex-1">
+                    <i data-lucide="search" class="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-2.5 pointer-events-none"></i>
+                    <input
+                      type="text"
+                      id="agenda-search-input"
+                      placeholder="Search student or ID..."
+                      class="text-xs border border-slate-200 rounded-lg pl-8 pr-2.5 py-2 sm:py-1.5 bg-white font-medium focus:border-[#00205B] focus:outline-none shadow-2xs w-full transition placeholder:text-slate-400"
+                    />
+                  </div>
 
-                <div id="agenda-date-wrapper" class="flex items-center gap-1.5">
-                  <label class="text-xs text-slate-400 font-medium">Date:</label>
-                  <input
-                    type="date"
-                    id="agenda-date-picker"
-                    class="text-xs border border-slate-200 rounded-md px-2.5 py-1 bg-white font-medium focus:border-[#00205B] focus:outline-none shadow-2xs"
-                  />
-                </div>
+                  <div id="agenda-date-wrapper" class="flex items-center gap-1.5 w-full sm:w-auto">
+                    <label class="text-xs text-slate-400 font-medium shrink-0">Date:</label>
+                    <input
+                      type="date"
+                      id="agenda-date-picker"
+                      class="text-xs border border-slate-200 rounded-lg px-2.5 py-2 sm:py-1.5 bg-white font-medium focus:border-[#00205B] focus:outline-none shadow-2xs w-full sm:w-auto"
+                    />
+                  </div>
 
-                <div id="agenda-status-wrapper" class="flex items-center gap-1.5">
-                  <label class="text-xs text-slate-400 font-medium">Status:</label>
-                  <select
-                    id="agenda-status-filter"
-                    class="text-xs border border-slate-200 rounded-md px-2.5 py-1 bg-white font-medium focus:border-[#00205B] focus:outline-none shadow-2xs"
-                  >
-                    <option value="ALL" selected>All Statuses (Active & Completed)</option>
-                    <option value="ACTIVE">Active (Pending & Confirmed)</option>
-                    <option value="Pending">Pending Only</option>
-                    <option value="Confirmed">Confirmed Only</option>
-                    <option value="Completed">Completed Only</option>
-                    <option value="Cancelled">Cancelled Only</option>
-                    <option value="No-Show">No-Show Only</option>
-                  </select>
+                  <div id="agenda-status-wrapper" class="flex items-center gap-1.5 w-full sm:w-auto">
+                    <label class="text-xs text-slate-400 font-medium shrink-0">Status:</label>
+                    <select
+                      id="agenda-status-filter"
+                      class="text-xs border border-slate-200 rounded-lg px-2.5 py-2 sm:py-1.5 bg-white font-medium focus:border-[#00205B] focus:outline-none shadow-2xs w-full sm:w-auto"
+                    >
+                      <option value="ALL" selected>All Statuses</option>
+                      <option value="ACTIVE">Active (Pending & Confirmed)</option>
+                      <option value="Pending">Pending Only</option>
+                      <option value="Confirmed">Confirmed Only</option>
+                      <option value="Completed">Completed Only</option>
+                      <option value="Cancelled">Cancelled Only</option>
+                      <option value="No-Show">No-Show Only</option>
+                    </select>
+                  </div>
                 </div>
               </div>
             </div>
 
             <!-- Today's Consultation Agenda At-a-Glance Widget -->
-            <div id="counselor-today-agenda-widget" class="mb-4 p-4 rounded-2xl bg-gradient-to-r from-blue-50/80 via-indigo-50/40 to-white border border-slate-200 shadow-2xs flex flex-col md:flex-row md:items-center justify-between gap-4">
-              <div class="flex items-center gap-3.5">
-                <div class="w-11 h-11 rounded-xl bg-[#00205B] text-[#F5B800] flex items-center justify-center shadow-xs shrink-0">
+            <div id="counselor-today-agenda-widget" class="mb-4 p-3.5 sm:p-4 rounded-2xl bg-gradient-to-r from-blue-50/80 via-indigo-50/40 to-white border border-slate-200 shadow-2xs flex flex-col md:flex-row md:items-center justify-between gap-3 sm:gap-4">
+              <div class="flex items-center gap-3">
+                <div class="w-10 h-10 sm:w-11 sm:h-11 rounded-xl bg-[#00205B] text-[#F5B800] flex items-center justify-center shadow-xs shrink-0">
                   <i data-lucide="calendar-clock" class="w-5 h-5"></i>
                 </div>
                 <div>
@@ -261,18 +266,18 @@
                   </p>
                 </div>
               </div>
-              <div class="flex items-center gap-2 flex-wrap">
-                <button type="button" id="btn-quick-view-today" class="px-3 py-1.5 rounded-xl text-xs font-semibold bg-white hover:bg-slate-50 text-slate-800 border border-slate-200 transition shadow-2xs flex items-center gap-1.5 active:scale-95" title="Filter to view today's scheduled consultations">
-                  <i data-lucide="calendar-check" class="w-3.5 h-3.5 text-blue-600"></i>
-                  <span>Today's Sessions (<span id="widget-count-today">0</span>)</span>
+              <div class="grid grid-cols-3 gap-1.5 sm:flex sm:items-center sm:gap-2 w-full md:w-auto">
+                <button type="button" id="btn-quick-view-today" class="flex flex-col sm:flex-row items-center justify-center text-center sm:text-left p-2 sm:px-3 sm:py-1.5 rounded-xl text-xs font-semibold bg-white hover:bg-slate-50 text-slate-800 border border-slate-200 transition shadow-2xs gap-1 active:scale-95" title="Filter to view today's scheduled consultations">
+                  <i data-lucide="calendar-check" class="w-3.5 h-3.5 text-blue-600 shrink-0"></i>
+                  <span class="text-[11px] sm:text-xs">Today (<span id="widget-count-today">0</span>)</span>
                 </button>
-                <button type="button" id="btn-quick-view-confirmed" class="px-3 py-1.5 rounded-xl text-xs font-semibold bg-emerald-700 hover:bg-emerald-800 text-white transition shadow-2xs flex items-center gap-1.5 active:scale-95" title="View all confirmed sessions across all dates awaiting consultation or completion">
-                  <i data-lucide="check-check" class="w-3.5 h-3.5 text-emerald-200"></i>
-                  <span>Confirmed (<span id="widget-count-confirmed">0</span>)</span>
+                <button type="button" id="btn-quick-view-confirmed" class="flex flex-col sm:flex-row items-center justify-center text-center sm:text-left p-2 sm:px-3 sm:py-1.5 rounded-xl text-xs font-semibold bg-emerald-700 hover:bg-emerald-800 text-white transition shadow-2xs gap-1 active:scale-95" title="View all confirmed sessions across all dates awaiting consultation or completion">
+                  <i data-lucide="check-check" class="w-3.5 h-3.5 text-emerald-200 shrink-0"></i>
+                  <span class="text-[11px] sm:text-xs">Confirmed (<span id="widget-count-confirmed">0</span>)</span>
                 </button>
-                <button type="button" id="btn-quick-view-pending" class="px-3 py-1.5 rounded-xl text-xs font-semibold bg-[#00205B] hover:bg-[#0A192F] text-[#F5B800] transition shadow-2xs flex items-center gap-1.5 active:scale-95" title="Review all pending student consultation requests">
-                  <i data-lucide="clock" class="w-3.5 h-3.5 text-[#F5B800]"></i>
-                  <span>Pending (<span id="widget-count-pending">0</span>)</span>
+                <button type="button" id="btn-quick-view-pending" class="flex flex-col sm:flex-row items-center justify-center text-center sm:text-left p-2 sm:px-3 sm:py-1.5 rounded-xl text-xs font-semibold bg-[#00205B] hover:bg-[#0A192F] text-[#F5B800] transition shadow-2xs gap-1 active:scale-95" title="Review all pending student consultation requests">
+                  <i data-lucide="clock" class="w-3.5 h-3.5 text-[#F5B800] shrink-0"></i>
+                  <span class="text-[11px] sm:text-xs">Pending (<span id="widget-count-pending">0</span>)</span>
                 </button>
               </div>
             </div>
@@ -1198,6 +1203,65 @@
       </div>
     </div>
 
-    <script type="module" src="../js/counselor.js?v=20261018f"></script>
+    <!-- Mobile Bottom Navigation Bar (Visible on phone viewports) -->
+    <nav class="md:hidden fixed bottom-0 left-0 right-0 bg-white/95 backdrop-blur-md border-t border-slate-200 z-40 px-2 py-1.5 shadow-[0_-4px_12px_rgba(0,0,0,0.06)] no-print">
+      <div class="grid grid-cols-5 gap-1 items-center max-w-md mx-auto">
+        <button
+          type="button"
+          data-mobile-tab="agenda"
+          class="mobile-counselor-nav-btn flex flex-col items-center justify-center py-1 rounded-xl text-[#00205B] font-bold transition active:scale-95"
+        >
+          <div class="relative">
+            <i data-lucide="calendar" class="w-5 h-5"></i>
+            <span id="mobile-badge-agenda-count" class="hidden absolute -top-1 -right-2 px-1 py-0.2 rounded-full text-[9px] bg-blue-600 text-white font-bold leading-none">0</span>
+          </div>
+          <span class="text-[10px] mt-0.5 tracking-tight font-semibold">Agenda</span>
+        </button>
+
+        <button
+          type="button"
+          data-mobile-tab="walkin"
+          class="mobile-counselor-nav-btn flex flex-col items-center justify-center py-1 rounded-xl text-slate-500 hover:text-slate-900 transition active:scale-95"
+        >
+          <div class="relative">
+            <i data-lucide="ticket" class="w-5 h-5"></i>
+            <span id="mobile-badge-walkin-count" class="hidden absolute -top-1 -right-2 px-1 py-0.2 rounded-full text-[9px] bg-amber-500 text-white font-bold leading-none">0</span>
+          </div>
+          <span class="text-[10px] mt-0.5 tracking-tight font-semibold">Walk-In</span>
+        </button>
+
+        <button
+          type="button"
+          data-mobile-tab="referrals"
+          class="mobile-counselor-nav-btn flex flex-col items-center justify-center py-1 rounded-xl text-slate-500 hover:text-slate-900 transition active:scale-95"
+        >
+          <div class="relative">
+            <i data-lucide="inbox" class="w-5 h-5"></i>
+            <span id="mobile-badge-referral-count" class="hidden absolute -top-1 -right-2 px-1 py-0.2 rounded-full text-[9px] bg-purple-600 text-white font-bold leading-none">0</span>
+          </div>
+          <span class="text-[10px] mt-0.5 tracking-tight font-semibold">Referrals</span>
+        </button>
+
+        <button
+          type="button"
+          data-mobile-tab="cases"
+          class="mobile-counselor-nav-btn flex flex-col items-center justify-center py-1 rounded-xl text-slate-500 hover:text-slate-900 transition active:scale-95"
+        >
+          <i data-lucide="folder-lock" class="w-5 h-5"></i>
+          <span class="text-[10px] mt-0.5 tracking-tight font-semibold">Cases</span>
+        </button>
+
+        <button
+          type="button"
+          data-mobile-tab="availability"
+          class="mobile-counselor-nav-btn flex flex-col items-center justify-center py-1 rounded-xl text-slate-500 hover:text-slate-900 transition active:scale-95"
+        >
+          <i data-lucide="clock" class="w-5 h-5"></i>
+          <span class="text-[10px] mt-0.5 tracking-tight font-semibold">Schedule</span>
+        </button>
+      </div>
+    </nav>
+
+    <script type="module" src="../js/counselor.js?v=20261018g"></script>
   </body>
 </html>

@@ -821,26 +821,27 @@ export function initNavbar(containerId = 'navbar-container', activePortal = '') 
 
   container.innerHTML = `
   <nav class="bg-[#00205B] text-white border-b border-white/10 sticky top-0 z-30 shadow-md">
-    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-      <div class="flex items-center justify-between h-16">
+    <div class="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8">
+      <div class="flex items-center justify-between h-14 sm:h-16">
         
         <!-- Brand Logo & Official NU Crest Image -->
-        <div class="flex items-center space-x-3">
-          <a href="${getRolePortalPath(user.role)}" class="flex items-center space-x-3 group">
-            <img src="${logoSrc}" alt="National University" class="h-10 w-auto object-contain flex-shrink-0 group-hover:scale-105 transition transform drop-shadow-sm" />
-            <div>
-              <div class="flex items-center gap-1.5">
+        <div class="flex items-center space-x-2 sm:space-x-3 min-w-0">
+          <a href="${getRolePortalPath(user.role)}" class="flex items-center space-x-2 sm:space-x-3 group min-w-0">
+            <img src="${logoSrc}" alt="National University" class="h-8 sm:h-10 w-auto object-contain flex-shrink-0 group-hover:scale-105 transition transform drop-shadow-sm" />
+            <div class="min-w-0">
+              <div class="flex items-center gap-1 sm:gap-1.5">
                 <span class="text-sm font-bold tracking-tight text-white">GuideHub</span>
-                <span class="text-[10px] bg-[#F5B800] text-[#00205B] font-extrabold px-1.5 py-0.2 rounded">FAIRVIEW</span>
+                <span class="text-[9px] sm:text-[10px] bg-[#F5B800] text-[#00205B] font-extrabold px-1 sm:px-1.5 py-0.2 rounded">FAIRVIEW</span>
               </div>
-              <span class="text-[10px] text-slate-300 font-medium block">Guidance & Counseling Center</span>
+              <span class="text-[10px] text-slate-300 font-medium hidden sm:block truncate">Guidance & Counseling Center</span>
+              <span class="text-[9px] text-slate-300 font-medium sm:hidden block truncate">Guidance Center</span>
             </div>
           </a>
         </div>
 
         <!-- User Identity, Profile & Logout -->
-        <div class="flex items-center space-x-2 sm:space-x-3">
-          <button id="nav-profile-pill-btn" type="button" class="flex items-center space-x-2.5 px-3 py-1.5 bg-white/10 hover:bg-white/20 backdrop-blur-sm rounded-xl border border-white/10 transition cursor-pointer text-left group" title="Click to view & edit Profile Dashboard">
+        <div class="flex items-center space-x-1.5 sm:space-x-3 shrink-0">
+          <button id="nav-profile-pill-btn" type="button" class="flex items-center space-x-1.5 sm:space-x-2.5 px-2 sm:px-3 py-1 sm:py-1.5 bg-white/10 hover:bg-white/20 backdrop-blur-sm rounded-xl border border-white/10 transition cursor-pointer text-left group" title="Click to view & edit Profile Dashboard">
             <div class="hidden sm:block text-right">
               <div id="nav-user-fullname" class="text-xs font-bold text-white leading-tight group-hover:text-amber-300 transition">${escapeHtml(user.fullName)}</div>
               <div class="text-[10px] text-slate-300 font-mono">${escapeHtml(user.studentOrEmpId || user.email)}</div>
@@ -851,7 +852,7 @@ export function initNavbar(containerId = 'navbar-container', activePortal = '') 
             </div>
           </button>
 
-          <button id="nav-logout-btn" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold text-[#00205B] bg-[#F5B800] hover:bg-[#D99B00] shadow-sm transition">
+          <button id="nav-logout-btn" class="inline-flex items-center gap-1 sm:gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-xl text-xs font-semibold text-[#00205B] bg-[#F5B800] hover:bg-[#D99B00] shadow-sm transition active:scale-95" title="Sign Out">
             <i data-lucide="log-out" class="w-3.5 h-3.5"></i>
             <span class="hidden sm:inline">Sign Out</span>
           </button>

@@ -271,6 +271,38 @@ body {
   background: #00205B;
 }
 
+/* ==========================================================================
+   MOBILE RESPONSIVENESS & TOUCH OPTIMIZATIONS
+   ========================================================================== */
+.no-scrollbar::-webkit-scrollbar {
+  display: none !important;
+}
+.no-scrollbar {
+  -ms-overflow-style: none !important;
+  scrollbar-width: none !important;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* Smooth Horizontal Touch Scrolling */
+.touch-scroll-x {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  scroll-behavior: smooth;
+  overscroll-behavior-x: contain;
+}
+
+/* Mobile Safe Tap Targets (at least 40px for comfortable thumb touch) */
+@media (max-width: 640px) {
+  button, select, input[type="text"], input[type="date"], input[type="number"], .btn-touch {
+    touch-action: manipulation;
+  }
+
+  /* Compact padding for modals on small devices */
+  .modal-content {
+    max-height: 90vh;
+  }
+}
+
 @media print {
   body {
     background-color: #ffffff !important;

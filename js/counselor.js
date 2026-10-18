@@ -46,6 +46,7 @@ document.addEventListener('DOMContentLoaded', () => {
   });
 
   const tabButtons = document.querySelectorAll('.tab-btn');
+  const mobileTabButtons = document.querySelectorAll('.mobile-counselor-nav-btn');
   const tabContents = {
     agenda: document.getElementById('tab-content-agenda'),
     walkin: document.getElementById('tab-content-walkin'),
@@ -59,10 +60,21 @@ document.addEventListener('DOMContentLoaded', () => {
       const isTarget = btn.getAttribute('data-tab') === targetTab;
       if (isTarget) {
         btn.className =
-          'tab-btn flex items-center gap-1.5 px-4 py-2.5 text-xs font-bold border-b-2 border-slate-900 text-slate-900 whitespace-nowrap transition';
+          'tab-btn flex items-center gap-1.5 px-3.5 sm:px-4 py-2.5 text-xs font-bold border-b-2 border-slate-900 text-slate-900 whitespace-nowrap transition shrink-0';
       } else {
         btn.className =
-          'tab-btn flex items-center gap-1.5 px-4 py-2.5 text-xs font-medium border-b-2 border-transparent text-slate-500 hover:text-slate-900 whitespace-nowrap transition';
+          'tab-btn flex items-center gap-1.5 px-3.5 sm:px-4 py-2.5 text-xs font-medium border-b-2 border-transparent text-slate-500 hover:text-slate-900 whitespace-nowrap transition shrink-0';
+      }
+    });
+
+    mobileTabButtons.forEach(mBtn => {
+      const isTarget = mBtn.getAttribute('data-mobile-tab') === targetTab;
+      if (isTarget) {
+        mBtn.className =
+          'mobile-counselor-nav-btn flex flex-col items-center justify-center py-1 rounded-xl text-[#00205B] font-bold transition active:scale-95';
+      } else {
+        mBtn.className =
+          'mobile-counselor-nav-btn flex flex-col items-center justify-center py-1 rounded-xl text-slate-400 hover:text-slate-700 transition active:scale-95';
       }
     });
 
@@ -84,6 +96,13 @@ document.addEventListener('DOMContentLoaded', () => {
     btn.addEventListener('click', () => switchTab(btn.getAttribute('data-tab')));
   });
 
+  mobileTabButtons.forEach(btn => {
+    btn.addEventListener('click', () => {
+      switchTab(btn.getAttribute('data-mobile-tab'));
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    });
+  });
+
   let allAppointments = [];
   let activeViewFilter = 'all_confirmed';
 
@@ -96,6 +115,33 @@ document.addEventListener('DOMContentLoaded', () => {
   const badgeAllPendingCount = document.getElementById('badge-all-pending-count');
   const badgeAllCancelledCount = document.getElementById('badge-all-cancelled-count');
   const badgeAllConsultationsCount = document.getElementById('badge-all-consultations-count');
+
+  function updateMobileNavBadges() {
+    const mobAgenda = document.getElementById('mobile-badge-agenda-count');
+    const mobWalkin = document.getElementById('mobile-badge-walkin-count');
+    const mobReferral = document.getElementById('mobile-badge-referral-count');
+
+    if (mobAgenda && badgeAgendaCount) {
+      const val = parseInt(badgeAgendaCount.textContent || '0', 10);
+      mobAgenda.textContent = val;
+      if (val > 0) mobAgenda.classList.remove('hidden');
+      else mobAgenda.classList.add('hidden');
+    }
+    if (mobWalkin) {
+      const walkBadge = document.getElementById('badge-walkin-count');
+      const val = parseInt(walkBadge?.textContent || '0', 10);
+      mobWalkin.textContent = val;
+      if (val > 0) mobWalkin.classList.remove('hidden');
+      else mobWalkin.classList.add('hidden');
+    }
+    if (mobReferral) {
+      const refBadge = document.getElementById('badge-referral-count');
+      const val = parseInt(refBadge?.textContent || '0', 10);
+      mobReferral.textContent = val;
+      if (val > 0) mobReferral.classList.remove('hidden');
+      else mobReferral.classList.add('hidden');
+    }
+  }
   const btnViewToday = document.getElementById('btn-view-today');
   const btnViewConfirmed = document.getElementById('btn-view-confirmed');
   const btnViewAll = document.getElementById('btn-view-all');
@@ -486,6 +532,7 @@ document.addEventListener('DOMContentLoaded', () => {
         a => (a.date === todayIso && ((a.status || '').toLowerCase() === 'pending' || (a.status || '').toLowerCase() === 'confirmed')) || (a.status || '').toLowerCase() === 'pending'
       ).length;
     }
+    updateMobileNavBadges();
 
     // Update Today's Agenda At-a-Glance Widget
     const widgetTodayDate = document.getElementById('widget-today-date');
@@ -646,15 +693,15 @@ document.addEventListener('DOMContentLoaded', () => {
           concernText.includes('urgent');
 
         return `
-          <div class="p-4 bg-white flex flex-col md:flex-row items-start md:items-center justify-between gap-3 hover:bg-slate-50/60 transition ${isPending ? 'border-l-4 border-amber-400 bg-amber-50/20' : ''} ${isCancelled ? 'border-l-4 border-rose-500 bg-rose-50/20' : ''} ${isConflict ? 'border-r-4 border-rose-500' : ''}">
-            <div class="flex items-center gap-3">
-              <div class="w-20 py-2 px-1 rounded-lg bg-[#00205B] text-white flex flex-col items-center justify-center flex-shrink-0 text-center font-mono shadow-2xs">
+          <div class="p-3.5 sm:p-4 bg-white flex flex-col md:flex-row items-start md:items-center justify-between gap-3 hover:bg-slate-50/60 transition ${isPending ? 'border-l-4 border-amber-400 bg-amber-50/20' : ''} ${isCancelled ? 'border-l-4 border-rose-500 bg-rose-50/20' : ''} ${isConflict ? 'border-r-4 border-rose-500' : ''}">
+            <div class="flex items-start sm:items-center gap-3 w-full md:w-auto">
+              <div class="w-16 sm:w-20 py-2 px-1 rounded-lg bg-[#00205B] text-white flex flex-col items-center justify-center flex-shrink-0 text-center font-mono shadow-2xs">
                 <span class="text-xs font-bold leading-tight">${escapeHtml(slotParts[0] || 'TBD')}</span>
                 <span class="text-[10px] text-[#F5B800] font-medium leading-tight">${escapeHtml(slotParts[1] || '')}</span>
               </div>
               
-              <div class="space-y-1">
-                <div class="flex flex-wrap items-center gap-2">
+              <div class="space-y-1 min-w-0 flex-1">
+                <div class="flex flex-wrap items-center gap-1.5 sm:gap-2">
                   <span class="font-bold text-xs text-slate-900">${escapeHtml(apt.studentName)}</span>
                   <span class="text-[11px] text-slate-500 font-mono">(${escapeHtml(apt.studentNumber)} • ${escapeHtml(apt.program)})</span>
                   <span class="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-medium border ${badgeStyles[statusLower] || badgeStyles.pending}">
@@ -676,9 +723,9 @@ document.addEventListener('DOMContentLoaded', () => {
               </div>
             </div>
 
-            <!-- Actions -->
-            <div class="flex items-center gap-1.5 self-end md:self-center flex-wrap">
-              <button data-id="${escapeHtml(apt.id)}" class="btn-view-apt-details px-2.5 py-1.5 rounded-lg border border-slate-200 hover:bg-slate-100 text-slate-700 text-xs font-semibold transition flex items-center gap-1 shadow-2xs" title="View complete details, contact info, notes, and cancellation reason">
+            <!-- Actions Container: 2-column touch grid on mobile, inline flex on desktop -->
+            <div class="grid grid-cols-2 sm:flex sm:items-center gap-1.5 w-full md:w-auto pt-2.5 md:pt-0 border-t border-slate-100 md:border-t-0">
+              <button data-id="${escapeHtml(apt.id)}" class="btn-view-apt-details px-2.5 py-2 sm:py-1.5 rounded-lg border border-slate-200 hover:bg-slate-100 text-slate-700 text-xs font-semibold transition flex items-center justify-center gap-1 shadow-2xs active:scale-95" title="View complete details, contact info, notes, and cancellation reason">
                 <i data-lucide="eye" class="w-3.5 h-3.5 text-slate-500"></i>
                 <span>Details</span>
               </button>
@@ -687,21 +734,21 @@ document.addEventListener('DOMContentLoaded', () => {
                 isPending
                   ? isConflict
                     ? `
-              <button disabled class="px-3 py-1.5 rounded-lg bg-rose-50 border border-rose-200 text-rose-700 text-xs font-semibold cursor-not-allowed flex items-center gap-1 shadow-2xs opacity-80" title="Cannot accept: You have marked this time slot (${escapeHtml(apt.timeSlot)}) as BLOCKED in your Availability Schedule. Unblock the slot first in 'Availability Schedule' tab if you wish to accept this consultation.">
+              <button disabled class="col-span-2 sm:col-span-1 px-3 py-2 sm:py-1.5 rounded-lg bg-rose-50 border border-rose-200 text-rose-700 text-xs font-semibold cursor-not-allowed flex items-center justify-center gap-1 shadow-2xs opacity-80" title="Cannot accept: You have marked this time slot (${escapeHtml(apt.timeSlot)}) as BLOCKED in your Availability Schedule.">
                 <i data-lucide="ban" class="w-3.5 h-3.5 text-rose-600"></i>
                 <span>Slot Blocked</span>
               </button>
-              <button data-action="Cancelled" data-id="${escapeHtml(apt.id)}" class="btn-apt-status px-2.5 py-1.5 rounded-lg border border-rose-200 hover:bg-rose-50 text-rose-700 text-xs font-medium transition" title="Decline this appointment due to schedule conflict">
+              <button data-action="Cancelled" data-id="${escapeHtml(apt.id)}" class="btn-apt-status px-2.5 py-2 sm:py-1.5 rounded-lg border border-rose-200 hover:bg-rose-50 text-rose-700 text-xs font-medium transition flex items-center justify-center active:scale-95" title="Decline this appointment due to schedule conflict">
                 Decline
               </button>
               `
                     : `
-              <button data-action="Confirmed" data-id="${escapeHtml(apt.id)}" class="btn-apt-status px-3 py-1.5 rounded-lg bg-[#00205B] hover:bg-[#0A192F] text-white text-xs font-semibold shadow-sm transition flex items-center gap-1" title="Accept consultation and dispatch confirmation email to student">
+              <button data-action="Cancelled" data-id="${escapeHtml(apt.id)}" class="btn-apt-status px-2.5 py-2 sm:py-1.5 rounded-lg border border-rose-200 hover:bg-rose-50 text-rose-700 text-xs font-medium transition flex items-center justify-center active:scale-95">
+                Decline
+              </button>
+              <button data-action="Confirmed" data-id="${escapeHtml(apt.id)}" class="btn-apt-status col-span-2 sm:col-span-1 px-3 py-2 sm:py-1.5 rounded-lg bg-[#00205B] hover:bg-[#0A192F] text-white text-xs font-semibold shadow-sm transition flex items-center justify-center gap-1 active:scale-95" title="Accept consultation and dispatch confirmation email to student">
                 <i data-lucide="check" class="w-3.5 h-3.5 text-emerald-400"></i>
                 <span>Accept</span>
-              </button>
-              <button data-action="Cancelled" data-id="${escapeHtml(apt.id)}" class="btn-apt-status px-2.5 py-1.5 rounded-lg border border-rose-200 hover:bg-rose-50 text-rose-700 text-xs font-medium transition">
-                Decline
               </button>
               `
                   : ''
@@ -710,22 +757,22 @@ document.addEventListener('DOMContentLoaded', () => {
               ${
                 isConfirmed
                   ? `
-              <button data-action="Completed" data-id="${escapeHtml(apt.id)}" class="btn-apt-status px-3 py-1.5 rounded-lg bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-semibold shadow-sm transition flex items-center gap-1.5" title="Mark this counseling session as completed and log clinical notes">
-                <i data-lucide="check-check" class="w-3.5 h-3.5"></i>
-                <span>Complete Session</span>
-              </button>
-              <button data-student-num="${escapeHtml(apt.studentNumber)}" data-student-name="${escapeHtml(apt.studentName)}" data-program="${escapeHtml(apt.program)}" data-date="${escapeHtml(apt.date)}" data-time="${escapeHtml(apt.timeSlot)}" class="btn-quick-callslip px-2.5 py-1.5 rounded-lg bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 text-xs font-semibold transition flex items-center gap-1 shadow-2xs" title="Generate institutional call slip for this student">
+              <button data-student-num="${escapeHtml(apt.studentNumber)}" data-student-name="${escapeHtml(apt.studentName)}" data-program="${escapeHtml(apt.program)}" data-date="${escapeHtml(apt.date)}" data-time="${escapeHtml(apt.timeSlot)}" class="btn-quick-callslip px-2.5 py-2 sm:py-1.5 rounded-lg bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 text-xs font-semibold transition flex items-center justify-center gap-1 shadow-2xs active:scale-95" title="Generate institutional call slip for this student">
                 <i data-lucide="file-badge-2" class="w-3.5 h-3.5"></i>
                 <span>Call Slip</span>
               </button>
-              <button data-action="No-Show" data-id="${escapeHtml(apt.id)}" class="btn-apt-status px-2.5 py-1.5 rounded-lg border border-slate-200 hover:bg-slate-100 text-slate-700 text-xs font-medium transition">
+              <button data-action="Completed" data-id="${escapeHtml(apt.id)}" class="btn-apt-status col-span-2 sm:col-span-1 px-3 py-2 sm:py-1.5 rounded-lg bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-semibold shadow-sm transition flex items-center justify-center gap-1.5 active:scale-95" title="Mark this counseling session as completed and log clinical notes">
+                <i data-lucide="check-check" class="w-3.5 h-3.5"></i>
+                <span>Complete Session</span>
+              </button>
+              <button data-action="No-Show" data-id="${escapeHtml(apt.id)}" class="btn-apt-status px-2.5 py-2 sm:py-1.5 rounded-lg border border-slate-200 hover:bg-slate-100 text-slate-700 text-xs font-medium transition flex items-center justify-center active:scale-95">
                 No-Show
               </button>
               `
                   : ''
               }
 
-              <button data-student-num="${escapeHtml(apt.studentNumber)}" data-student-name="${escapeHtml(apt.studentName)}" data-program="${escapeHtml(apt.program)}" class="btn-open-case-direct px-2.5 py-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-medium transition">
+              <button data-student-num="${escapeHtml(apt.studentNumber)}" data-student-name="${escapeHtml(apt.studentName)}" data-program="${escapeHtml(apt.program)}" class="btn-open-case-direct px-2.5 py-2 sm:py-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-medium transition flex items-center justify-center active:scale-95">
                 Open Case
               </button>
             </div>
@@ -1247,6 +1294,7 @@ document.addEventListener('DOMContentLoaded', () => {
     if (countCalling) countCalling.textContent = calling.length;
     if (countInSession) countInSession.textContent = insession.length;
     if (badgeWalkinCount) badgeWalkinCount.textContent = waiting.length + calling.length;
+    updateMobileNavBadges();
 
     if (listWaiting) {
       if (waiting.length === 0) {
@@ -1506,6 +1554,7 @@ document.addEventListener('DOMContentLoaded', () => {
     if (badgeReferralCount) {
       badgeReferralCount.textContent = openReferralsCount;
     }
+    updateMobileNavBadges();
 
     const filterVal = referralStatusFilter?.value || 'ACTIVE';
     const filteredReferrals = allReferrals.filter(r => {
