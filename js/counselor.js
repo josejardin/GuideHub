@@ -269,7 +269,7 @@ document.addEventListener('DOMContentLoaded', () => {
       const currentName = (currentUser.fullName || '').toLowerCase();
 
       // Fetch this counselor's blocked slots (support both 12h and 24h formats)
-      const counselorAltIds = [currentUser.uid, currentUser.id, currentUser.authUid, 'usr_counselor_mark_d'].filter(Boolean);
+      const counselorAltIds = [currentUser.uid, currentUser.id, currentUser.authUid].filter(Boolean);
       let blockedRecords = [];
       try {
         blockedRecords = await getCounselorBlockedSlots(currentUser.uid, counselorAltIds);

@@ -477,6 +477,22 @@ export async function getCounselors(forceRefresh = false) {
         email: 'claire.m@nu-fairview.edu.ph',
         gender: 'Female',
         department: 'Guidance and Counseling Center'
+      },
+      {
+        id: 'usr_counselor_robert_p',
+        uid: 'usr_counselor_robert_p',
+        fullName: 'Robert Pangilinan, RGC',
+        email: 'robert.p@nu-fairview.edu.ph',
+        gender: 'Male',
+        department: 'Guidance and Counseling Center'
+      },
+      {
+        id: 'usr_counselor_carmela_r',
+        uid: 'usr_counselor_carmela_r',
+        fullName: 'Dr. Carmela Ramos, RGC',
+        email: 'carmela.r@nu-fairview.edu.ph',
+        gender: 'Female',
+        department: 'Guidance and Counseling Center'
       }
     ];
     _cachedCounselorsTime = Date.now();
@@ -495,11 +511,11 @@ export async function getAvailableCounselorsForSlot(date, timeSlot, genderPrefer
 
   let allDateApts = [];
   const now = Date.now();
-  if (_dateAptsCache.has(date) && (now - (_dateAptsCacheTime.get(date) || 0) < 15000)) {
+  if (_dateAptsCache.has(date) && (now - (_dateAptsCacheTime.get(date) || 0) < 2000)) {
     allDateApts = _dateAptsCache.get(date);
   } else {
     allDateApts = Object.values(state.appointments || {}).filter(
-      apt => apt.date === date && apt.status !== 'Cancelled' && apt.status !== 'No-Show'
+      apt => apt.date === date && (apt.status === 'Pending' || apt.status === 'Confirmed')
     );
     try {
       if (db) {
@@ -508,7 +524,7 @@ export async function getAvailableCounselorsForSlot(date, timeSlot, genderPrefer
         if (!snap.empty) {
           allDateApts = snap.docs
             .map(d => ({ id: d.id, ...d.data() }))
-            .filter(apt => apt.status !== 'Cancelled' && apt.status !== 'No-Show');
+            .filter(apt => apt.status === 'Pending' || apt.status === 'Confirmed');
         }
       }
     } catch (err) {
