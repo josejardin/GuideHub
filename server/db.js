@@ -189,7 +189,15 @@ export async function findAccountById(idNumber) {
       if (catDoc.exists()) {
         const data = catDoc.data();
         for (const [key, val] of Object.entries(data)) {
-          if (val && typeof val === 'object' && val.studentOrEmpId === cleanId) {
+          if (
+            val &&
+            typeof val === 'object' &&
+            (val.studentOrEmpId === cleanId ||
+              key === cleanId ||
+              val.authUid === cleanId ||
+              val.uid === cleanId ||
+              val.id === cleanId)
+          ) {
             return { id: key, path: `users/${cat}#${key}`, ...val };
           }
         }

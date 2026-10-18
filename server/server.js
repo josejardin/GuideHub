@@ -568,6 +568,8 @@ app.post('/api/send-appointment-confirmation', async (req, res) => {
       studentEmail,
       studentName,
       studentNumber,
+      studentId,
+      studentAuthUid,
       counselorName,
       date,
       timeSlot,
@@ -578,10 +580,12 @@ app.post('/api/send-appointment-confirmation', async (req, res) => {
 
     let targetEmail = (studentEmail || '').trim().toLowerCase();
 
-    // Auto-resolve student email by ID number or Full Name if omitted or missing
-    if (!targetEmail && studentNumber) {
+    // Auto-resolve student email by ID number, studentId, studentAuthUid, or Full Name if omitted or missing
+    const idsToTry = [studentNumber, studentId, studentAuthUid].filter(Boolean);
+    for (const testId of idsToTry) {
+      if (targetEmail) break;
       try {
-        const acct = await findAccountById(studentNumber);
+        const acct = await findAccountById(testId);
         if (acct && acct.email) {
           targetEmail = acct.email.trim().toLowerCase();
         }

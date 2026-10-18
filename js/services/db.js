@@ -1953,3 +1953,62 @@ export function subscribeAnalyticsDataset(callback) {
   emit();
   return () => window.removeEventListener('guidehub_data_changed', emit);
 }
+
+export async function verifyStudentCallSlip(queryStr = '') {
+  const q = String(queryStr || '').trim().toLowerCase();
+  if (!q) return null;
+
+  // 1. Search referrals collection for call slip or intake milestone
+  try {
+    const refSnap = await getDocs(collection(db, 'referrals'));
+    for (const docSnap of refSnap.docs) {
+      const data = { id: docSnap.id, ...docSnap.data() };
+      const sNum = (data.studentNumber || '').toLowerCase();
+      const sName = (data.studentName || '').toLowerCase();
+      const refId = (data.id || '').toLowerCase();
+      if (sNum.includes(q) || sName.includes(q) || refId.includes(q)) {
+        if (data.callSlipAppointmentDate || data.status === 'Call Slip Issued' || data.status === 'Intake Conducted') {
+          return {
+            type: 'referral',
+            studentName: data.studentName,
+            studentNumber: data.studentNumber,
+            program: data.program || 'N/A',
+            scheduledDate: data.callSlipAppointmentDate || 'Recorded on File',
+            scheduledTime: data.callSlipAppointmentTime || 'Guidance Consultation Hours',
+            counselor: data.assignedCounselor || 'Registered Guidance Counselor'
+          };
+        }
+      }
+    }
+  } catch (err) {
+    console.warn('Referrals call slip check notice:', err);
+  }
+
+  // 2. Search appointments collection for confirmed or completed consultation
+  try {
+    const aptSnap = await getDocs(collection(db, 'appointments'));
+    for (const docSnap of aptSnap.docs) {
+      const apt = { id: docSnap.id, ...docSnap.data() };
+      const sNum = (apt.studentNumber || '').toLowerCase();
+      const sName = (apt.studentName || '').toLowerCase();
+      const aptId = (apt.id || '').toLowerCase();
+      const st = (apt.status || '').toLowerCase();
+      if ((sNum.includes(q) || sName.includes(q) || aptId.includes(q)) && (st === 'confirmed' || st === 'completed')) {
+        return {
+          type: 'appointment',
+          studentName: apt.studentName,
+          studentNumber: apt.studentNumber,
+          program: apt.program || 'N/A',
+          scheduledDate: apt.date || 'Recorded on File',
+          scheduledTime: apt.timeSlot || 'Guidance Consultation Hours',
+          counselor: apt.counselorName || 'Registered Guidance Counselor'
+        };
+      }
+    }
+  } catch (err) {
+    console.warn('Appointments call slip check notice:', err);
+  }
+
+  return null;
+}
+

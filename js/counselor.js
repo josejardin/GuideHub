@@ -95,8 +95,10 @@ document.addEventListener('DOMContentLoaded', () => {
   const badgeAllConfirmedCount = document.getElementById('badge-all-confirmed-count');
   const badgeAllPendingCount = document.getElementById('badge-all-pending-count');
   const badgeAllCancelledCount = document.getElementById('badge-all-cancelled-count');
+  const badgeAllConsultationsCount = document.getElementById('badge-all-consultations-count');
   const btnViewToday = document.getElementById('btn-view-today');
   const btnViewConfirmed = document.getElementById('btn-view-confirmed');
+  const btnViewAll = document.getElementById('btn-view-all');
   const btnViewDate = document.getElementById('btn-view-date');
   const btnViewPending = document.getElementById('btn-view-pending');
   const btnViewCancelled = document.getElementById('btn-view-cancelled');
@@ -110,7 +112,9 @@ document.addEventListener('DOMContentLoaded', () => {
   const agendaStatusFilter = document.getElementById('agenda-status-filter');
   ['change', 'input'].forEach(evt => {
     agendaStatusFilter?.addEventListener(evt, () => {
-      activeViewFilter = 'selected_date';
+      if (activeViewFilter !== 'all') {
+        activeViewFilter = 'selected_date';
+      }
       updateFilterUI();
       renderAgenda();
     });
@@ -136,6 +140,12 @@ document.addEventListener('DOMContentLoaded', () => {
 
   btnViewConfirmed?.addEventListener('click', () => {
     activeViewFilter = 'all_confirmed';
+    updateFilterUI();
+    renderAgenda();
+  });
+
+  btnViewAll?.addEventListener('click', () => {
+    activeViewFilter = 'all';
     updateFilterUI();
     renderAgenda();
   });
@@ -177,7 +187,7 @@ document.addEventListener('DOMContentLoaded', () => {
   });
 
   function updateFilterUI() {
-    [btnViewToday, btnViewConfirmed, btnViewDate, btnViewPending, btnViewCancelled].forEach(btn => {
+    [btnViewToday, btnViewConfirmed, btnViewPending, btnViewAll, btnViewDate, btnViewCancelled].forEach(btn => {
       btn?.classList.remove('bg-white', 'text-[#00205B]', 'font-bold', 'shadow-sm');
       btn?.classList.add('text-slate-600');
     });
@@ -196,6 +206,13 @@ document.addEventListener('DOMContentLoaded', () => {
       agendaStatusWrapper?.classList.add('opacity-50', 'pointer-events-none');
       if (agendaDatePicker) agendaDatePicker.disabled = true;
       if (agendaStatusFilter) agendaStatusFilter.disabled = true;
+    } else if (activeViewFilter === 'all') {
+      btnViewAll?.classList.add('bg-white', 'text-[#00205B]', 'font-bold', 'shadow-sm');
+      btnViewAll?.classList.remove('text-slate-600');
+      agendaDateWrapper?.classList.add('opacity-50', 'pointer-events-none');
+      agendaStatusWrapper?.classList.remove('opacity-50', 'pointer-events-none');
+      if (agendaDatePicker) agendaDatePicker.disabled = true;
+      if (agendaStatusFilter) agendaStatusFilter.disabled = false;
     } else if (activeViewFilter === 'selected_date') {
       btnViewDate?.classList.add('bg-white', 'text-[#00205B]', 'font-bold', 'shadow-sm');
       btnViewDate?.classList.remove('text-slate-600');
@@ -427,9 +444,21 @@ document.addEventListener('DOMContentLoaded', () => {
       if (activeViewFilter === 'all_cancelled') {
         return itemStatus === 'cancelled';
       }
+      if (activeViewFilter === 'all') {
+        if (statusFilterVal === 'ACTIVE') {
+          return itemStatus === 'pending' || itemStatus === 'confirmed';
+        } else if (statusFilterVal === 'ALL') {
+          return true;
+        } else {
+          return itemStatus === statusFilterVal.toLowerCase();
+        }
+      }
       if (activeViewFilter === 'today') {
         return item.date === todayIso && itemStatus !== 'cancelled';
       }
+
+      // If text query is active, allow search across all dates
+      if (searchQuery) return true;
 
       // Selected date mode:
       if (item.date !== selectedDate) return false;
@@ -443,6 +472,10 @@ document.addEventListener('DOMContentLoaded', () => {
         return itemStatus === statusFilterVal.toLowerCase();
       }
     });
+
+    if (badgeAllConsultationsCount) {
+      badgeAllConsultationsCount.textContent = accessibleAppointments.length;
+    }
 
     if (badgeAgendaCount) {
       badgeAgendaCount.textContent = accessibleAppointments.filter(
@@ -511,6 +544,11 @@ document.addEventListener('DOMContentLoaded', () => {
       if (activeViewFilter === 'all_cancelled') {
         return new Date(b.cancelledAt || b.date) - new Date(a.cancelledAt || a.date);
       }
+      if (activeViewFilter === 'all') {
+        const dateComp = (b.date || '').localeCompare(a.date || '');
+        if (dateComp !== 0) return dateComp;
+        return normalizeTimeSlot(b.timeSlot || '').localeCompare(normalizeTimeSlot(a.timeSlot || ''));
+      }
       if (activeViewFilter === 'all_confirmed' || activeViewFilter === 'all_pending') {
         const dateComp = (a.date || '').localeCompare(b.date || '');
         if (dateComp !== 0) return dateComp;
@@ -538,13 +576,17 @@ document.addEventListener('DOMContentLoaded', () => {
         emptyMsg = 'No pending appointment requests currently.';
       } else if (activeViewFilter === 'all_cancelled') {
         emptyMsg = 'No cancelled appointments on record.';
+      } else if (activeViewFilter === 'all') {
+        emptyMsg = statusFilterVal === 'ALL'
+          ? 'No consultations found on record.'
+          : `No consultations found matching status "${statusFilterVal}".`;
       } else if (statusFilterVal === 'ACTIVE') {
-        emptyMsg = `No active consultations (Pending/Confirmed) for ${selectedDate}. Switch status to "All Statuses" to view completed or past consultations.`;
+        emptyMsg = `No active consultations (Pending/Confirmed) for ${selectedDate}. Switch status to "All Statuses" or click "All" tab to view consultations across all dates.`;
       } else if (statusFilterVal === 'ALL') {
         if (blockedSlotsOnDate.length > 0) {
           emptyMsg = `No student consultations booked for ${selectedDate}. (Note: You have blocked ${blockedSlotsOnDate.join(', ')} in your weekly Availability Schedule, so students cannot book those hours.)`;
         } else {
-          emptyMsg = `No consultations found for ${selectedDate}.`;
+          emptyMsg = `No consultations found for ${selectedDate}. Tip: Click "All" tab above to view consultations across all dates.`;
         }
       } else {
         emptyMsg = `No ${statusFilterVal} consultations found for ${selectedDate}.`;
@@ -758,6 +800,8 @@ document.addEventListener('DOMContentLoaded', () => {
               studentEmail: targetStudentEmail,
               studentName: targetApt?.studentName || 'Student',
               studentNumber: targetApt?.studentNumber || '',
+              studentId: targetApt?.studentId || targetApt?.studentAuthUid || '',
+              studentAuthUid: targetApt?.studentAuthUid || '',
               counselorName: currentUser.fullName || 'Guidance Counselor',
               date: targetApt?.date || '',
               timeSlot: targetApt?.timeSlot || '',

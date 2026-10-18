@@ -141,24 +141,51 @@ document.addEventListener('DOMContentLoaded', () => {
 
   statusFilterEl?.addEventListener('change', renderAppointments);
 
+  function parseTimeSlotTo24hParts(timeSlot = '') {
+    let startHour = '09', startMin = '00', endHour = '10', endMin = '00';
+    if (!timeSlot) return { startHour, startMin, endHour, endMin };
+
+    function parseSingle(str) {
+      if (!str) return null;
+      const match = String(str).trim().match(/^(\d{1,2}):(\d{2})\s*(am|pm)?$/i);
+      if (!match) return null;
+      let h = parseInt(match[1], 10);
+      const m = match[2];
+      const meridiem = (match[3] || '').toUpperCase();
+      if (meridiem === 'PM' && h < 12) h += 12;
+      if (meridiem === 'AM' && h === 12) h = 0;
+      return { h: String(h).padStart(2, '0'), m };
+    }
+
+    if (timeSlot.includes('-')) {
+      const [startPart, endPart] = timeSlot.split('-');
+      const s = parseSingle(startPart);
+      const e = parseSingle(endPart);
+      if (s) {
+        startHour = s.h;
+        startMin = s.m;
+      }
+      if (e) {
+        endHour = e.h;
+        endMin = e.m;
+      }
+    } else {
+      const s = parseSingle(timeSlot);
+      if (s) {
+        startHour = s.h;
+        startMin = s.m;
+        endHour = String(Math.min(23, parseInt(startHour, 10) + 1)).padStart(2, '0');
+        endMin = startMin;
+      }
+    }
+    return { startHour, startMin, endHour, endMin };
+  }
+
   function generateGoogleCalendarUrl(apt) {
     if (!apt || !apt.date) return '#';
     try {
       const cleanDate = apt.date.replace(/-/g, '');
-      let startHour = '09', startMin = '00', endHour = '10', endMin = '00';
-      if (apt.timeSlot && apt.timeSlot.includes('-')) {
-        const [startPart, endPart] = apt.timeSlot.split('-');
-        const sMatch = startPart.trim().match(/^(\d{1,2}):(\d{2})$/);
-        const eMatch = endPart.trim().match(/^(\d{1,2}):(\d{2})$/);
-        if (sMatch) {
-          startHour = sMatch[1].padStart(2, '0');
-          startMin = sMatch[2];
-        }
-        if (eMatch) {
-          endHour = eMatch[1].padStart(2, '0');
-          endMin = eMatch[2];
-        }
-      }
+      const { startHour, startMin, endHour, endMin } = parseTimeSlotTo24hParts(apt.timeSlot);
       const startIso = `${cleanDate}T${startHour}${startMin}00`;
       const endIso = `${cleanDate}T${endHour}${endMin}00`;
       const title = encodeURIComponent(`NU Fairview Guidance Consultation with ${apt.counselorName || 'Guidance Counselor'}`);
@@ -169,6 +196,56 @@ document.addEventListener('DOMContentLoaded', () => {
       return `https://calendar.google.com/calendar/render?action=TEMPLATE&text=${title}&dates=${startIso}/${endIso}&ctz=Asia/Manila&details=${details}&location=${location}`;
     } catch (_) {
       return '#';
+    }
+  }
+
+  function downloadIcsCalendar(apt) {
+    if (!apt || !apt.date) return;
+    try {
+      const cleanDate = apt.date.replace(/-/g, '');
+      const { startHour, startMin, endHour, endMin } = parseTimeSlotTo24hParts(apt.timeSlot);
+      const startIso = `${cleanDate}T${startHour}${startMin}00`;
+      const endIso = `${cleanDate}T${endHour}${endMin}00`;
+      const summary = `NU Fairview Guidance Consultation - ${apt.counselorName || 'Guidance Counselor'}`;
+      const description = `Consultation Focus: ${apt.concernCategory || 'General Guidance'}\\nVenue: Guidance & Counseling Center (2nd Floor, Main Building)\\nReference Code: ${apt.id || 'N/A'}\\n\\nPlease arrive 5-10 minutes early.`;
+      const location = `National University Fairview Guidance & Counseling Office, 2nd Floor, Main Building`;
+
+      const icsLines = [
+        'BEGIN:VCALENDAR',
+        'VERSION:2.0',
+        'PRODID:-//NU Fairview//GuideHub Care Portal//EN',
+        'CALSCALE:GREGORIAN',
+        'METHOD:PUBLISH',
+        'BEGIN:VEVENT',
+        `UID:${apt.id || Date.now()}@guidehub.nu-fairview.edu.ph`,
+        `DTSTAMP:${cleanDate}T000000Z`,
+        `DTSTART;TZID=Asia/Manila:${startIso}`,
+        `DTEND;TZID=Asia/Manila:${endIso}`,
+        `SUMMARY:${summary}`,
+        `DESCRIPTION:${description}`,
+        `LOCATION:${location}`,
+        'STATUS:CONFIRMED',
+        'BEGIN:VALARM',
+        'TRIGGER:-PT30M',
+        'ACTION:DISPLAY',
+        'DESCRIPTION:Reminder: NU Fairview Guidance Consultation in 30 minutes',
+        'END:VALARM',
+        'END:VEVENT',
+        'END:VCALENDAR'
+      ].join('\r\n');
+
+      const blob = new Blob([icsLines], { type: 'text/calendar;charset=utf-8' });
+      const link = document.createElement('a');
+      link.href = URL.createObjectURL(blob);
+      link.download = `Guidance_Consultation_${apt.date}.ics`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(link.href);
+      showToast('Calendar event (.ics) downloaded! Ready to add to Apple Calendar, Outlook, or mobile calendar.', 'success', 'Calendar Ready');
+    } catch (e) {
+      console.warn('ICS generation error:', e);
+      showToast('Could not download calendar file. Please use Google Calendar option.', 'error');
     }
   }
 
@@ -332,8 +409,17 @@ document.addEventListener('DOMContentLoaded', () => {
                     title="Add to Google Calendar with automatic reminder"
                   >
                     <i data-lucide="calendar-plus" class="w-3.5 h-3.5 text-blue-600"></i>
-                    <span>Add to Calendar</span>
+                    <span>Google Calendar</span>
                   </a>
+                  <button
+                    type="button"
+                    data-ics-id="${escapeHtml(apt.id)}"
+                    class="btn-download-ics inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-slate-100 hover:bg-slate-200 text-slate-800 border border-slate-200 transition shadow-2xs"
+                    title="Download .ics file (Apple Calendar, Outlook, Mobile)"
+                  >
+                    <i data-lucide="download" class="w-3.5 h-3.5 text-slate-600"></i>
+                    <span>.ICS Calendar</span>
+                  </button>
                   `
                     : ''
                 }
@@ -383,6 +469,14 @@ document.addEventListener('DOMContentLoaded', () => {
       .join('');
 
     if (window.lucide) window.lucide.createIcons();
+
+    document.querySelectorAll('.btn-download-ics').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const id = btn.getAttribute('data-ics-id');
+        const apt = cachedAppointments.find(a => a.id === id);
+        if (apt) downloadIcsCalendar(apt);
+      });
+    });
 
     document.querySelectorAll('.btn-cancel-apt').forEach(btn => {
       btn.addEventListener('click', () => {

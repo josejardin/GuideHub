@@ -1,5 +1,5 @@
 import { requireRole, initNavbar, showToast } from './auth.js';
-import { createReferral, subscribeFacultyReferrals, logAuditEvent } from './db.js';
+import { createReferral, subscribeFacultyReferrals, logAuditEvent, verifyStudentCallSlip } from './db.js';
 import { escapeHtml, formatDateIso } from './utils/validation.js';
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -290,19 +290,44 @@ document.addEventListener('DOMContentLoaded', () => {
     verifyModal?.classList.add('hidden');
   });
 
-  verifyForm?.addEventListener('submit', e => {
+  verifyForm?.addEventListener('submit', async e => {
     e.preventDefault();
     const query = (verifyInput?.value || '').trim().toLowerCase();
     if (!query) return;
 
-    const matchedRef = cachedReferrals.find(
+    verifyResultBox.innerHTML = `
+      <div class="p-3 text-center text-slate-500 text-xs flex items-center justify-center gap-2">
+        <i data-lucide="loader-2" class="w-4 h-4 animate-spin text-[#00205B]"></i>
+        <span>Authenticating with guidance records...</span>
+      </div>
+    `;
+    verifyResultBox.classList.remove('hidden');
+    if (window.lucide) window.lucide.createIcons();
+
+    // 1. Check local faculty referrals first
+    let matchedRef = cachedReferrals.find(
       r =>
         (r.studentNumber && r.studentNumber.toLowerCase().includes(query)) ||
         (r.studentName && r.studentName.toLowerCase().includes(query)) ||
         (r.id && r.id.toLowerCase().includes(query))
     );
 
+    let verifyData = null;
     if (matchedRef && (matchedRef.callSlipAppointmentDate || matchedRef.status === 'Call Slip Issued' || matchedRef.status === 'Intake Conducted')) {
+      verifyData = {
+        studentName: matchedRef.studentName,
+        studentNumber: matchedRef.studentNumber,
+        program: matchedRef.program || 'N/A',
+        scheduledDate: matchedRef.callSlipAppointmentDate || 'Recorded on File',
+        scheduledTime: matchedRef.callSlipAppointmentTime || 'Guidance Consultation Hours',
+        counselor: matchedRef.assignedCounselor || 'Registered Guidance Counselor'
+      };
+    } else {
+      // 2. Query system-wide call slips and consultations in Firestore
+      verifyData = await verifyStudentCallSlip(query);
+    }
+
+    if (verifyData) {
       verifyResultBox.innerHTML = `
         <div class="p-4 rounded-xl bg-emerald-50/90 border border-emerald-200 text-emerald-950 space-y-2">
           <div class="flex items-center gap-2 text-emerald-800 font-bold">
@@ -310,11 +335,11 @@ document.addEventListener('DOMContentLoaded', () => {
             <span>Verified Official Call Slip</span>
           </div>
           <div class="text-xs space-y-1 text-emerald-900">
-            <p><strong>Student:</strong> ${escapeHtml(matchedRef.studentName)} (${escapeHtml(matchedRef.studentNumber)})</p>
-            <p><strong>Program / Course:</strong> ${escapeHtml(matchedRef.program || 'N/A')}</p>
-            <p><strong>Scheduled Date:</strong> ${escapeHtml(matchedRef.callSlipAppointmentDate || 'Recorded on File')}</p>
-            <p><strong>Scheduled Time:</strong> ${escapeHtml(matchedRef.callSlipAppointmentTime || 'Guidance Consultation Hours')}</p>
-            <p><strong>Issuing Counselor:</strong> ${escapeHtml(matchedRef.assignedCounselor || 'Registered Guidance Counselor')}</p>
+            <p><strong>Student:</strong> ${escapeHtml(verifyData.studentName)} (${escapeHtml(verifyData.studentNumber)})</p>
+            <p><strong>Program / Course:</strong> ${escapeHtml(verifyData.program || 'N/A')}</p>
+            <p><strong>Scheduled Date:</strong> ${escapeHtml(verifyData.scheduledDate)}</p>
+            <p><strong>Scheduled Time:</strong> ${escapeHtml(verifyData.scheduledTime)}</p>
+            <p><strong>Issuing Counselor:</strong> ${escapeHtml(verifyData.counselor)}</p>
           </div>
           <div class="pt-1 text-[10px] text-emerald-700 border-t border-emerald-200">
             Valid excuse verification. In compliance with RA 9258, confidential counseling notes are not disclosed.
