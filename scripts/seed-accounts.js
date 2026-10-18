@@ -74,7 +74,22 @@ const standardizedAccounts = [
     contactNumber: '0919-555-7788',
     isVerified: true
   },
-  // 2. Counselors
+  {
+    docId: 'usr_student_miguel_s',
+    email: 'miguel.s@students.nu-fairview.edu.ph',
+    password: 'Password123!',
+    fullName: 'Miguel Santos',
+    role: 'student',
+    roleType: 'student',
+    department: 'College of Computing and Information Technology',
+    program: 'BS Computer Engineering',
+    yearLevel: '3rd Year',
+    studentOrEmpId: '2024-10558',
+    gender: 'Male',
+    contactNumber: '0917-333-8899',
+    isVerified: true
+  },
+  // 2. Counselors (3 Accounts)
   {
     docId: 'usr_counselor_mark_d',
     email: 'mark.d@nu-fairview.edu.ph',
@@ -101,7 +116,20 @@ const standardizedAccounts = [
     contactNumber: '0920-444-5556',
     isVerified: true
   },
-  // 3. Faculty
+  {
+    docId: 'usr_counselor_robert_p',
+    email: 'robert.p@nu-fairview.edu.ph',
+    password: 'Password123!',
+    fullName: 'Robert Pangilinan, RGC',
+    role: 'counselor',
+    roleType: 'counselor',
+    department: 'Guidance and Counseling Center',
+    studentOrEmpId: 'EMP-2024-0104',
+    gender: 'Male',
+    contactNumber: '0920-444-5557',
+    isVerified: true
+  },
+  // 3. Faculty (3 Accounts)
   {
     docId: 'usr_faculty_benedict_z',
     email: 'b.zurbito@nu-fairview.edu.ph',
@@ -128,7 +156,20 @@ const standardizedAccounts = [
     contactNumber: '0921-555-6667',
     isVerified: true
   },
-  // 4. Guidance Head
+  {
+    docId: 'usr_faculty_carlos_t',
+    email: 'carlos.t@nu-fairview.edu.ph',
+    password: 'Password123!',
+    fullName: 'Prof. Carlos Tan',
+    role: 'faculty',
+    roleType: 'faculty',
+    department: 'College of Computing and Information Technology',
+    studentOrEmpId: 'EMP-2024-0205',
+    gender: 'Male',
+    contactNumber: '0921-555-6668',
+    isVerified: true
+  },
+  // 4. Guidance Head (3 Accounts)
   {
     docId: 'usr_head_maria_s',
     email: 'maria.s@nu-fairview.edu.ph',
@@ -142,7 +183,33 @@ const standardizedAccounts = [
     contactNumber: '0919-333-4444',
     isVerified: true
   },
-  // 5. System Administrator
+  {
+    docId: 'usr_head_elena_b',
+    email: 'head.elena@nu-fairview.edu.ph',
+    password: 'Password123!',
+    fullName: 'Dr. Elena Bautista, RGC',
+    role: 'head',
+    roleType: 'head',
+    department: 'Guidance and Counseling Center',
+    studentOrEmpId: 'EMP-2024-0105',
+    gender: 'Female',
+    contactNumber: '0919-333-5555',
+    isVerified: true
+  },
+  {
+    docId: 'usr_head_vicente_d',
+    email: 'head.vicente@nu-fairview.edu.ph',
+    password: 'Password123!',
+    fullName: 'Vicente Dela Cruz, RGC',
+    role: 'head',
+    roleType: 'head',
+    department: 'Guidance and Counseling Center',
+    studentOrEmpId: 'EMP-2024-0106',
+    gender: 'Male',
+    contactNumber: '0919-333-6666',
+    isVerified: true
+  },
+  // 5. System Administrator (3 Accounts)
   {
     docId: 'usr_admin_alex_m',
     email: 'admin.alex@nu-fairview.edu.ph',
@@ -154,6 +221,32 @@ const standardizedAccounts = [
     studentOrEmpId: 'EMP-2024-0001',
     gender: 'Male',
     contactNumber: '0925-999-0000',
+    isVerified: true
+  },
+  {
+    docId: 'usr_admin_sarah_j',
+    email: 'admin.sarah@nu-fairview.edu.ph',
+    password: 'Password123!',
+    fullName: 'Sarah Jenkins',
+    role: 'admin',
+    roleType: 'admin',
+    department: 'IT Systems Administration',
+    studentOrEmpId: 'EMP-2024-0002',
+    gender: 'Female',
+    contactNumber: '0925-999-0001',
+    isVerified: true
+  },
+  {
+    docId: 'usr_admin_david_r',
+    email: 'admin.david@nu-fairview.edu.ph',
+    password: 'Password123!',
+    fullName: 'David Reyes',
+    role: 'admin',
+    roleType: 'admin',
+    department: 'Enterprise Security & Infrastructure',
+    studentOrEmpId: 'EMP-2024-0003',
+    gender: 'Male',
+    contactNumber: '0925-999-0002',
     isVerified: true
   }
 ];
