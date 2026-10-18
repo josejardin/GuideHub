@@ -2482,7 +2482,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   async function renderAvailabilityGrid() {
     if (!availabilityGrid) return;
-    const counselorAltIds = [currentUser.uid, currentUser.id, currentUser.authUid, 'usr_counselor_mark_d'].filter(Boolean);
+    const counselorAltIds = [currentUser.uid, currentUser.id, currentUser.authUid].filter(Boolean);
     const blockedRecords = await getCounselorBlockedSlots(currentUser.uid, counselorAltIds);
     const blockedSet = new Set();
     blockedRecords.forEach(b => {
