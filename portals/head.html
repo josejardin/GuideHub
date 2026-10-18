@@ -16,13 +16,13 @@
   <body class="bg-slate-50 text-slate-700 flex flex-col min-h-screen">
     <div id="navbar-container" class="no-print"></div>
 
-    <main class="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6">
+    <main class="flex-1 max-w-7xl w-full mx-auto px-3 sm:px-6 lg:px-8 py-4 sm:py-8 space-y-4 sm:space-y-6">
       <div
-        class="bg-white rounded-xl p-6 border border-slate-200 shadow-sm flex flex-col md:flex-row items-start md:items-center justify-between gap-4"
+        class="bg-white rounded-2xl p-4 sm:p-6 border border-slate-200 shadow-sm flex flex-col md:flex-row items-start md:items-center justify-between gap-4"
       >
         <div>
           <div class="flex items-center gap-2">
-            <h1 class="text-xl font-bold text-slate-900 tracking-tight">Guidance Head Analytics & Reports</h1>
+            <h1 class="text-lg sm:text-xl font-bold text-slate-900 tracking-tight">Guidance Head Analytics &amp; Reports</h1>
             <span
               class="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-medium bg-indigo-50 text-indigo-800 border border-indigo-200"
             >
@@ -36,67 +36,67 @@
 
         <button
           id="btn-export-report"
-          class="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-md bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold shadow-sm transition"
+          class="w-full sm:w-auto inline-flex items-center justify-center gap-1.5 px-3.5 py-2.5 sm:py-2 rounded-xl sm:rounded-md bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold shadow-sm transition active:scale-95"
         >
           <i data-lucide="printer" class="w-3.5 h-3.5"></i>
           <span>Print Summary Report</span>
         </button>
       </div>
 
-      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <div class="bg-white p-5 rounded-xl border border-slate-200 shadow-sm flex items-center justify-between">
-          <div>
-            <span class="text-[11px] font-semibold uppercase tracking-wider text-slate-400">Completed Sessions</span>
-            <h3 class="text-2xl font-bold text-slate-900 mt-0.5" id="kpi-completed-sessions">0</h3>
-            <span class="text-[11px] text-emerald-700 font-medium flex items-center gap-1 mt-1">
-              <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
-              Conducted Consultations
+      <div class="grid grid-cols-2 lg:grid-cols-4 gap-2.5 sm:gap-4">
+        <div class="bg-white p-3.5 sm:p-5 rounded-xl sm:rounded-2xl border border-slate-200 shadow-sm flex items-center justify-between gap-2">
+          <div class="min-w-0">
+            <span class="text-[10px] sm:text-[11px] font-semibold uppercase tracking-wider text-slate-400 truncate block">Completed</span>
+            <h3 class="text-xl sm:text-2xl font-bold text-slate-900 mt-0.5" id="kpi-completed-sessions">0</h3>
+            <span class="text-[10px] sm:text-[11px] text-emerald-700 font-medium flex items-center gap-1 mt-1 truncate">
+              <span class="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0"></span>
+              Consultations
             </span>
           </div>
-          <div class="w-10 h-10 rounded-lg bg-slate-100 text-slate-800 flex items-center justify-center">
-            <i data-lucide="heart-handshake" class="w-5 h-5"></i>
+          <div class="w-8 h-8 sm:w-10 sm:h-10 rounded-lg sm:rounded-xl bg-slate-100 text-slate-800 flex items-center justify-center shrink-0">
+            <i data-lucide="heart-handshake" class="w-4 h-4 sm:w-5 sm:h-5"></i>
           </div>
         </div>
 
-        <div class="bg-white p-5 rounded-xl border border-slate-200 shadow-sm flex items-center justify-between">
-          <div>
-            <span class="text-[11px] font-semibold uppercase tracking-wider text-slate-400">Total Referrals</span>
-            <h3 class="text-2xl font-bold text-slate-900 mt-0.5" id="kpi-total-referrals">0</h3>
-            <span class="text-[11px] text-amber-700 font-medium flex items-center gap-1 mt-1">
-              <span class="w-1.5 h-1.5 rounded-full bg-amber-500"></span>
-              Faculty Early Alerts
+        <div class="bg-white p-3.5 sm:p-5 rounded-xl sm:rounded-2xl border border-slate-200 shadow-sm flex items-center justify-between gap-2">
+          <div class="min-w-0">
+            <span class="text-[10px] sm:text-[11px] font-semibold uppercase tracking-wider text-slate-400 truncate block">Referrals</span>
+            <h3 class="text-xl sm:text-2xl font-bold text-slate-900 mt-0.5" id="kpi-total-referrals">0</h3>
+            <span class="text-[10px] sm:text-[11px] text-amber-700 font-medium flex items-center gap-1 mt-1 truncate">
+              <span class="w-1.5 h-1.5 rounded-full bg-amber-500 shrink-0"></span>
+              Faculty Alerts
             </span>
           </div>
-          <div class="w-10 h-10 rounded-lg bg-slate-100 text-slate-800 flex items-center justify-center">
-            <i data-lucide="inbox" class="w-5 h-5"></i>
+          <div class="w-8 h-8 sm:w-10 sm:h-10 rounded-lg sm:rounded-xl bg-slate-100 text-slate-800 flex items-center justify-center shrink-0">
+            <i data-lucide="inbox" class="w-4 h-4 sm:w-5 sm:h-5"></i>
           </div>
         </div>
 
-        <div class="bg-white p-5 rounded-xl border border-slate-200 shadow-sm flex items-center justify-between">
-          <div>
-            <span class="text-[11px] font-semibold uppercase tracking-wider text-slate-400">High-Risk Cases</span>
-            <h3 class="text-2xl font-bold text-rose-700 mt-0.5" id="kpi-high-risk">0</h3>
-            <span class="text-[11px] text-rose-700 font-medium flex items-center gap-1 mt-1">
-              <span class="w-1.5 h-1.5 rounded-full bg-rose-500"></span>
-              Crisis Alerts Flagged
+        <div class="bg-white p-3.5 sm:p-5 rounded-xl sm:rounded-2xl border border-slate-200 shadow-sm flex items-center justify-between gap-2">
+          <div class="min-w-0">
+            <span class="text-[10px] sm:text-[11px] font-semibold uppercase tracking-wider text-slate-400 truncate block">High-Risk</span>
+            <h3 class="text-xl sm:text-2xl font-bold text-rose-700 mt-0.5" id="kpi-high-risk">0</h3>
+            <span class="text-[10px] sm:text-[11px] text-rose-700 font-medium flex items-center gap-1 mt-1 truncate">
+              <span class="w-1.5 h-1.5 rounded-full bg-rose-500 shrink-0"></span>
+              Crisis Flagged
             </span>
           </div>
-          <div class="w-10 h-10 rounded-lg bg-rose-50 text-rose-700 flex items-center justify-center">
-            <i data-lucide="alert-triangle" class="w-5 h-5"></i>
+          <div class="w-8 h-8 sm:w-10 sm:h-10 rounded-lg sm:rounded-xl bg-rose-50 text-rose-700 flex items-center justify-center shrink-0">
+            <i data-lucide="alert-triangle" class="w-4 h-4 sm:w-5 sm:h-5"></i>
           </div>
         </div>
 
-        <div class="bg-white p-5 rounded-xl border border-slate-200 shadow-sm flex items-center justify-between">
-          <div>
-            <span class="text-[11px] font-semibold uppercase tracking-wider text-slate-400">No-Show Rate</span>
-            <h3 class="text-2xl font-bold text-slate-900 mt-0.5" id="kpi-noshow-rate">0.0%</h3>
-            <span class="text-[11px] text-slate-500 font-medium flex items-center gap-1 mt-1">
-              <span class="w-1.5 h-1.5 rounded-full bg-slate-400"></span>
-              Attendance Reliability
+        <div class="bg-white p-3.5 sm:p-5 rounded-xl sm:rounded-2xl border border-slate-200 shadow-sm flex items-center justify-between gap-2">
+          <div class="min-w-0">
+            <span class="text-[10px] sm:text-[11px] font-semibold uppercase tracking-wider text-slate-400 truncate block">No-Show</span>
+            <h3 class="text-xl sm:text-2xl font-bold text-slate-900 mt-0.5" id="kpi-noshow-rate">0.0%</h3>
+            <span class="text-[10px] sm:text-[11px] text-slate-500 font-medium flex items-center gap-1 mt-1 truncate">
+              <span class="w-1.5 h-1.5 rounded-full bg-slate-400 shrink-0"></span>
+              Attendance
             </span>
           </div>
-          <div class="w-10 h-10 rounded-lg bg-slate-100 text-slate-800 flex items-center justify-center">
-            <i data-lucide="percent" class="w-5 h-5"></i>
+          <div class="w-8 h-8 sm:w-10 sm:h-10 rounded-lg sm:rounded-xl bg-slate-100 text-slate-800 flex items-center justify-center shrink-0">
+            <i data-lucide="percent" class="w-4 h-4 sm:w-5 sm:h-5"></i>
           </div>
         </div>
       </div>
@@ -165,6 +165,6 @@
       </div>
     </main>
 
-    <script type="module" src="../js/head.js"></script>
+    <script type="module" src="../js/head.js?v=20261018g"></script>
   </body>
 </html>
