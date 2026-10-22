@@ -1,0 +1,35 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "type": "npm",
+      "script": "install",
+      "label": "npm: install (Install Dependencies)",
+      "detail": "Installs required npm dependencies defined in package.json",
+      "problemMatcher": [],
+      "group": {
+        "kind": "build",
+        "isDefault": false
+      }
+    },
+    {
+      "type": "npm",
+      "script": "start",
+      "label": "npm: start (Start GuideHub Express Server)",
+      "detail": "Starts backend Express server serving on http://localhost:3000",
+      "isBackground": true,
+      "problemMatcher": [],
+      "group": {
+        "kind": "build",
+        "isDefault": true
+      }
+    },
+    {
+      "type": "npm",
+      "script": "clean-db",
+      "label": "npm: clean-db (Purge Test Data)",
+      "detail": "Cleans temporary operational records from Firestore",
+      "problemMatcher": []
+    }
+  ]
+}
